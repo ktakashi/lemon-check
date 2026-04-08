@@ -8,7 +8,9 @@ import io.swagger.v3.oas.models.PathItem
 /**
  * Resolves OpenAPI operation IDs to path and method information.
  */
-class OperationResolver(private val openApi: OpenAPI) {
+class OperationResolver(
+    private val openApi: OpenAPI,
+) {
     private val operationIndex: Map<String, ResolvedOperation> by lazy {
         buildOperationIndex()
     }
@@ -20,10 +22,9 @@ class OperationResolver(private val openApi: OpenAPI) {
      * @return Resolved operation with path and method
      * @throws OperationNotFoundException if operation is not found
      */
-    fun resolve(operationId: String): ResolvedOperation {
-        return operationIndex[operationId]
+    fun resolve(operationId: String): ResolvedOperation =
+        operationIndex[operationId]
             ?: throw OperationNotFoundException(operationId, operationIndex.keys.toList())
-    }
 
     /**
      * Check if an operation ID exists.

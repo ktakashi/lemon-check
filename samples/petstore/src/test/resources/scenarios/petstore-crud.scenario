@@ -4,7 +4,7 @@
 scenario: List all available pets
   given the Petstore API is available
   when I filter pets by status
-    call findPetsByStatus
+    call ^findPetsByStatus
       query_status: "available"
   then I receive a list of pets
     assert status 200
@@ -12,7 +12,7 @@ scenario: List all available pets
 
 scenario: Get a specific pet
   when I request a pet by ID
-    call getPetById
+    call ^getPetById
       petId: 1
   then I see the pet details
     assert status 200
@@ -20,7 +20,7 @@ scenario: Get a specific pet
 
 scenario: Create a new pet
   when I create a pet
-    call addPet
+    call ^addPet
       body: {"name": "TestPet", "photoUrls": ["https://example.com/pet.jpg"], "status": "available"}
   then the pet is created
     assert status 200
@@ -28,7 +28,7 @@ scenario: Create a new pet
 
 scenario: Update a pet
   when I update the pet
-    call updatePet
+    call ^updatePet
       body: {"id": {{newPetId}}, "name": "UpdatedPet", "photoUrls": ["https://example.com/pet.jpg"], "status": "pending"}
   then the update is successful
     assert status 200
@@ -36,7 +36,7 @@ scenario: Update a pet
 
 scenario: Delete a pet
   when I delete the pet
-    call deletePet
+    call ^deletePet
       petId: {{newPetId}}
   then the pet is removed
     assert status 200

@@ -21,8 +21,8 @@ class ValueExtractor {
     fun extract(
         body: String,
         jsonPath: String,
-    ): Any? {
-        return try {
+    ): Any? =
+        try {
             JsonPath.read(body, jsonPath)
         } catch (_: PathNotFoundException) {
             null
@@ -34,7 +34,6 @@ class ValueExtractor {
                 cause = e,
             )
         }
-    }
 
     /**
      * Extract a value and store in context.
@@ -73,9 +72,7 @@ class ValueExtractor {
         body: String,
         jsonPath: String,
         defaultValue: Any,
-    ): Any {
-        return extract(body, jsonPath) ?: defaultValue
-    }
+    ): Any = extract(body, jsonPath) ?: defaultValue
 
     /**
      * Extract multiple values from a response.
@@ -117,9 +114,7 @@ class ValueExtractor {
     fun <T> extractTyped(
         body: String,
         jsonPath: String,
-    ): T? {
-        return extract(body, jsonPath) as? T
-    }
+    ): T? = extract(body, jsonPath) as? T
 
     /**
      * Extract a list of values.
@@ -131,13 +126,12 @@ class ValueExtractor {
     fun extractList(
         body: String,
         jsonPath: String,
-    ): List<Any?> {
-        return when (val result = extract(body, jsonPath)) {
+    ): List<Any?> =
+        when (val result = extract(body, jsonPath)) {
             is List<*> -> result.toList()
             null -> emptyList()
             else -> listOf(result)
         }
-    }
 
     /**
      * Check if a path exists in the response.
@@ -149,12 +143,11 @@ class ValueExtractor {
     fun pathExists(
         body: String,
         jsonPath: String,
-    ): Boolean {
-        return try {
+    ): Boolean =
+        try {
             val result = extract(body, jsonPath)
             result != null
         } catch (_: Exception) {
             false
         }
-    }
 }

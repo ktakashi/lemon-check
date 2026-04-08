@@ -54,7 +54,7 @@ class ValueExtractorTest {
         val availablePet = extractor.extract(sampleJson, "$.pets[?(@.status=='available')].name")
 
         assertTrue(availablePet is List<*>)
-        assertEquals("Rex", (availablePet as List<*>)[0])
+        assertEquals("Rex", availablePet[0])
     }
 
     @Test
@@ -92,9 +92,12 @@ class ValueExtractorTest {
         val context = ExecutionContext()
         val extractions =
             listOf(
-                io.github.ktakashi.lemoncheck.model.Extraction("total", "$.total"),
-                io.github.ktakashi.lemoncheck.model.Extraction("storeName", "$.store.name"),
-                io.github.ktakashi.lemoncheck.model.Extraction("firstPet", "$.pets[0].name"),
+                io.github.ktakashi.lemoncheck.model
+                    .Extraction("total", "$.total"),
+                io.github.ktakashi.lemoncheck.model
+                    .Extraction("storeName", "$.store.name"),
+                io.github.ktakashi.lemoncheck.model
+                    .Extraction("firstPet", "$.pets[0].name"),
             )
 
         val results = extractor.extractAll(sampleJson, extractions, context)

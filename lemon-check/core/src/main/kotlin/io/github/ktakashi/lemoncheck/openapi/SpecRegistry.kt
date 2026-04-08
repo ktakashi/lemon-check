@@ -59,9 +59,7 @@ class SpecRegistry {
     /**
      * Get a loaded spec by name.
      */
-    fun get(name: String): LoadedSpec {
-        return specs[name] ?: throw IllegalArgumentException("Spec '$name' not found. Available: ${specs.keys}")
-    }
+    fun get(name: String): LoadedSpec = specs[name] ?: throw IllegalArgumentException("Spec '$name' not found. Available: ${specs.keys}")
 
     /**
      * Get the default spec.
@@ -122,9 +120,7 @@ class SpecRegistry {
      */
     fun specNames(): Set<String> = specs.keys.toSet()
 
-    private fun extractBaseUrl(openApi: OpenAPI): String {
-        return openApi.servers?.firstOrNull()?.url ?: "http://localhost"
-    }
+    private fun extractBaseUrl(openApi: OpenAPI): String = openApi.servers?.firstOrNull()?.url ?: "http://localhost"
 }
 
 /**

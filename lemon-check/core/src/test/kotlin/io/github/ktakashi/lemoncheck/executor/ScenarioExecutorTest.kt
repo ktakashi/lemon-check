@@ -151,7 +151,8 @@ class ScenarioExecutorTest {
                         Step(
                             type = StepType.THEN,
                             description = "no-op step with passing assertion",
-                            assertions = listOf(), // No assertions = pass
+                            // No assertions = pass
+                            assertions = listOf(),
                         ),
                     ),
             )

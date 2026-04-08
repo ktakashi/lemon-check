@@ -8,9 +8,7 @@ import io.github.ktakashi.lemoncheck.report.TestReporter
 
 /**
  * Extension functions for executing scenarios.
- */
-
-/**
+ *
  * Execute this scenario within the given suite context.
  *
  * @param suite The LemonCheck suite containing spec and configuration

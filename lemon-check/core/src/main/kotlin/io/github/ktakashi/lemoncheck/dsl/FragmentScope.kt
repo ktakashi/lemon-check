@@ -25,6 +25,7 @@ class FragmentScope internal constructor(
     /**
      * Define a WHEN step.
      */
+    @Suppress("FunctionName")
     fun `when`(
         description: String,
         block: FragmentStepScope.() -> Unit = {},
@@ -62,12 +63,11 @@ class FragmentScope internal constructor(
         steps.add(stepScope.build())
     }
 
-    internal fun build(): Fragment {
-        return Fragment(
+    internal fun build(): Fragment =
+        Fragment(
             name = name,
             steps = steps.toList(),
         )
-    }
 }
 
 /**
@@ -108,7 +108,10 @@ class FragmentStepScope internal constructor(
         variableName: String,
         jsonPath: String,
     ) {
-        extractions.add(io.github.ktakashi.lemoncheck.model.Extraction(variableName, jsonPath))
+        extractions.add(
+            io.github.ktakashi.lemoncheck.model
+                .Extraction(variableName, jsonPath),
+        )
     }
 
     fun statusCode(expected: Int) {
@@ -120,8 +123,8 @@ class FragmentStepScope internal constructor(
         )
     }
 
-    internal fun build(): Step {
-        return Step(
+    internal fun build(): Step =
+        Step(
             type = type,
             description = description,
             operationId = operationId,
@@ -134,5 +137,4 @@ class FragmentStepScope internal constructor(
             assertions = assertions.toList(),
             autoAssert = true,
         )
-    }
 }

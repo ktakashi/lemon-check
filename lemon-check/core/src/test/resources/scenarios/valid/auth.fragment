@@ -1,12 +1,12 @@
 # Valid fragment for authentication
 fragment: authenticate
   given I have valid credentials
-    call login
+    call ^login
       username: "admin"
       password: "secret"
     extract $.token => authToken
 
 fragment: setAuthHeader
   given I have the auth token
-    call withHeader
+    call ^withHeader
       header_Authorization: "Bearer {{authToken}}"

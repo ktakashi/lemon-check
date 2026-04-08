@@ -30,6 +30,7 @@ class ScenarioOutlineScope internal constructor(
     /**
      * Define a WHEN step template.
      */
+    @Suppress("FunctionName")
     fun `when`(
         description: String,
         block: StepScope.() -> Unit = {},
@@ -67,9 +68,7 @@ class ScenarioOutlineScope internal constructor(
     /**
      * Create an example row with named parameters.
      */
-    fun row(vararg params: Pair<String, Any>): ExampleRow {
-        return ExampleRow(params.toMap())
-    }
+    fun row(vararg params: Pair<String, Any>): ExampleRow = ExampleRow(params.toMap())
 
     private fun addStepTemplate(
         type: StepType,

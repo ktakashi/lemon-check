@@ -15,10 +15,11 @@ data class ParseError(
     val found: String? = null,
 ) {
     override fun toString(): String {
-        val details = buildString {
-            if (expected != null) append(", expected: $expected")
-            if (found != null) append(", found: $found")
-        }
+        val details =
+            buildString {
+                if (expected != null) append(", expected: $expected")
+                if (found != null) append(", found: $found")
+            }
         return "Parse error at $location: $message$details"
     }
 }

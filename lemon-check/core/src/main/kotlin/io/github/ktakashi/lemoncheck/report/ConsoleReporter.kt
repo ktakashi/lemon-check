@@ -33,7 +33,10 @@ class ConsoleReporter(
                 ResultStatus.PENDING -> "$yellow?$reset"
             }
 
-        val stepType = stepResult.step.type.name.lowercase().replaceFirstChar { it.uppercase() }
+        val stepType =
+            stepResult.step.type.name
+                .lowercase()
+                .replaceFirstChar { it.uppercase() }
         out.println("  $icon $stepType ${stepResult.step.description}")
 
         if (stepResult.status == ResultStatus.FAILED) {

@@ -30,6 +30,7 @@ class ScenarioScope internal constructor(
      * Define a WHEN step (action).
      * Note: Uses backticks because 'when' is a Kotlin keyword.
      */
+    @Suppress("FunctionName")
     fun `when`(
         description: String,
         block: StepScope.() -> Unit = {},
@@ -94,12 +95,11 @@ class ScenarioScope internal constructor(
         steps.add(stepScope.build())
     }
 
-    internal fun build(): Scenario {
-        return Scenario(
+    internal fun build(): Scenario =
+        Scenario(
             name = name,
             tags = tags,
             steps = steps.toList(),
             background = backgroundSteps.toList(),
         )
-    }
 }

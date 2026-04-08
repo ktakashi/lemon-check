@@ -1,7 +1,7 @@
 # Scenario: Delete a pet
 scenario: Delete a pet
   when I delete the pet
-    call deletePet
+    call ^deletePet
       petId: 1
   then the pet is deleted
     assert status 204

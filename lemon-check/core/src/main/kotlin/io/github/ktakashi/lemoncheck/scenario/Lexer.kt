@@ -120,6 +120,11 @@ class Lexer(
             return scanNumber()
         }
 
+        // Handle operation ID prefix (^operationId)
+        if (c == '^') {
+            return scanOperationId()
+        }
+
         // Handle identifiers and keywords
         if (c.isLetter() || c == '_') {
             return scanIdentifier()
@@ -300,12 +305,34 @@ class Lexer(
         val text = sb.toString()
         val type = KEYWORDS[text.lowercase()] ?: TokenType.IDENTIFIER
 
-        // If it looks like an operationId (camelCase or contains an op-like name)
-        return if (type == TokenType.IDENTIFIER && text.first().isLowerCase()) {
-            Token(TokenType.OPERATION_ID, text, loc)
-        } else {
-            Token(type, text, loc)
+        return Token(type, text, loc)
+    }
+
+    /**
+     * Scan an operation ID prefixed with ^.
+     *
+     * Operation IDs are explicitly marked with ^ prefix to distinguish them
+     * from regular identifiers. For example: ^listPets, ^getPetById
+     *
+     * @return OPERATION_ID token with the identifier value (excluding ^),
+     *         or ERROR token if ^ is not followed by a valid identifier
+     */
+    private fun scanOperationId(): Token {
+        val loc = currentLocation()
+        advance() // consume '^'
+
+        // Check if followed by a valid identifier start (letter or underscore)
+        if (isAtEnd() || (!peek().isLetter() && peek() != '_')) {
+            return Token(TokenType.ERROR, "Expected identifier after '^'", loc)
         }
+
+        // Read the identifier
+        val sb = StringBuilder()
+        while (!isAtEnd() && (peek().isLetterOrDigit() || peek() == '_')) {
+            sb.append(advance())
+        }
+
+        return Token(TokenType.OPERATION_ID, sb.toString(), loc)
     }
 
     private fun scanSymbol(): Token {

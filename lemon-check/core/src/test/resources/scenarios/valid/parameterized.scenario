@@ -1,7 +1,7 @@
 # Valid scenario outline with examples
 outline: Test multiple pet retrieval
   when I get a pet by ID
-    call getPetById
+    call ^getPetById
       petId: {{petId}}
   then I see the expected name
     assert $.name equals {{expectedName}}

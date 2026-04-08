@@ -1,7 +1,7 @@
 # Scenario: Get a pet by ID
 scenario: Get pet by ID
   when I request a specific pet
-    call getPetById
+    call ^getPetById
       petId: 1
   then I get the pet details
     assert status 200

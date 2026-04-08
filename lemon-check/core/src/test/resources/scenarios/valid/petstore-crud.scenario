@@ -2,14 +2,14 @@
 scenario: List all pets
   given the API is available
   when I request the list of pets
-    call listPets
+    call ^listPets
   then I get a successful response
     assert status 200
     assert $.length notEmpty
 
 scenario: Create a new pet
   when I create a pet
-    call createPet
+    call ^createPet
       body: {"name": "Fluffy", "tag": "dog"}
   then the pet is created
     assert status 201
@@ -17,7 +17,7 @@ scenario: Create a new pet
 
 scenario: Get pet by ID
   when I request a specific pet
-    call getPetById
+    call ^getPetById
       petId: 1
   then I get the pet details
     assert status 200

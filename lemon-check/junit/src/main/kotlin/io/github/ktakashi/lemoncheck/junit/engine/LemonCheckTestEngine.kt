@@ -8,8 +8,6 @@ import io.github.ktakashi.lemoncheck.junit.LemonCheckScenarios
 import io.github.ktakashi.lemoncheck.junit.discovery.ScenarioDiscovery
 import io.github.ktakashi.lemoncheck.model.ResultStatus
 import io.github.ktakashi.lemoncheck.scenario.ScenarioLoader
-import java.io.InputStreamReader
-import java.net.URL
 import org.junit.jupiter.api.Disabled
 import org.junit.platform.engine.EngineDiscoveryRequest
 import org.junit.platform.engine.ExecutionRequest
@@ -21,6 +19,8 @@ import org.junit.platform.engine.discovery.ClassSelector
 import org.junit.platform.engine.discovery.ClasspathRootSelector
 import org.junit.platform.engine.discovery.PackageSelector
 import org.junit.platform.engine.support.descriptor.EngineDescriptor
+import java.io.InputStreamReader
+import java.net.URL
 
 /**
  * JUnit 5 TestEngine implementation for LemonCheck scenarios.
@@ -89,16 +89,17 @@ class LemonCheckTestEngine : TestEngine {
         testClass: Class<*>,
     ) {
         val annotation = testClass.getAnnotation(LemonCheckScenarios::class.java) ?: return
-        
+
         // Skip classes marked with @Disabled
         if (testClass.isAnnotationPresent(Disabled::class.java)) {
             return
         }
 
         // Check if class descriptor already exists
-        val existingDescriptor = engineDescriptor.children.find { 
-            it is ClassTestDescriptor && it.testClass == testClass 
-        }
+        val existingDescriptor =
+            engineDescriptor.children.find {
+                it is ClassTestDescriptor && it.testClass == testClass
+            }
         if (existingDescriptor != null) return
 
         val classUniqueId = engineDescriptor.uniqueId.append("class", testClass.name)
@@ -124,12 +125,13 @@ class LemonCheckTestEngine : TestEngine {
 
         for (scenario in scenarios) {
             val scenarioId = classUniqueId.append("scenario", scenario.name.removeSuffix(".scenario"))
-            val scenarioDescriptor = ScenarioTestDescriptor(
-                uniqueId = scenarioId,
-                displayName = scenario.name,
-                scenarioPath = scenario.path,
-                scenarioSource = scenario.url,
-            )
+            val scenarioDescriptor =
+                ScenarioTestDescriptor(
+                    uniqueId = scenarioId,
+                    displayName = scenario.name,
+                    scenarioPath = scenario.path,
+                    scenarioSource = scenario.url,
+                )
             classDescriptor.addChild(scenarioDescriptor)
         }
 
@@ -183,8 +185,8 @@ class LemonCheckTestEngine : TestEngine {
         // Apply bindings configuration
         bindings.configure(suite.configuration)
         val bindingsMap = bindings.getBindings()
-        bindingsMap["baseUrl"]?.let { 
-            suite.configuration.baseUrl = it.toString() 
+        bindingsMap["baseUrl"]?.let {
+            suite.configuration.baseUrl = it.toString()
         }
 
         // Load OpenAPI spec if specified
@@ -222,15 +224,17 @@ class LemonCheckTestEngine : TestEngine {
 
                     if (result.status != ResultStatus.PASSED) {
                         allPassed = false
-                        val failedSteps = result.stepResults
-                            .filter { it.status != ResultStatus.PASSED }
-                            .joinToString("\n") { step ->
-                                "  - ${step.step.description}: ${step.status}" +
-                                    (step.error?.let { " - ${it.message}" } ?: "")
-                            }
-                        failureReason = AssertionError(
-                            "Scenario '${scenario.name}' failed:\n$failedSteps",
-                        )
+                        val failedSteps =
+                            result.stepResults
+                                .filter { it.status != ResultStatus.PASSED }
+                                .joinToString("\n") { step ->
+                                    "  - ${step.step.description}: ${step.status}" +
+                                        (step.error?.let { " - ${it.message}" } ?: "")
+                                }
+                        failureReason =
+                            AssertionError(
+                                "Scenario '${scenario.name}' failed:\n$failedSteps",
+                            )
                         break
                     }
                 }
@@ -269,8 +273,8 @@ class LemonCheckTestEngine : TestEngine {
     private fun loadScenarioFromUrl(
         loader: ScenarioLoader,
         url: URL,
-    ): List<io.github.ktakashi.lemoncheck.model.Scenario> {
-        return try {
+    ): List<io.github.ktakashi.lemoncheck.model.Scenario> =
+        try {
             url.openStream().use { input ->
                 val content = InputStreamReader(input).readText()
                 val fileName = url.path.substringAfterLast("/")
@@ -282,5 +286,4 @@ class LemonCheckTestEngine : TestEngine {
                 e,
             )
         }
-    }
 }

@@ -9,7 +9,6 @@ import kotlin.test.assertTrue
  * Tests for LemonCheckTestEngine.
  */
 class LemonCheckTestEngineTest {
-
     @Test
     fun `engine has correct ID`() {
         val engine = LemonCheckTestEngine()
@@ -19,10 +18,11 @@ class LemonCheckTestEngineTest {
     @Test
     fun `scenario discovery finds scenario files`() {
         val classLoader = Thread.currentThread().contextClassLoader
-        val scenarios = ScenarioDiscovery.discoverScenarios(
-            classLoader,
-            arrayOf("scenarios/*.scenario"),
-        )
+        val scenarios =
+            ScenarioDiscovery.discoverScenarios(
+                classLoader,
+                arrayOf("scenarios/*.scenario"),
+            )
 
         assertTrue(scenarios.isNotEmpty(), "Should discover at least one scenario file")
         assertTrue(

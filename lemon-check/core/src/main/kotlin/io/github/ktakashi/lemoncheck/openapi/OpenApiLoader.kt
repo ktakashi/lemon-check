@@ -67,4 +67,7 @@ class OpenApiLoader {
 /**
  * Exception thrown when OpenAPI parsing fails.
  */
-class OpenApiParseException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+class OpenApiParseException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)

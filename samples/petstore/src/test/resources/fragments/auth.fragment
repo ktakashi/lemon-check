@@ -3,7 +3,7 @@
 
 fragment: authenticate
   given I have valid credentials
-    call loginUser
+    call ^loginUser
       query_username: "test"
       query_password: "abc123"
     extract $.message => sessionToken
@@ -15,6 +15,6 @@ fragment: setAuthHeader
 
 fragment: logout
   when I log out
-    call logoutUser
+    call ^logoutUser
   then the session is terminated
     assert status 200

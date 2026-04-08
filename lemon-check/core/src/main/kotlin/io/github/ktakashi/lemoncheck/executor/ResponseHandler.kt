@@ -9,23 +9,17 @@ class ResponseHandler {
     /**
      * Extract the response body as a string.
      */
-    fun getBody(response: HttpResponse<String>): String {
-        return response.body() ?: ""
-    }
+    fun getBody(response: HttpResponse<String>): String = response.body() ?: ""
 
     /**
      * Get response status code.
      */
-    fun getStatusCode(response: HttpResponse<String>): Int {
-        return response.statusCode()
-    }
+    fun getStatusCode(response: HttpResponse<String>): Int = response.statusCode()
 
     /**
      * Get response headers as a map.
      */
-    fun getHeaders(response: HttpResponse<String>): Map<String, List<String>> {
-        return response.headers().map()
-    }
+    fun getHeaders(response: HttpResponse<String>): Map<String, List<String>> = response.headers().map()
 
     /**
      * Get a specific header value (first value if multiple).
@@ -33,9 +27,7 @@ class ResponseHandler {
     fun getHeader(
         response: HttpResponse<String>,
         name: String,
-    ): String? {
-        return response.headers().firstValue(name).orElse(null)
-    }
+    ): String? = response.headers().firstValue(name).orElse(null)
 
     /**
      * Get all values for a specific header.
@@ -43,9 +35,7 @@ class ResponseHandler {
     fun getHeaderValues(
         response: HttpResponse<String>,
         name: String,
-    ): List<String> {
-        return response.headers().allValues(name)
-    }
+    ): List<String> = response.headers().allValues(name)
 
     /**
      * Check if Content-Type is JSON.
@@ -58,7 +48,5 @@ class ResponseHandler {
     /**
      * Get Content-Type header.
      */
-    fun getContentType(response: HttpResponse<String>): String? {
-        return getHeader(response, "Content-Type")
-    }
+    fun getContentType(response: HttpResponse<String>): String? = getHeader(response, "Content-Type")
 }

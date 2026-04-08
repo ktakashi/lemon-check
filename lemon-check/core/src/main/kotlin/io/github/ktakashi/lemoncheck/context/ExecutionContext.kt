@@ -44,9 +44,7 @@ class ExecutionContext {
      * Get a variable value.
      */
     @Suppress("UNCHECKED_CAST")
-    operator fun <T> get(name: String): T? {
-        return variables[name] as? T
-    }
+    operator fun <T> get(name: String): T? = variables[name] as? T
 
     /**
      * Get a variable value with a default.
@@ -55,9 +53,7 @@ class ExecutionContext {
     fun <T> getOrDefault(
         name: String,
         default: T,
-    ): T {
-        return (variables[name] as? T) ?: default
-    }
+    ): T = (variables[name] as? T) ?: default
 
     /**
      * Check if a variable exists.

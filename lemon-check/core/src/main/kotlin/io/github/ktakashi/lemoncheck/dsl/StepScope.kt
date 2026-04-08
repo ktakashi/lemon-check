@@ -215,8 +215,8 @@ class StepScope internal constructor(
         )
     }
 
-    internal fun build(): Step {
-        return Step(
+    internal fun build(): Step =
+        Step(
             type = type,
             description = description,
             operationId = operationId,
@@ -229,5 +229,4 @@ class StepScope internal constructor(
             assertions = assertions.toList(),
             autoAssert = autoAssert,
         )
-    }
 }

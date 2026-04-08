@@ -8,7 +8,7 @@ dependencies {
 
     // JUnit 5
     implementation(libs.bundles.junit)
-    
+
     // JUnit Platform Engine API
     api(libs.bundles.junit.platform)
     api(libs.junit.platform.suite.api)

@@ -54,15 +54,13 @@ class JsonReporter : TestReporter {
     /**
      * Generate a full test report as JSON string.
      */
-    fun report(report: TestReport): String {
-        return toJson(report)
-    }
+    fun report(report: TestReport): String = toJson(report)
 
     /**
      * Convert a scenario result to JSON.
      */
-    fun toJson(result: ScenarioResult): String {
-        return buildString {
+    fun toJson(result: ScenarioResult): String =
+        buildString {
             append("{\n")
             append("  \"scenarioName\": ${jsonString(result.scenario.name)},\n")
             append("  \"status\": ${jsonString(result.status.name)},\n")
@@ -86,13 +84,12 @@ class JsonReporter : TestReporter {
             append("  ]\n")
             append("}")
         }
-    }
 
     /**
      * Convert a test report to JSON.
      */
-    fun toJson(report: TestReport): String {
-        return buildString {
+    fun toJson(report: TestReport): String =
+        buildString {
             append("{\n")
             append("  \"title\": ${jsonString(report.title)},\n")
             append("  \"timestamp\": ${jsonString(DateTimeFormatter.ISO_INSTANT.format(report.timestamp))},\n")
@@ -128,7 +125,6 @@ class JsonReporter : TestReporter {
             append("  ]\n")
             append("}")
         }
-    }
 
     private fun jsonString(value: String?): String {
         if (value == null) return "null"

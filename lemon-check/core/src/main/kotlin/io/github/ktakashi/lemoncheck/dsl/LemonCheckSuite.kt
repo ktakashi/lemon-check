@@ -114,16 +114,13 @@ class LemonCheckSuite internal constructor() {
 fun lemonCheck(
     openApiSpec: String,
     config: Configuration.() -> Unit = {},
-): LemonCheckSuite {
-    return LemonCheckSuite().apply {
+): LemonCheckSuite =
+    LemonCheckSuite().apply {
         spec(openApiSpec)
         configure(config)
     }
-}
 
 /**
  * Create a LemonCheck test suite with custom configuration (multi-spec support).
  */
-fun lemonCheck(config: LemonCheckSuite.() -> Unit): LemonCheckSuite {
-    return LemonCheckSuite().apply(config)
-}
+fun lemonCheck(config: LemonCheckSuite.() -> Unit): LemonCheckSuite = LemonCheckSuite().apply(config)

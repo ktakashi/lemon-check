@@ -18,6 +18,5 @@ class ScenarioTestDescriptor(
     val scenarioPath: String,
     val scenarioSource: URL,
 ) : AbstractTestDescriptor(uniqueId, displayName, UriSource.from(scenarioSource.toURI())) {
-
     override fun getType(): TestDescriptor.Type = TestDescriptor.Type.TEST
 }

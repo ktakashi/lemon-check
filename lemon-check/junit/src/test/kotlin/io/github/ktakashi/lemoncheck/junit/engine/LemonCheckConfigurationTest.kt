@@ -12,7 +12,6 @@ import kotlin.test.assertNotNull
  * Tests for @LemonCheckConfiguration annotation handling.
  */
 class LemonCheckConfigurationTest {
-
     @Test
     fun `ClassTestDescriptor reads configuration annotation`() {
         val uniqueId = UniqueId.forEngine("lemoncheck").append("class", ConfiguredTestStub::class.java.name)
@@ -48,10 +47,11 @@ class LemonCheckConfigurationTest {
  * Test bindings implementation for testing.
  */
 class TestBindings : LemonCheckBindings {
-    override fun getBindings(): Map<String, Any> = mapOf(
-        "baseUrl" to "http://localhost:8080",
-        "authToken" to "test-token",
-    )
+    override fun getBindings(): Map<String, Any> =
+        mapOf(
+            "baseUrl" to "http://localhost:8080",
+            "authToken" to "test-token",
+        )
 
     override fun getOpenApiSpec(): String = "custom-spec.yaml"
 

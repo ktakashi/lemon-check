@@ -1,7 +1,7 @@
 # Scenario: Create a new pet
 scenario: Create a new pet
   when I create a pet
-    call createPet
+    call ^createPet
       body: {"name": "Fluffy", "status": "available", "category": "cat", "price": 199.99}
   then the pet is created
     assert status 201

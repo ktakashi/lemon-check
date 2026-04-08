@@ -161,14 +161,13 @@ class ScenarioExecutor(
     private fun resolveParams(
         params: Map<String, Any>,
         context: ExecutionContext,
-    ): Map<String, Any> {
-        return params.mapValues { (_, value) ->
+    ): Map<String, Any> =
+        params.mapValues { (_, value) ->
             when (value) {
                 is String -> context.interpolate(value)
                 else -> value
             }
         }
-    }
 
     private fun extractValues(
         response: HttpResponse<String>,
@@ -195,15 +194,13 @@ class ScenarioExecutor(
     private fun runAssertions(
         response: HttpResponse<String>,
         assertions: List<Assertion>,
-    ): List<AssertionResult> {
-        return assertions.map { assertion -> runAssertion(response, assertion) }
-    }
+    ): List<AssertionResult> = assertions.map { assertion -> runAssertion(response, assertion) }
 
     private fun runAssertion(
         response: HttpResponse<String>,
         assertion: Assertion,
-    ): AssertionResult {
-        return when (assertion.type) {
+    ): AssertionResult =
+        when (assertion.type) {
             AssertionType.STATUS_CODE -> assertStatusCode(response, assertion)
             AssertionType.BODY_CONTAINS -> assertBodyContains(response, assertion)
             AssertionType.BODY_EQUALS -> assertBodyEquals(response, assertion)
@@ -215,7 +212,6 @@ class ScenarioExecutor(
             AssertionType.MATCHES_SCHEMA -> AssertionResult(assertion, true, "Schema validation not implemented yet")
             AssertionType.RESPONSE_TIME -> AssertionResult(assertion, true, "Response time assertion not implemented yet")
         }
-    }
 
     private fun assertStatusCode(
         response: HttpResponse<String>,
@@ -392,10 +388,12 @@ class ScenarioExecutor(
         val actual = response.headers().firstValue(headerName).orElse(null)
         val passed = actual == expected
 
+        val passedMessage = "Header '$headerName' equals '$expected'"
+        val failedMessage = "Expected header '$headerName' to be '$expected' but got '$actual'"
         return AssertionResult(
             assertion = assertion,
             passed = passed,
-            message = if (passed) "Header '$headerName' equals '$expected'" else "Expected header '$headerName' to be '$expected' but got '$actual'",
+            message = if (passed) passedMessage else failedMessage,
             actual = actual,
         )
     }

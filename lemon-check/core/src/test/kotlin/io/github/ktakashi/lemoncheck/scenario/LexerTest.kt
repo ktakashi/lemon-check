@@ -85,8 +85,8 @@ class LexerTest {
     }
 
     @Test
-    fun `should tokenize operation IDs`() {
-        val lexer = Lexer("listPets createPet getPetById")
+    fun `should tokenize operation IDs with caret prefix`() {
+        val lexer = Lexer("^listPets ^createPet ^getPetById")
         val tokens = lexer.tokenize()
 
         assertEquals(TokenType.OPERATION_ID, tokens[0].type)
@@ -97,6 +97,72 @@ class LexerTest {
 
         assertEquals(TokenType.OPERATION_ID, tokens[2].type)
         assertEquals("getPetById", tokens[2].value)
+    }
+
+    @Test
+    fun `should tokenize unprefixed identifiers as IDENTIFIER`() {
+        val lexer = Lexer("listPets createPet getPetById")
+        val tokens = lexer.tokenize()
+
+        assertEquals(TokenType.IDENTIFIER, tokens[0].type)
+        assertEquals("listPets", tokens[0].value)
+
+        assertEquals(TokenType.IDENTIFIER, tokens[1].type)
+        assertEquals("createPet", tokens[1].value)
+
+        assertEquals(TokenType.IDENTIFIER, tokens[2].type)
+        assertEquals("getPetById", tokens[2].value)
+    }
+
+    @Test
+    fun `should produce ERROR for lone caret`() {
+        val lexer = Lexer("^")
+        val tokens = lexer.tokenize()
+
+        assertEquals(TokenType.ERROR, tokens[0].type)
+        assertEquals("Expected identifier after '^'", tokens[0].value)
+    }
+
+    @Test
+    fun `should produce ERROR for caret followed by number`() {
+        val lexer = Lexer("^123")
+        val tokens = lexer.tokenize()
+
+        assertEquals(TokenType.ERROR, tokens[0].type)
+        assertEquals("Expected identifier after '^'", tokens[0].value)
+    }
+
+    @Test
+    fun `should produce ERROR for caret followed by space`() {
+        val lexer = Lexer("^ listPets")
+        val tokens = lexer.tokenize()
+
+        assertEquals(TokenType.ERROR, tokens[0].type)
+        assertEquals("Expected identifier after '^'", tokens[0].value)
+        // The identifier after the space should be tokenized separately
+        assertEquals(TokenType.IDENTIFIER, tokens[1].type)
+        assertEquals("listPets", tokens[1].value)
+    }
+
+    @Test
+    fun `should handle double caret`() {
+        val lexer = Lexer("^^listPets")
+        val tokens = lexer.tokenize()
+
+        // First ^ produces an error (followed by another ^, not a letter)
+        assertEquals(TokenType.ERROR, tokens[0].type)
+        // Second ^listPets produces OPERATION_ID
+        assertEquals(TokenType.OPERATION_ID, tokens[1].type)
+        assertEquals("listPets", tokens[1].value)
+    }
+
+    @Test
+    fun `should tokenize operation ID with underscore`() {
+        val lexer = Lexer("^List_Pets_123")
+        val tokens = lexer.tokenize()
+
+        assertEquals(TokenType.OPERATION_ID, tokens[0].type)
+        assertEquals("List_Pets_123", tokens[0].value)
     }
 
     @Test
@@ -129,10 +195,10 @@ class LexerTest {
     fun `should track indentation`() {
         val source =
             """
-scenario: Test
-  given something
-    call listPets
-""".trimIndent()
+            scenario: Test
+              given something
+                call ^listPets
+            """.trimIndent()
 
         val lexer = Lexer(source)
         val tokens = lexer.tokenize()
@@ -153,9 +219,9 @@ scenario: Test
     fun `should track line and column numbers`() {
         val source =
             """
-line1
-line2
-""".trimIndent()
+            line1
+            line2
+            """.trimIndent()
 
         val lexer = Lexer(source, "test.scenario")
         val tokens = lexer.tokenize()

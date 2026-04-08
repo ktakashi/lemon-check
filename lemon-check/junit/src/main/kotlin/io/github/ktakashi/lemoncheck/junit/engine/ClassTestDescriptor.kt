@@ -21,7 +21,6 @@ class ClassTestDescriptor(
     uniqueId: UniqueId,
     val testClass: Class<*>,
 ) : AbstractTestDescriptor(uniqueId, testClass.simpleName, ClassSource.from(testClass)) {
-
     /**
      * Scenario file location patterns from @LemonCheckScenarios annotation.
      */
@@ -47,10 +46,10 @@ class ClassTestDescriptor(
     init {
         val config = testClass.getAnnotation(LemonCheckConfiguration::class.java)
         val spec = testClass.getAnnotation(LemonCheckSpec::class.java)
-        
+
         bindingsClass = config?.bindings?.java
         timeout = config?.timeout ?: 30_000L
-        
+
         // OpenAPI spec: prefer @LemonCheckConfiguration, fallback to @LemonCheckSpec
         openApiSpec = config?.openApiSpec?.takeIf { it.isNotBlank() }
             ?: spec?.paths?.firstOrNull()

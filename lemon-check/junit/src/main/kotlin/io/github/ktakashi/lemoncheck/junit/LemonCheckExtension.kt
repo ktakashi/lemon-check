@@ -4,7 +4,6 @@ import io.github.ktakashi.lemoncheck.config.Configuration
 import io.github.ktakashi.lemoncheck.dsl.LemonCheckSuite
 import io.github.ktakashi.lemoncheck.executor.ScenarioExecutor
 import io.github.ktakashi.lemoncheck.model.Scenario
-import java.util.stream.Stream
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionContext
@@ -12,6 +11,7 @@ import org.junit.jupiter.api.extension.ParameterContext
 import org.junit.jupiter.api.extension.ParameterResolver
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider
+import java.util.stream.Stream
 
 /**
  * JUnit 5 extension for LemonCheck scenarios.
@@ -90,15 +90,17 @@ class LemonCheckExtension :
     override fun resolveParameter(
         parameterContext: ParameterContext,
         extensionContext: ExtensionContext,
-    ): Any = when (val paramType = parameterContext.parameter.type) {
-        LemonCheckSuite::class.java -> getSuite(extensionContext)
-        ScenarioExecutor::class.java -> getExecutor(extensionContext)
-        Configuration::class.java -> getSuite(extensionContext).configuration
-        else -> throw IllegalArgumentException("Unsupported parameter type: $paramType")
-    }
+    ): Any =
+        when (val paramType = parameterContext.parameter.type) {
+            LemonCheckSuite::class.java -> getSuite(extensionContext)
+            ScenarioExecutor::class.java -> getExecutor(extensionContext)
+            Configuration::class.java -> getSuite(extensionContext).configuration
+            else -> throw IllegalArgumentException("Unsupported parameter type: $paramType")
+        }
 
-    override fun supportsTestTemplate(context: ExtensionContext): Boolean = context.requiredTestMethod.isAnnotationPresent(LemonCheckScenarios::class.java) ||
-        context.requiredTestClass.isAnnotationPresent(LemonCheckScenarios::class.java)
+    override fun supportsTestTemplate(context: ExtensionContext): Boolean =
+        context.requiredTestMethod.isAnnotationPresent(LemonCheckScenarios::class.java) ||
+            context.requiredTestClass.isAnnotationPresent(LemonCheckScenarios::class.java)
 
     override fun provideTestTemplateInvocationContexts(context: ExtensionContext): Stream<TestTemplateInvocationContext> =
         getSuite(context).allScenarios().stream().map { scenario ->
@@ -122,9 +124,10 @@ class LemonCheckExtension :
     ) : TestTemplateInvocationContext {
         override fun getDisplayName(invocationIndex: Int): String = scenario.name
 
-        override fun getAdditionalExtensions(): List<org.junit.jupiter.api.extension.Extension> = listOf(
-            ScenarioParameterResolver(scenario, executor),
-        )
+        override fun getAdditionalExtensions(): List<org.junit.jupiter.api.extension.Extension> =
+            listOf(
+                ScenarioParameterResolver(scenario, executor),
+            )
     }
 
     /**

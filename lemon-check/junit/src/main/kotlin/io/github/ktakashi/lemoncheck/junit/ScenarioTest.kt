@@ -86,9 +86,7 @@ abstract class ScenarioTest {
         name: String,
         tags: Set<String> = emptySet(),
         block: ScenarioScope.() -> Unit,
-    ): Scenario {
-        return suite.scenario(name, tags, block)
-    }
+    ): Scenario = suite.scenario(name, tags, block)
 
     /**
      * Define a scenario outline (parameterized scenario).
@@ -97,9 +95,7 @@ abstract class ScenarioTest {
         name: String,
         tags: Set<String> = emptySet(),
         block: io.github.ktakashi.lemoncheck.dsl.ScenarioOutlineScope.() -> Unit,
-    ): List<Scenario> {
-        return suite.scenarioOutline(name, tags, block)
-    }
+    ): List<Scenario> = suite.scenarioOutline(name, tags, block)
 
     /**
      * Define a reusable fragment.
@@ -137,7 +133,8 @@ abstract class ScenarioTest {
                 }
 
                 if (result.status == ResultStatus.SKIPPED) {
-                    org.junit.jupiter.api.Assumptions.assumeTrue(false, "Scenario was skipped")
+                    org.junit.jupiter.api.Assumptions
+                        .assumeTrue(false, "Scenario was skipped")
                 }
             }
         }

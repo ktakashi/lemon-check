@@ -12,7 +12,6 @@ import io.swagger.v3.oas.models.responses.ApiResponse
  * defined in the OpenAPI operation.
  */
 class AssertionGenerator {
-
     /**
      * Generate assertions for an expected response.
      *
@@ -61,7 +60,10 @@ class AssertionGenerator {
 
         // Schema validation assertion
         if (includeSchema && response?.content != null) {
-            val schema = response.content.values.firstOrNull()?.schema
+            val schema =
+                response.content.values
+                    .firstOrNull()
+                    ?.schema
             if (schema != null) {
                 assertions.add(
                     Assertion(type = AssertionType.MATCHES_SCHEMA),

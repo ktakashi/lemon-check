@@ -114,8 +114,8 @@ class CallScope internal constructor() {
         }
     }
 
-    private fun valueToJson(value: Any?): String {
-        return when (value) {
+    private fun valueToJson(value: Any?): String =
+        when (value) {
             null -> "null"
             is String -> "\"${escapeJson(value)}\""
             is Number -> value.toString()
@@ -124,18 +124,19 @@ class CallScope internal constructor() {
                 @Suppress("UNCHECKED_CAST")
                 mapToJson(value as Map<String, Any?>)
             }
+
             is List<*> -> {
                 value.joinToString(",", "[", "]") { valueToJson(it) }
             }
+
             else -> "\"${escapeJson(value.toString())}\""
         }
-    }
 
-    private fun escapeJson(s: String): String {
-        return s.replace("\\", "\\\\")
+    private fun escapeJson(s: String): String =
+        s
+            .replace("\\", "\\\\")
             .replace("\"", "\\\"")
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t")
-    }
 }

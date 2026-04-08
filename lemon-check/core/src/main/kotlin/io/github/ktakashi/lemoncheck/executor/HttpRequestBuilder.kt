@@ -32,7 +32,8 @@ class HttpRequestBuilder(
     ): HttpResponse<String> {
         try {
             val requestBuilder =
-                HttpRequest.newBuilder()
+                HttpRequest
+                    .newBuilder()
                     .uri(URI.create(url))
                     .timeout(timeout)
                     .method(method.name, bodyPublisher(body))
@@ -92,25 +93,22 @@ class HttpRequestBuilder(
         return url.toString()
     }
 
-    private fun bodyPublisher(body: String?): HttpRequest.BodyPublisher {
-        return if (body != null) {
+    private fun bodyPublisher(body: String?): HttpRequest.BodyPublisher =
+        if (body != null) {
             HttpRequest.BodyPublishers.ofString(body)
         } else {
             HttpRequest.BodyPublishers.noBody()
         }
-    }
 
-    private fun encode(value: String): String {
-        return java.net.URLEncoder.encode(value, Charsets.UTF_8)
-    }
+    private fun encode(value: String): String = java.net.URLEncoder.encode(value, Charsets.UTF_8)
 
     companion object {
-        fun createDefaultClient(): HttpClient {
-            return HttpClient.newBuilder()
+        fun createDefaultClient(): HttpClient =
+            HttpClient
+                .newBuilder()
                 .version(HttpClient.Version.HTTP_2)
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(Duration.ofSeconds(10))
                 .build()
-        }
     }
 }

@@ -1,6 +1,6 @@
 scenario: Simple test
   given the API is available
   when I make a request
-    call getTest
+    call ^getTest
   then I get a response
     assert status 200

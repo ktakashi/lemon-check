@@ -78,12 +78,12 @@ class ScenarioLoaderTest {
     fun `should parse scenario with steps containing operations`() {
         val source =
             """
-scenario: Test with operations
-  when I list pets
-    call listPets
-  then I get results
-    assert status 200
-""".trimIndent()
+            |scenario: Test with operations
+            |  when I list pets
+            |    call ^listPets
+            |  then I get results
+            |    assert status 200
+            """.trimMargin()
 
         val scenarios = loader.loadScenariosFromString(source)
 
@@ -97,12 +97,12 @@ scenario: Test with operations
     fun `should transform step types correctly`() {
         val source =
             """
-scenario: Step types test
-  given the prerequisite
-  when I do something
-  then I see results
-  and another assertion
-""".trimIndent()
+            |scenario: Step types test
+            |  given the prerequisite
+            |  when I do something
+            |  then I see results
+            |  and another assertion
+            """.trimMargin()
 
         val scenarios = loader.loadScenariosFromString(source)
         val steps = scenarios[0].steps
@@ -117,11 +117,11 @@ scenario: Step types test
     fun `should transform extractions correctly`() {
         val source =
             """
-scenario: Extraction test
-  when I create something
-    call createPet
-    extract $.id => petId
-""".trimIndent()
+            |scenario: Extraction test
+            |  when I create something
+            |    call ^createPet
+            |    extract $.id => petId
+            """.trimMargin()
 
         val scenarios = loader.loadScenariosFromString(source)
         val step = scenarios[0].steps.first()
@@ -135,11 +135,11 @@ scenario: Extraction test
     fun `should transform assertions correctly`() {
         val source =
             """
-scenario: Assertions test
-  then the response is correct
-    assert status 200
-    assert $.name equals "Fluffy"
-""".trimIndent()
+            |scenario: Assertions test
+            |  then the response is correct
+            |    assert status 200
+            |    assert $.name equals "Fluffy"
+            """.trimMargin()
 
         val scenarios = loader.loadScenariosFromString(source)
         val step = scenarios[0].steps.first()
@@ -151,12 +151,12 @@ scenario: Assertions test
     fun `should handle fragment includes`() {
         val source =
             """
-scenario: Fragment include test
-  given I am authenticated
-    include authenticate
-  when I call protected endpoint
-    call getProtected
-""".trimIndent()
+            |scenario: Fragment include test
+            |  given I am authenticated
+            |    include authenticate
+            |  when I call protected endpoint
+            |    call ^getProtected
+            """.trimMargin()
 
         val scenarios = loader.loadScenariosFromString(source)
         val steps = scenarios[0].steps
@@ -168,12 +168,12 @@ scenario: Fragment include test
     fun `should handle call with parameters`() {
         val source =
             """
-scenario: Call with params
-  when I get a specific pet
-    call getPetById
-      petId: 123
-      query_include: "details"
-""".trimIndent()
+            |scenario: Call with params
+            |  when I get a specific pet
+            |    call ^getPetById
+            |      petId: 123
+            |      query_include: "details"
+            """.trimMargin()
 
         val scenarios = loader.loadScenariosFromString(source)
         val step = scenarios[0].steps.first { it.operationId != null }
@@ -186,12 +186,12 @@ scenario: Call with params
     fun `should handle call with headers and body`() {
         val source =
             """
-scenario: Call with headers
-  when I create a pet
-    call createPet
-      header_Authorization: "Bearer token"
-      body: {"name": "Fluffy"}
-""".trimIndent()
+            |scenario: Call with headers
+            |  when I create a pet
+            |    call ^createPet
+            |      header_Authorization: "Bearer token"
+            |      body: {"name": "Fluffy"}
+            """.trimMargin()
 
         val scenarios = loader.loadScenariosFromString(source)
         val step = scenarios[0].steps.first { it.operationId != null }
