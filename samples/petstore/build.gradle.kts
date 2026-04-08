@@ -21,4 +21,5 @@ dependencies {
     testImplementation(project(":lemon-check:junit"))
     // JUnit Platform suite API for @Suite annotations
     testImplementation(libs.junit.platform.suite.api)
+    testImplementation(libs.junit.platform.launcher)
 }
