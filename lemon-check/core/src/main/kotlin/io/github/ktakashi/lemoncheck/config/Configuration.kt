@@ -25,6 +25,17 @@ data class Configuration(
     var followRedirects: Boolean = true,
     var logRequests: Boolean = false,
     var logResponses: Boolean = false,
+    /**
+     * Whether to share variables across scenarios.
+     *
+     * When enabled, variables extracted in one scenario are available in subsequent
+     * scenarios. This allows for chained scenarios like:
+     * - Scenario 1: Create a resource, extract its ID
+     * - Scenario 2: Use the extracted ID to fetch or update the resource
+     *
+     * Default is false (each scenario has isolated variable scope).
+     */
+    var shareVariablesAcrossScenarios: Boolean = false,
 ) {
     /**
      * DSL helper to set timeout in seconds.
@@ -41,6 +52,61 @@ data class Configuration(
         value: String,
     ) {
         defaultHeaders[name] = value
+    }
+
+    /**
+     * Create a copy of this configuration with parameters applied.
+     *
+     * Supports the following parameter names:
+     * - `baseUrl` - Override the base URL
+     * - `timeout` - Request timeout in seconds (number)
+     * - `environment` - Environment name
+     * - `strictSchemaValidation` - true/false
+     * - `followRedirects` - true/false
+     * - `logRequests` - true/false
+     * - `logResponses` - true/false
+     * - `shareVariablesAcrossScenarios` - true/false
+     * - `header.<name>` - Add/override a default header
+     *
+     * @param parameters Map of parameter names to values
+     * @return A new Configuration with parameters applied
+     */
+    fun withParameters(parameters: Map<String, Any>): Configuration {
+        val copy =
+            this.copy(
+                defaultHeaders = this.defaultHeaders.toMutableMap(),
+                autoAssertions = this.autoAssertions.copy(),
+            )
+
+        for ((key, value) in parameters) {
+            when {
+                key == "baseUrl" -> copy.baseUrl = value.toString()
+                key == "timeout" ->
+                    copy.timeout =
+                        when (value) {
+                            is Number -> Duration.ofSeconds(value.toLong())
+                            is String -> Duration.ofSeconds(value.toLong())
+                            else -> copy.timeout
+                        }
+                key == "environment" -> copy.environment = value.toString()
+                key == "strictSchemaValidation" -> copy.strictSchemaValidation = value.toString().toBoolean()
+                key == "followRedirects" -> copy.followRedirects = value.toString().toBoolean()
+                key == "logRequests" -> copy.logRequests = value.toString().toBoolean()
+                key == "logResponses" -> copy.logResponses = value.toString().toBoolean()
+                key == "shareVariablesAcrossScenarios" -> copy.shareVariablesAcrossScenarios = value.toString().toBoolean()
+                key.startsWith("header.") -> {
+                    val headerName = key.removePrefix("header.")
+                    copy.defaultHeaders[headerName] = value.toString()
+                }
+                // Auto assertion parameters
+                key == "autoAssertions.enabled" -> copy.autoAssertions.enabled = value.toString().toBoolean()
+                key == "autoAssertions.statusCode" -> copy.autoAssertions.statusCode = value.toString().toBoolean()
+                key == "autoAssertions.contentType" -> copy.autoAssertions.contentType = value.toString().toBoolean()
+                key == "autoAssertions.schema" -> copy.autoAssertions.schema = value.toString().toBoolean()
+            }
+        }
+
+        return copy
     }
 }
 

@@ -297,4 +297,73 @@ class ParserTest {
 
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
     }
+
+    @Test
+    fun `should parse parameters section`() {
+        val source =
+            """
+            parameters:
+              baseUrl: "http://localhost:8080"
+              timeout: 60
+              shareVariablesAcrossScenarios: true
+
+            scenario: Test with parameters
+              when I get pets
+                call ^listPets
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        assertNotNull(result.ast!!.parameters)
+        assertEquals("http://localhost:8080", result.ast.parameters!!.values["baseUrl"])
+        assertEquals(60L, result.ast.parameters.values["timeout"])
+        assertEquals(true, result.ast.parameters.values["shareVariablesAcrossScenarios"])
+    }
+
+    @Test
+    fun `should parse parameters with header override`() {
+        val source =
+            """
+            parameters:
+              header.Authorization: "Bearer test-token"
+              logRequests: true
+
+            scenario: Authenticated request
+              when I make a request
+                call ^listPets
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        assertNotNull(result.ast!!.parameters)
+        assertEquals("Bearer test-token", result.ast.parameters!!.values["header.Authorization"])
+        assertEquals(true, result.ast.parameters.values["logRequests"])
+    }
+
+    @Test
+    fun `should parse parameters before scenarios and fragments`() {
+        val source =
+            """
+            parameters:
+              environment: "test"
+
+            fragment: authenticate
+              given credentials
+                call ^login
+
+            scenario: Test endpoint
+              when I call the API
+                call ^listPets
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        assertNotNull(result.ast!!.parameters)
+        assertEquals("test", result.ast.parameters!!.values["environment"])
+        assertEquals(1, result.ast.fragments.size)
+        assertEquals(1, result.ast.scenarios.size)
+    }
 }

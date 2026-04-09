@@ -111,6 +111,61 @@ File-level configuration at the top of the file.
 
 ---
 
+### 1b. Parameters Block (Alternative File-Level Configuration)
+
+For simplified scenario files (without `Feature:` block), a `parameters:` section provides
+file-level configuration that overrides bindings configuration for all scenarios in that file.
+
+**Syntax**:
+```
+parameters:
+  baseUrl: "http://localhost:8080"
+  timeout: 60
+  shareVariablesAcrossScenarios: true
+  header.Authorization: "Bearer test-token"
+
+scenario: My test scenario
+  when I call the API
+    call ^listPets
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `baseUrl` | String | Override the base URL for API requests |
+| `timeout` | Number | Request timeout in seconds |
+| `environment` | String | Environment name for reporting |
+| `strictSchemaValidation` | Boolean | Fail on schema validation warnings |
+| `followRedirects` | Boolean | Follow HTTP redirects (default: true) |
+| `logRequests` | Boolean | Log HTTP requests |
+| `logResponses` | Boolean | Log HTTP responses |
+| `shareVariablesAcrossScenarios` | Boolean | Share extracted variables across scenarios in this file |
+| `header.<name>` | String | Add/override a default header |
+| `autoAssertions.enabled` | Boolean | Enable/disable all auto-assertions |
+| `autoAssertions.statusCode` | Boolean | Auto-assert correct status code |
+| `autoAssertions.contentType` | Boolean | Auto-assert Content-Type header |
+| `autoAssertions.schema` | Boolean | Auto-assert response matches schema |
+
+**Example (Cross-Scenario Variable Sharing)**:
+```
+parameters:
+  shareVariablesAcrossScenarios: true
+
+scenario: Create a resource
+  when I create a pet
+    call ^createPet
+      body: {"name": "Fluffy"}
+    extract $.id => petId
+
+scenario: Use the resource
+  when I get the pet
+    call ^getPetById
+      petId: {{petId}}
+  then I see the pet
+    assert $.name equals "Fluffy"
+```
+
+---
+
 ### 2. Feature Block
 
 ```gherkin

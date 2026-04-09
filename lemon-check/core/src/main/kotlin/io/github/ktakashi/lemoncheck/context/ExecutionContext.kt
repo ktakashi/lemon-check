@@ -97,10 +97,20 @@ class ExecutionContext {
     /**
      * Resolve a string with variable interpolation.
      *
-     * Variables are referenced as ${variableName} or $variableName.
+     * Variables can be referenced using:
+     * - Mustache-style: {{variableName}}
+     * - Dollar-style: ${variableName} or $variableName
      */
     fun interpolate(template: String): String {
         var result = template
+
+        // Replace {{name}} patterns (mustache-style, used in scenario files)
+        val mustachePattern = Regex("""\{\{(\w+)}}""")
+        result =
+            mustachePattern.replace(result) { match ->
+                val varName = match.groupValues[1]
+                variables[varName]?.toString() ?: match.value
+            }
 
         // Replace ${name} patterns
         val bracketPattern = Regex("""\$\{([^}]+)}""")

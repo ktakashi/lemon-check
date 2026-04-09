@@ -8,8 +8,6 @@ junit-platform = "6.0.3"
 jackson = "3.1.1"
 spring-boot = "4.0.5"
 h2 = "2.3.232"
-# NOTE: Target versions (Spring Boot 4.0.5, Jackson 3.1.1, JUnit 6.0.3, etc.) 
-# do not exist yet. See specs/005-library-enhancement/research.md for details.
 
 [libraries]
 swagger-parser = { module = "io.swagger.parser.v3:swagger-parser", version.ref = "swagger-parser" }

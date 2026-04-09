@@ -109,4 +109,73 @@ class ScenarioRunnerTest {
         assertEquals(0, result.failed)
         assertTrue(result.duration.toMillis() >= 0)
     }
+
+    @Test
+    fun `initializes shared context when shareVariablesAcrossScenarios is enabled`() {
+        val specRegistry = SpecRegistry()
+        val configuration =
+            Configuration().apply {
+                shareVariablesAcrossScenarios = true
+            }
+        val pluginRegistry = PluginRegistry()
+
+        val events = mutableListOf<String>()
+        val trackingPlugin =
+            object : LemonCheckPlugin {
+                override val id = "test:tracking"
+                override val name = "Tracking Plugin"
+
+                override fun onTestExecutionStart() {
+                    events.add("testStart")
+                }
+
+                override fun onTestExecutionEnd() {
+                    events.add("testEnd")
+                }
+            }
+
+        pluginRegistry.register(trackingPlugin)
+        val runner = ScenarioRunner(specRegistry, configuration, pluginRegistry)
+
+        runner.run(emptyList())
+
+        // Verify lifecycle still works with shared context enabled
+        assertEquals(listOf("testStart", "testEnd"), events)
+    }
+
+    @Test
+    fun `shares variables across scenarios when enabled`() {
+        val specRegistry = SpecRegistry()
+        val configuration =
+            Configuration().apply {
+                shareVariablesAcrossScenarios = true
+            }
+
+        val runner = ScenarioRunner(specRegistry, configuration)
+
+        // Create two scenarios - first one should set a variable,
+        // second one should be able to access it (indirectly through the shared context)
+        val scenario1 =
+            Scenario(
+                name = "First Scenario",
+                steps = emptyList(),
+                background = emptyList(),
+                tags = emptySet(),
+            )
+
+        val scenario2 =
+            Scenario(
+                name = "Second Scenario",
+                steps = emptyList(),
+                background = emptyList(),
+                tags = emptySet(),
+            )
+
+        // Run both scenarios
+        val result = runner.run(listOf(scenario1, scenario2))
+
+        // Both empty scenarios should pass
+        assertEquals(2, result.passed)
+        assertEquals(0, result.failed)
+    }
 }

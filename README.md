@@ -206,6 +206,37 @@ call ^getPetById
   petId: {{petId}}
 ```
 
+### File-Level Parameters
+
+Override configuration settings at the file level using a `parameters:` block:
+
+```
+parameters:
+  shareVariablesAcrossScenarios: true
+  timeout: 60
+  header.Authorization: "Bearer test-token"
+
+scenario: Create a resource
+  when I create a pet
+    call ^createPet
+      body: {"name": "Fluffy"}
+    extract $.id => petId
+
+scenario: Use the resource (variables shared across scenarios)
+  when I get the pet
+    call ^getPetById
+      petId: {{petId}}
+  then I see the pet
+    assert $.name equals "Fluffy"
+```
+
+Available parameters:
+- `baseUrl` - Override the base URL
+- `timeout` - Request timeout in seconds
+- `shareVariablesAcrossScenarios` - Share extracted variables across scenarios in the file
+- `logRequests`, `logResponses` - Enable request/response logging
+- `header.<name>` - Add/override default headers
+
 ### Multi-Spec Support
 
 Register multiple OpenAPI specs in your bindings:
@@ -332,8 +363,8 @@ cd lemon-check
 
 - Java 21 or higher
 - Kotlin 2.x (for Kotlin DSL scenarios)
-- JUnit Platform 5.10+
-- Spring Boot 3.x (for Spring integration)
+- JUnit Platform 6.0+
+- Spring Boot 4.x (for Spring integration)
 
 ## License
 

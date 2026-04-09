@@ -116,4 +116,25 @@ class ExecutionContextTest {
         child["inherited"] = "modified"
         assertEquals("value", parent.get<String>("inherited"))
     }
+
+    @Test
+    fun `should interpolate mustache-style variables`() {
+        val context = ExecutionContext()
+        context["petId"] = 123
+        context["name"] = "Fluffy"
+
+        val result = context.interpolate("Pet {{petId}} is named {{name}}")
+
+        assertEquals("Pet 123 is named Fluffy", result)
+    }
+
+    @Test
+    fun `should leave unknown mustache variables as-is`() {
+        val context = ExecutionContext()
+        context["known"] = "value"
+
+        val result = context.interpolate("{{known}} and {{unknown}}")
+
+        assertEquals("value and {{unknown}}", result)
+    }
 }

@@ -1,0 +1,34 @@
+# Cross-Scenario Variable Extraction Test
+# This scenario file demonstrates sharing variables across scenarios.
+# Requires Configuration.shareVariablesAcrossScenarios = true
+
+parameters:
+  shareVariablesAcrossScenarios: true
+
+# Scenario 1: Create a pet and extract its ID
+scenario: Create a pet for cross-scenario test
+  when I create a pet
+    call ^createPet
+      body: {"name": "CrossScenarioTestPet", "status": "available", "category": "test", "price": 99.99}
+  then the pet is created
+    assert status 201
+    assert $.name equals "CrossScenarioTestPet"
+    extract $.id => sharedPetId
+
+# Scenario 2: Use the extracted ID to retrieve the pet
+scenario: Retrieve pet using shared variable
+  when I get the pet using the shared ID
+    call ^getPetById
+      petId: {{sharedPetId}}
+  then I see the correct pet details
+    assert status 200
+    assert $.name equals "CrossScenarioTestPet"
+    extract $.name => sharedPetName
+
+# Scenario 3: Clean up - delete the pet
+scenario: Clean up cross-scenario test
+  when I delete the pet
+    call ^deletePet
+      petId: {{sharedPetId}}
+  then the pet is deleted
+    assert status 204

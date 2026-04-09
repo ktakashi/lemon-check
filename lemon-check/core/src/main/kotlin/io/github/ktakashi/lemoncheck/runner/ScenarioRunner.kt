@@ -1,6 +1,7 @@
 package io.github.ktakashi.lemoncheck.runner
 
 import io.github.ktakashi.lemoncheck.config.Configuration
+import io.github.ktakashi.lemoncheck.context.ExecutionContext
 import io.github.ktakashi.lemoncheck.executor.ScenarioExecutor
 import io.github.ktakashi.lemoncheck.model.FragmentRegistry
 import io.github.ktakashi.lemoncheck.model.ResultStatus
@@ -102,12 +103,22 @@ class ScenarioRunner(
     }
 
     /**
+     * Shared execution context for cross-scenario variable sharing.
+     * Only used when [Configuration.shareVariablesAcrossScenarios] is true.
+     */
+    private var sharedContext: ExecutionContext? = null
+
+    /**
      * Begin test execution lifecycle.
      *
      * Call this before executing any scenarios. This invokes `onTestExecutionStart()`
      * on all plugins.
      */
     fun beginExecution() {
+        // Initialize shared context if cross-scenario variable sharing is enabled
+        if (configuration.shareVariablesAcrossScenarios) {
+            sharedContext = ExecutionContext()
+        }
         try {
             pluginRegistry?.dispatchTestExecutionStart()
         } catch (e: Exception) {
@@ -127,6 +138,8 @@ class ScenarioRunner(
         } catch (e: Exception) {
             System.err.println("Warning: Plugin test execution end hook failed: ${e.message}")
         }
+        // Clear shared context
+        sharedContext = null
     }
 
     /**
@@ -135,10 +148,13 @@ class ScenarioRunner(
      * Note: This does NOT invoke lifecycle start/end hooks. Use [beginExecution]
      * before first scenario and [endExecution] after last scenario.
      *
+     * When cross-scenario variable sharing is enabled via [Configuration.shareVariablesAcrossScenarios],
+     * variables extracted in this scenario will be available to subsequent scenarios.
+     *
      * @param scenario Scenario to execute
      * @return Execution result for the scenario
      */
-    fun executeScenario(scenario: Scenario): ScenarioResult = executor.execute(scenario)
+    fun executeScenario(scenario: Scenario): ScenarioResult = executor.execute(scenario, sharedContext)
 
     /**
      * Run all provided scenarios and return aggregated results.
@@ -210,6 +226,71 @@ class ScenarioRunner(
      * @return Run result with single scenario outcome
      */
     fun run(scenario: Scenario): RunResult = run(listOf(scenario))
+
+    /**
+     * Run scenarios with file-level parameter overrides.
+     *
+     * This method applies the provided parameters to the configuration
+     * only for this run, without affecting the base configuration.
+     *
+     * Supported parameters:
+     * - `baseUrl` - Override the base URL
+     * - `timeout` - Request timeout in seconds
+     * - `environment` - Environment name
+     * - `strictSchemaValidation` - true/false
+     * - `followRedirects` - true/false
+     * - `logRequests` - true/false
+     * - `logResponses` - true/false
+     * - `shareVariablesAcrossScenarios` - true/false
+     * - `header.<name>` - Add/override a default header
+     *
+     * @param scenarios List of scenarios to execute
+     * @param parameters File-level configuration parameters
+     * @return Aggregated run result with all scenario outcomes
+     */
+    fun runWithParameters(
+        scenarios: List<Scenario>,
+        parameters: Map<String, Any>,
+    ): RunResult {
+        if (parameters.isEmpty()) {
+            return run(scenarios)
+        }
+
+        val startTime = Instant.now()
+        val results = mutableListOf<Pair<Scenario, ScenarioResult>>()
+
+        // Create a modified configuration with parameters applied
+        val modifiedConfig = configuration.withParameters(parameters)
+        val modifiedExecutor = ScenarioExecutor(specRegistry, modifiedConfig, pluginRegistry, fragmentRegistry)
+
+        // Initialize shared context for modified config if needed
+        val localSharedContext =
+            if (modifiedConfig.shareVariablesAcrossScenarios) {
+                ExecutionContext()
+            } else {
+                null
+            }
+
+        try {
+            pluginRegistry?.dispatchTestExecutionStart()
+        } catch (e: Exception) {
+            System.err.println("Warning: Plugin test execution start hook failed: ${e.message}")
+        }
+
+        // Execute all scenarios with modified executor
+        for (scenario in scenarios) {
+            val result = modifiedExecutor.execute(scenario, localSharedContext)
+            results.add(scenario to result)
+        }
+
+        try {
+            pluginRegistry?.dispatchTestExecutionEnd()
+        } catch (e: Exception) {
+            System.err.println("Warning: Plugin test execution end hook failed: ${e.message}")
+        }
+
+        return buildRunResult(startTime, results)
+    }
 
     private fun buildRunResult(
         startTime: Instant,

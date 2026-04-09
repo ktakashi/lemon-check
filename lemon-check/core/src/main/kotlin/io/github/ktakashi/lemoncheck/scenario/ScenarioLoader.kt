@@ -13,6 +13,17 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
+ * Result of loading a scenario file.
+ *
+ * @property scenarios List of parsed scenarios
+ * @property parameters Optional file-level configuration parameters
+ */
+data class ScenarioFileContent(
+    val scenarios: List<Scenario>,
+    val parameters: Map<String, Any> = emptyMap(),
+)
+
+/**
  * Loads and transforms scenario files into executable Scenario objects.
  */
 class ScenarioLoader {
@@ -46,6 +57,42 @@ class ScenarioLoader {
         val content = Files.readString(path)
         val fileName = path.fileName.toString()
         return loadScenariosFromString(content, fileName)
+    }
+
+    /**
+     * Load scenarios and parameters from a single file.
+     *
+     * @param path Path to the .scenario file
+     * @return ScenarioFileContent containing scenarios and parameters
+     */
+    fun loadFileContent(path: Path): ScenarioFileContent {
+        val content = Files.readString(path)
+        val fileName = path.fileName.toString()
+        return loadFileContentFromString(content, fileName)
+    }
+
+    /**
+     * Load scenarios and parameters from a string.
+     *
+     * @param source The scenario file content
+     * @param fileName Optional filename for error reporting
+     * @return ScenarioFileContent containing scenarios and parameters
+     */
+    fun loadFileContentFromString(
+        source: String,
+        fileName: String? = null,
+    ): ScenarioFileContent {
+        val result = Parser.parse(source, fileName)
+
+        if (!result.isSuccess) {
+            val errorMessages = result.errors.joinToString("\n") { it.toString() }
+            throw IllegalArgumentException("Failed to parse scenario file:\n$errorMessages")
+        }
+
+        val scenarios = result.ast!!.scenarios.map { transformScenario(it) }
+        val parameters = result.ast.parameters?.values ?: emptyMap()
+
+        return ScenarioFileContent(scenarios, parameters)
     }
 
     /**

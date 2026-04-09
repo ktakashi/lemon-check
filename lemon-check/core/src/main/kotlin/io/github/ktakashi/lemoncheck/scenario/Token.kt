@@ -8,6 +8,7 @@ enum class TokenType {
     SCENARIO,
     OUTLINE,
     FRAGMENT,
+    PARAMETERS,
     GIVEN,
     WHEN,
     THEN,

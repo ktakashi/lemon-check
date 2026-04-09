@@ -29,6 +29,7 @@ class Lexer(
                 "scenario" to TokenType.SCENARIO,
                 "outline" to TokenType.OUTLINE,
                 "fragment" to TokenType.FRAGMENT,
+                "parameters" to TokenType.PARAMETERS,
                 "given" to TokenType.GIVEN,
                 "when" to TokenType.WHEN,
                 "then" to TokenType.THEN,

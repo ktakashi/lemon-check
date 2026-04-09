@@ -199,4 +199,64 @@ class ScenarioLoaderTest {
         assertEquals("Bearer token", step.headers["Authorization"])
         assertNotNull(step.body)
     }
+
+    @Test
+    fun `should load file content with parameters`() {
+        val source =
+            """
+            |parameters:
+            |  baseUrl: "http://localhost:8080"
+            |  timeout: 60
+            |  shareVariablesAcrossScenarios: true
+            |
+            |scenario: Test with parameters
+            |  when I get pets
+            |    call ^listPets
+            """.trimMargin()
+
+        val content = loader.loadFileContentFromString(source)
+
+        assertEquals(1, content.scenarios.size)
+        assertEquals(3, content.parameters.size)
+        assertEquals("http://localhost:8080", content.parameters["baseUrl"])
+        assertEquals(60L, content.parameters["timeout"])
+        assertEquals(true, content.parameters["shareVariablesAcrossScenarios"])
+    }
+
+    @Test
+    fun `should load file content with empty parameters`() {
+        val source =
+            """
+            |scenario: Test without parameters
+            |  when I get pets
+            |    call ^listPets
+            """.trimMargin()
+
+        val content = loader.loadFileContentFromString(source)
+
+        assertEquals(1, content.scenarios.size)
+        assertTrue(content.parameters.isEmpty())
+    }
+
+    @Test
+    fun `should load file content with header parameters`() {
+        val source =
+            """
+            |parameters:
+            |  header.Authorization: "Bearer test-token"
+            |  header.X-Custom: "custom-value"
+            |  logRequests: true
+            |
+            |scenario: Authenticated request
+            |  when I make a request
+            |    call ^listPets
+            """.trimMargin()
+
+        val content = loader.loadFileContentFromString(source)
+
+        assertEquals(1, content.scenarios.size)
+        assertEquals("Bearer test-token", content.parameters["header.Authorization"])
+        assertEquals("custom-value", content.parameters["header.X-Custom"])
+        assertEquals(true, content.parameters["logRequests"])
+    }
 }

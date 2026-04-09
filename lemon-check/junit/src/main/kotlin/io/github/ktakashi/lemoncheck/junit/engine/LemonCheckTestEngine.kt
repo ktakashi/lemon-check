@@ -1,6 +1,7 @@
 package io.github.ktakashi.lemoncheck.junit.engine
 
 import io.github.ktakashi.lemoncheck.dsl.LemonCheckSuite
+import io.github.ktakashi.lemoncheck.executor.ScenarioExecutor
 import io.github.ktakashi.lemoncheck.junit.DefaultBindings
 import io.github.ktakashi.lemoncheck.junit.LemonCheckBindings
 import io.github.ktakashi.lemoncheck.junit.LemonCheckConfiguration
@@ -12,6 +13,7 @@ import io.github.ktakashi.lemoncheck.junit.spi.BindingsProvider
 import io.github.ktakashi.lemoncheck.model.FragmentRegistry
 import io.github.ktakashi.lemoncheck.plugin.PluginRegistry
 import io.github.ktakashi.lemoncheck.runner.ScenarioRunner
+import io.github.ktakashi.lemoncheck.scenario.ScenarioFileContent
 import io.github.ktakashi.lemoncheck.scenario.ScenarioLoader
 import io.github.ktakashi.lemoncheck.step.AnnotationStepScanner
 import io.github.ktakashi.lemoncheck.step.DefaultStepRegistry
@@ -256,7 +258,9 @@ class LemonCheckTestEngine : TestEngine {
             listener.executionStarted(scenarioDescriptor)
 
             try {
-                val scenarios = loadScenarioFromUrl(scenarioLoader, scenarioDescriptor.scenarioSource)
+                val fileContent = loadScenarioFromUrl(scenarioLoader, scenarioDescriptor.scenarioSource)
+                val scenarios = fileContent.scenarios
+                val fileParameters = fileContent.parameters
 
                 if (scenarios.isEmpty()) {
                     listener.executionFinished(
@@ -276,14 +280,33 @@ class LemonCheckTestEngine : TestEngine {
                     )
                 pluginRegistry.replace(consolePlugin)
 
-                for (scenario in scenarios) {
-                    // Execute scenario using the runner
-                    // (ConsoleOutputPlugin handles printing and result tracking via plugin hooks)
-                    runner.executeScenario(scenario)
+                // Apply file-level parameters if present
+                if (fileParameters.isNotEmpty()) {
+                    // Create a modified executor and shared context for this file
+                    val fileConfig = suite.configuration.withParameters(fileParameters)
+                    val fileExecutor = ScenarioExecutor(suite.specRegistry, fileConfig, pluginRegistry, fragmentRegistry)
 
-                    // Stop on first failure (behavior preserved from original)
-                    if (!consolePlugin.isAllPassed()) {
-                        break
+                    // Initialize shared context if shareVariablesAcrossScenarios is enabled
+                    val sharedContext =
+                        if (fileConfig.shareVariablesAcrossScenarios) {
+                            io.github.ktakashi.lemoncheck.context.ExecutionContext()
+                        } else {
+                            null
+                        }
+
+                    for (scenario in scenarios) {
+                        fileExecutor.execute(scenario, sharedContext)
+                        if (!consolePlugin.isAllPassed()) {
+                            break
+                        }
+                    }
+                } else {
+                    // No file-level parameters - use the default runner
+                    for (scenario in scenarios) {
+                        runner.executeScenario(scenario)
+                        if (!consolePlugin.isAllPassed()) {
+                            break
+                        }
                     }
                 }
 
@@ -472,12 +495,12 @@ class LemonCheckTestEngine : TestEngine {
     private fun loadScenarioFromUrl(
         loader: ScenarioLoader,
         url: URL,
-    ): List<io.github.ktakashi.lemoncheck.model.Scenario> =
+    ): ScenarioFileContent =
         try {
             url.openStream().use { input ->
                 val content = InputStreamReader(input).readText()
                 val fileName = url.path.substringAfterLast("/")
-                loader.loadScenariosFromString(content, fileName)
+                loader.loadFileContentFromString(content, fileName)
             }
         } catch (e: Exception) {
             throw IllegalArgumentException(

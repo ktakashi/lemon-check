@@ -48,12 +48,16 @@ class Parser(
     fun parse(): ParserResult {
         val scenarios = mutableListOf<ScenarioNode>()
         val fragments = mutableListOf<FragmentNode>()
+        var parameters: ParametersNode? = null
         val startLocation = currentLocation()
 
         skipNewlines()
 
         while (!isAtEnd()) {
             when (current().type) {
+                TokenType.PARAMETERS -> {
+                    parameters = parseParameters()
+                }
                 TokenType.SCENARIO -> {
                     val scenario = parseScenario()
                     if (scenario != null) scenarios.add(scenario)
@@ -75,7 +79,7 @@ class Parser(
                         ParseError(
                             "Unexpected token",
                             currentLocation(),
-                            expected = "scenario, outline, or fragment",
+                            expected = "parameters, scenario, outline, or fragment",
                             found = current().value,
                         ),
                     )
@@ -87,7 +91,7 @@ class Parser(
 
         val ast =
             if (errors.isEmpty()) {
-                ScenarioFileNode(scenarios, fragments, startLocation)
+                ScenarioFileNode(scenarios, fragments, parameters, startLocation)
             } else {
                 null
             }
@@ -162,6 +166,150 @@ class Parser(
             location = loc,
         )
     }
+
+    /**
+     * Parse file-level parameters block.
+     *
+     * Syntax:
+     * ```
+     * parameters:
+     *   name: value
+     *   name2: value2
+     * ```
+     */
+    private fun parseParameters(): ParametersNode? {
+        val loc = currentLocation()
+
+        if (!expect(TokenType.PARAMETERS)) return null
+        skipWhitespace()
+
+        if (!expect(TokenType.COLON)) return null
+        skipNewlines()
+
+        val values = mutableMapOf<String, Any>()
+
+        // Expect indent
+        if (current().type == TokenType.INDENT) {
+            advance()
+        }
+
+        // Parse name: value pairs
+        while (!isAtEnd() &&
+            current().type != TokenType.DEDENT &&
+            current().type != TokenType.SCENARIO &&
+            current().type != TokenType.OUTLINE &&
+            current().type != TokenType.FRAGMENT &&
+            current().type != TokenType.PARAMETERS
+        ) {
+            if (current().type == TokenType.NEWLINE) {
+                advance()
+                continue
+            }
+
+            // Parse parameter name (can be compound like "header.Authorization" or "header.X-Custom")
+            // We need to read tokens until we hit a colon at the same level
+            val paramName = parseParameterName() ?: break
+            skipWhitespace()
+
+            // Expect colon
+            if (!expect(TokenType.COLON)) {
+                errors.add(ParseError("Expected ':' after parameter name", currentLocation()))
+                break
+            }
+            skipWhitespace()
+
+            // Parse value
+            val value = parseParameterValue()
+            if (value != null) {
+                values[paramName] = value
+            }
+
+            skipNewlines()
+        }
+
+        // Handle dedent
+        if (current().type == TokenType.DEDENT) {
+            advance()
+        }
+
+        return ParametersNode(values, loc)
+    }
+
+    /**
+     * Parse a parameter name, supporting compound names with dots and hyphens.
+     * E.g., "header.Authorization", "header.X-Custom", "autoAssertions.enabled"
+     */
+    private fun parseParameterName(): String? {
+        if (current().type != TokenType.IDENTIFIER) {
+            return null
+        }
+
+        val parts = StringBuilder(current().value)
+        advance()
+
+        // Continue reading while we see dots, hyphens, or identifiers
+        while (!isAtEnd() && current().type != TokenType.COLON && current().type != TokenType.NEWLINE) {
+            when (current().type) {
+                TokenType.DOT -> {
+                    parts.append(".")
+                    advance()
+                }
+                TokenType.IDENTIFIER -> {
+                    parts.append(current().value)
+                    advance()
+                }
+                TokenType.NUMBER -> {
+                    // Support numbers in compound names
+                    parts.append(current().value)
+                    advance()
+                }
+                TokenType.ERROR -> {
+                    // Might be a hyphen or other character - include it
+                    val value = current().value
+                    if (value == "-" || value.startsWith("-")) {
+                        parts.append(value)
+                        advance()
+                    } else {
+                        break
+                    }
+                }
+                else -> break
+            }
+        }
+
+        return parts.toString()
+    }
+
+    /**
+     * Parse a parameter value (string, number, or boolean).
+     */
+    private fun parseParameterValue(): Any? =
+        when (current().type) {
+            TokenType.STRING -> {
+                val value = current().value
+                advance()
+                value
+            }
+            TokenType.NUMBER -> {
+                val value = current().value
+                advance()
+                if (value.contains('.')) value.toDouble() else value.toLong()
+            }
+            TokenType.IDENTIFIER -> {
+                val value = current().value
+                advance()
+                // Handle boolean values
+                when (value.lowercase()) {
+                    "true" -> true
+                    "false" -> false
+                    else -> value
+                }
+            }
+            else -> {
+                errors.add(ParseError("Expected parameter value", currentLocation()))
+                null
+            }
+        }
 
     private fun parseScenarioName(): String? {
         val nameParts = mutableListOf<String>()

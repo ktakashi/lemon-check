@@ -41,10 +41,18 @@ class ScenarioExecutor(
 
     /**
      * Execute a single scenario.
+     *
+     * @param scenario The scenario to execute
+     * @param sharedContext Optional shared context for cross-scenario variable sharing.
+     *                      If provided, variables from previous scenarios are available.
      */
-    fun execute(scenario: Scenario): ScenarioResult {
+    fun execute(
+        scenario: Scenario,
+        sharedContext: ExecutionContext? = null,
+    ): ScenarioResult {
         val startTime = Instant.now()
-        val context = ExecutionContext()
+        // Use shared context if provided, otherwise create a fresh one
+        val context = sharedContext?.createChild() ?: ExecutionContext()
         val stepResults = mutableListOf<StepResult>()
         var overallStatus = ResultStatus.PASSED
         var continueExecution = true
@@ -123,6 +131,15 @@ class ScenarioExecutor(
         // Dispatch plugin: onScenarioEnd
         pluginRegistry?.dispatchScenarioEnd(scenarioContext, ScenarioResultAdapter(scenarioResult))
 
+        // Copy extracted variables back to shared context for cross-scenario sharing
+        if (sharedContext != null && scenarioResult.status == ResultStatus.PASSED) {
+            context.allVariables().forEach { (name, value) ->
+                if (value != null) {
+                    sharedContext[name] = value
+                }
+            }
+        }
+
         return scenarioResult
     }
 
@@ -176,19 +193,23 @@ class ScenarioExecutor(
     ): StepResult {
         val stepStartTime = Instant.now()
 
-        // If no operation to call, check if there are assertions to run against the last response
+        // If no operation to call, check if there are assertions or extractions to run against the last response
         if (step.operationId == null) {
-            // If there are assertions, run them against the last response
-            if (step.assertions.isNotEmpty()) {
+            // If there are assertions or extractions, run them against the last response
+            if (step.assertions.isNotEmpty() || step.extractions.isNotEmpty()) {
                 val lastResponse =
                     context.lastResponse
                         ?: return StepResult(
                             step = step,
                             status = ResultStatus.ERROR,
                             duration = Duration.between(stepStartTime, Instant.now()),
-                            error = IllegalStateException("No previous response to run assertions against"),
+                            error = IllegalStateException("No previous response to run assertions/extractions against"),
                         )
 
+                // Run extractions
+                val extractedValues = extractValues(lastResponse, step, context)
+
+                // Run assertions
                 val assertionResults = runAssertions(lastResponse, step.assertions)
                 val allPassed = assertionResults.all { it.passed }
 
@@ -199,6 +220,7 @@ class ScenarioExecutor(
                     responseBody = lastResponse.body(),
                     responseHeaders = lastResponse.headers().map(),
                     duration = Duration.between(stepStartTime, Instant.now()),
+                    extractedValues = extractedValues,
                     assertionResults = assertionResults,
                 )
             }

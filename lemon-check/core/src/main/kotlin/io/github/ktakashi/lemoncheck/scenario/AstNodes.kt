@@ -13,6 +13,23 @@ sealed class AstNode {
 data class ScenarioFileNode(
     val scenarios: List<ScenarioNode>,
     val fragments: List<FragmentNode>,
+    val parameters: ParametersNode? = null,
+    override val location: SourceLocation,
+) : AstNode()
+
+/**
+ * Represents file-level configuration parameters.
+ *
+ * Parameters can override configuration settings for all scenarios in the file.
+ * Example:
+ * ```
+ * parameters:
+ *   shareVariablesAcrossScenarios: true
+ *   timeout: 60
+ * ```
+ */
+data class ParametersNode(
+    val values: Map<String, Any>,
     override val location: SourceLocation,
 ) : AstNode()
 
