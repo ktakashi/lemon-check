@@ -3,35 +3,45 @@ package io.github.ktakashi.samples.petstore;
 import io.github.ktakashi.lemoncheck.junit.LemonCheckConfiguration;
 import io.github.ktakashi.lemoncheck.junit.LemonCheckScenarios;
 import io.github.ktakashi.lemoncheck.junit.LemonCheckSpec;
-import org.junit.jupiter.api.Disabled;
+import io.github.ktakashi.lemoncheck.spring.LemonCheckContextConfiguration;
 import org.junit.platform.suite.api.IncludeEngines;
 import org.junit.platform.suite.api.Suite;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
 
 /**
- * Integration test for petstore API using lemon-check scenarios.
+ * Integration test for petstore API using lemon-check scenarios with Spring Boot.
  * 
- * This test class demonstrates how to integrate lemon-check scenarios
- * with a Spring Boot test context. The scenarios are executed against
- * the running Spring Boot application with H2 database.
+ * <p>This test class demonstrates how to integrate lemon-check scenarios
+ * with Spring Boot test context. The scenarios are executed against
+ * a running Spring Boot application with H2 database.
  * 
- * NOTE: This test is currently disabled because the LemonCheck JUnit engine
- * instantiates the test class independently, which means Spring's @LocalServerPort
- * injection doesn't work. Full Spring Boot integration requires additional
- * lifecycle callbacks or a custom JUnit extension approach.
+ * <h2>Spring Integration Setup</h2>
+ * <ol>
+ *   <li>Add {@code @SpringBootTest(webEnvironment = RANDOM_PORT)} - starts embedded server</li>
+ *   <li>Add {@code @LemonCheckContextConfiguration} - enables Spring bindings injection</li>
+ *   <li>Ensure bindings class (e.g., {@link PetstoreBindings}) is a Spring {@code @Component}</li>
+ *   <li>Use {@code @LocalServerPort} in bindings to get the dynamic port</li>
+ * </ol>
  * 
- * For working examples, see PetstoreKotlinScenarios which uses the programmatic DSL.
+ * <h2>How It Works</h2>
+ * <p>The {@code @LemonCheckContextConfiguration} annotation triggers the Spring 
+ * context integration module which:
+ * <ul>
+ *   <li>Initializes Spring TestContext before scenario execution</li>
+ *   <li>Retrieves the bindings instance from Spring's ApplicationContext</li>
+ *   <li>Enables dependency injection ({@code @Autowired}, {@code @LocalServerPort})</li>
+ *   <li>Cleans up context after all scenarios complete</li>
+ * </ul>
+ *
+ * @see LemonCheckContextConfiguration
+ * @see PetstoreBindings
  */
-@Disabled("Requires Spring context integration - see PetstoreKotlinScenarios for working examples")
 @Suite
 @IncludeEngines("lemoncheck")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@LemonCheckContextConfiguration
 @LemonCheckScenarios(locations = {"scenarios/*.scenario"})
 @LemonCheckConfiguration(bindings = PetstoreBindings.class, openApiSpec = "petstore.yaml")
 @LemonCheckSpec(paths = {"petstore.yaml"})
 public class PetstoreScenarioTest {
-    
-    @LocalServerPort
-    private int port;
 }

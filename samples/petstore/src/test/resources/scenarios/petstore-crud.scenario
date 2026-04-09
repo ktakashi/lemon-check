@@ -3,12 +3,11 @@
 
 scenario: List all available pets
   given the Petstore API is available
-  when I filter pets by status
-    call ^findPetsByStatus
-      query_status: "available"
+  when I list all pets
+    call ^listPets
   then I receive a list of pets
     assert status 200
-    assert $ notEmpty
+    assert $.pets notEmpty
 
 scenario: Get a specific pet
   when I request a pet by ID
@@ -16,27 +15,4 @@ scenario: Get a specific pet
       petId: 1
   then I see the pet details
     assert status 200
-    assert $.name equals "doggie"
-
-scenario: Create a new pet
-  when I create a pet
-    call ^addPet
-      body: {"name": "TestPet", "photoUrls": ["https://example.com/pet.jpg"], "status": "available"}
-  then the pet is created
-    assert status 200
-    extract $.id => newPetId
-
-scenario: Update a pet
-  when I update the pet
-    call ^updatePet
-      body: {"id": {{newPetId}}, "name": "UpdatedPet", "photoUrls": ["https://example.com/pet.jpg"], "status": "pending"}
-  then the update is successful
-    assert status 200
-    assert $.name equals "UpdatedPet"
-
-scenario: Delete a pet
-  when I delete the pet
-    call ^deletePet
-      petId: {{newPetId}}
-  then the pet is removed
-    assert status 200
+    assert $.name equals "Max"

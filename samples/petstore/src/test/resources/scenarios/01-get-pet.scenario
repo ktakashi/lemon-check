@@ -5,4 +5,4 @@ scenario: Get pet by ID
       petId: 1
   then I get the pet details
     assert status 200
-    assert $.id equals 1
+    assert $.name equals "Max"

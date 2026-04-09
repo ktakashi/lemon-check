@@ -19,6 +19,7 @@ dependencies {
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(project(":lemon-check:core"))
     testImplementation(project(":lemon-check:junit"))
+    testImplementation(project(":lemon-check:spring"))
     // JUnit Platform suite API for @Suite annotations
     testImplementation(libs.junit.platform.suite.api)
     testImplementation(libs.junit.platform.launcher)

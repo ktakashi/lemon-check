@@ -2,8 +2,8 @@ package io.github.ktakashi.samples.petstore;
 
 import io.github.ktakashi.lemoncheck.config.Configuration;
 import io.github.ktakashi.lemoncheck.junit.LemonCheckBindings;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -13,26 +13,19 @@ import java.util.Map;
  * 
  * This class provides runtime configuration for scenario execution,
  * including the dynamically allocated port from Spring Boot's test server.
+ * 
+ * When used with @LemonCheckContextConfiguration, this class is retrieved
+ * from Spring's ApplicationContext, enabling @LocalServerPort injection.
+ * 
+ * Note: @Lazy is required because @LocalServerPort is only available
+ * after the web server has started, which happens after initial bean creation.
  */
 @Component
+@Lazy
 public class PetstoreBindings implements LemonCheckBindings {
 
+    @LocalServerPort
     private int port;
-
-    /**
-     * Default constructor for JUnit engine instantiation.
-     */
-    public PetstoreBindings() {
-        // Port will be set via setPort or defaults to 8080
-        this.port = 8080;
-    }
-
-    /**
-     * Sets the port for the test server.
-     */
-    public void setPort(int port) {
-        this.port = port;
-    }
 
     @Override
     public Map<String, Object> getBindings() {

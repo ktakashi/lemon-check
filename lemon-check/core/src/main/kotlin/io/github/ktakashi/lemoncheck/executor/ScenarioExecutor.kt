@@ -85,8 +85,35 @@ class ScenarioExecutor(
     ): StepResult {
         val stepStartTime = Instant.now()
 
-        // If no operation to call, just pass
+        // If no operation to call, check if there are assertions to run against the last response
         if (step.operationId == null) {
+            // If there are assertions, run them against the last response
+            if (step.assertions.isNotEmpty()) {
+                val lastResponse = context.lastResponse
+                if (lastResponse == null) {
+                    return StepResult(
+                        step = step,
+                        status = ResultStatus.ERROR,
+                        duration = Duration.between(stepStartTime, Instant.now()),
+                        error = IllegalStateException("No previous response to run assertions against"),
+                    )
+                }
+
+                val assertionResults = runAssertions(lastResponse, step.assertions)
+                val allPassed = assertionResults.all { it.passed }
+
+                return StepResult(
+                    step = step,
+                    status = if (allPassed) ResultStatus.PASSED else ResultStatus.FAILED,
+                    statusCode = lastResponse.statusCode(),
+                    responseBody = lastResponse.body(),
+                    responseHeaders = lastResponse.headers().map(),
+                    duration = Duration.between(stepStartTime, Instant.now()),
+                    assertionResults = assertionResults,
+                )
+            }
+
+            // No operation and no assertions - just pass
             return StepResult(
                 step = step,
                 status = ResultStatus.PASSED,
@@ -222,7 +249,7 @@ class ScenarioExecutor(
 
         val passed =
             when (expected) {
-                is Int -> actual == expected
+                is Number -> actual == expected.toInt()
                 is IntRange -> actual in expected
                 else -> false
             }

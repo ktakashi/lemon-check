@@ -6,6 +6,7 @@ import io.github.ktakashi.lemoncheck.junit.DefaultBindings
 import io.github.ktakashi.lemoncheck.junit.LemonCheckBindings
 import io.github.ktakashi.lemoncheck.junit.LemonCheckScenarios
 import io.github.ktakashi.lemoncheck.junit.discovery.ScenarioDiscovery
+import io.github.ktakashi.lemoncheck.junit.spi.BindingsProvider
 import io.github.ktakashi.lemoncheck.model.ResultStatus
 import io.github.ktakashi.lemoncheck.scenario.ScenarioLoader
 import org.junit.jupiter.api.Disabled
@@ -21,6 +22,7 @@ import org.junit.platform.engine.discovery.PackageSelector
 import org.junit.platform.engine.support.descriptor.EngineDescriptor
 import java.io.InputStreamReader
 import java.net.URL
+import java.util.ServiceLoader
 
 /**
  * JUnit 5 TestEngine implementation for LemonCheck scenarios.
@@ -40,6 +42,14 @@ import java.net.URL
 class LemonCheckTestEngine : TestEngine {
     companion object {
         const val ENGINE_ID = "lemoncheck"
+    }
+
+    // Lazy-loaded BindingsProvider instances discovered via ServiceLoader
+    private val bindingsProviders: List<BindingsProvider> by lazy {
+        ServiceLoader
+            .load(BindingsProvider::class.java)
+            .toList()
+            .sortedByDescending { it.priority() }
     }
 
     override fun getId(): String = ENGINE_ID
@@ -160,27 +170,48 @@ class LemonCheckTestEngine : TestEngine {
 
             listener.executionStarted(classDescriptor)
 
+            // Find a BindingsProvider that supports this test class
+            val provider = findBindingsProvider(classDescriptor.testClass)
+
             try {
-                executeClassTests(classDescriptor, listener)
+                // Initialize the provider before test execution
+                provider?.initialize(classDescriptor.testClass)
+
+                executeClassTests(classDescriptor, listener, provider)
                 listener.executionFinished(classDescriptor, TestExecutionResult.successful())
             } catch (e: Exception) {
                 listener.executionFinished(
                     classDescriptor,
                     TestExecutionResult.failed(e),
                 )
+            } finally {
+                // Cleanup the provider after test execution
+                try {
+                    provider?.cleanup(classDescriptor.testClass)
+                } catch (e: Exception) {
+                    // Log cleanup error but don't fail the test
+                    System.err.println("Warning: BindingsProvider cleanup failed: ${e.message}")
+                }
             }
         }
 
         listener.executionFinished(engineDescriptor, TestExecutionResult.successful())
     }
 
+    /**
+     * Finds a BindingsProvider that supports the given test class.
+     * Returns null if no provider supports the class (fallback to reflection).
+     */
+    private fun findBindingsProvider(testClass: Class<*>): BindingsProvider? = bindingsProviders.firstOrNull { it.supports(testClass) }
+
     private fun executeClassTests(
         classDescriptor: ClassTestDescriptor,
         listener: org.junit.platform.engine.EngineExecutionListener,
+        provider: BindingsProvider?,
     ) {
         // Initialize suite and executor
         val suite = LemonCheckSuite.create()
-        val bindings = createBindings(classDescriptor)
+        val bindings = createBindings(classDescriptor, provider)
 
         // Apply bindings configuration
         bindings.configure(suite.configuration)
@@ -222,6 +253,38 @@ class LemonCheckTestEngine : TestEngine {
                 for (scenario in scenarios) {
                     val result = executor.execute(scenario)
 
+                    // Report step results for visibility
+                    println("\n=== Scenario: ${scenario.name} ===")
+                    for (stepResult in result.stepResults) {
+                        val statusIcon =
+                            when (stepResult.status) {
+                                ResultStatus.PASSED -> "✓"
+                                ResultStatus.FAILED -> "✗"
+                                ResultStatus.ERROR -> "!"
+                                ResultStatus.SKIPPED -> "-"
+                                ResultStatus.PENDING -> "?"
+                            }
+                        println("  $statusIcon ${stepResult.step.description}: ${stepResult.status}")
+
+                        // Show HTTP status if available
+                        stepResult.statusCode?.let { status ->
+                            println("    HTTP Status: $status")
+                        }
+
+                        // Show assertion results
+                        for (assertion in stepResult.assertionResults) {
+                            val assertIcon = if (assertion.passed) "✓" else "✗"
+                            println("    $assertIcon ${assertion.message}")
+                        }
+
+                        // Show error if present
+                        stepResult.error?.let { error ->
+                            println("    Error: ${error.message}")
+                        }
+                    }
+                    println("  Result: ${result.status} (${result.duration.toMillis()}ms)")
+                    println()
+
                     if (result.status != ResultStatus.PASSED) {
                         allPassed = false
                         val failedSteps =
@@ -229,7 +292,10 @@ class LemonCheckTestEngine : TestEngine {
                                 .filter { it.status != ResultStatus.PASSED }
                                 .joinToString("\n") { step ->
                                     "  - ${step.step.description}: ${step.status}" +
-                                        (step.error?.let { " - ${it.message}" } ?: "")
+                                        (step.error?.let { " - ${it.message}" } ?: "") +
+                                        step.assertionResults
+                                            .filter { !it.passed }
+                                            .joinToString("") { "\n      ✗ ${it.message}" }
                                 }
                         failureReason =
                             AssertionError(
@@ -256,9 +322,37 @@ class LemonCheckTestEngine : TestEngine {
         }
     }
 
-    private fun createBindings(classDescriptor: ClassTestDescriptor): LemonCheckBindings {
+    /**
+     * Creates a LemonCheckBindings instance for the given class descriptor.
+     *
+     * If a BindingsProvider is available and supports the test class, it will be used
+     * to create the bindings (enabling dependency injection frameworks like Spring).
+     * Otherwise, falls back to direct instantiation via reflection.
+     *
+     * @param classDescriptor The test class descriptor containing bindings class info
+     * @param provider The BindingsProvider to use, or null for reflection fallback
+     * @return The created LemonCheckBindings instance
+     */
+    private fun createBindings(
+        classDescriptor: ClassTestDescriptor,
+        provider: BindingsProvider?,
+    ): LemonCheckBindings {
         val bindingsClass = classDescriptor.bindingsClass ?: DefaultBindings::class.java
 
+        // If a provider is available, use it to create bindings
+        if (provider != null) {
+            return try {
+                provider.createBindings(classDescriptor.testClass, bindingsClass)
+            } catch (e: Exception) {
+                throw IllegalStateException(
+                    "BindingsProvider failed to create bindings for class: ${bindingsClass.name}. " +
+                        "Cause: ${e.message}",
+                    e,
+                )
+            }
+        }
+
+        // Fallback: direct instantiation via reflection
         return try {
             bindingsClass.getDeclaredConstructor().newInstance()
         } catch (e: Exception) {

@@ -17,9 +17,14 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
+    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: true
+  
+  sql:
+    init:
+      mode: always
   
   h2:
     console:

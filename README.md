@@ -1,0 +1,279 @@
+# Lemon-Check
+
+**BDD-style API testing framework for Java/Kotlin with OpenAPI integration**
+
+Lemon-Check enables you to write human-readable scenario files that test your REST APIs against their OpenAPI specifications. It integrates seamlessly with JUnit 5 and optionally with Spring Boot for dependency injection.
+
+## Features
+
+- **BDD Scenario Format**: Write tests in plain text using Given/When/Then syntax
+- **OpenAPI Integration**: Validate requests/responses against your API spec
+- **JUnit 5 Engine**: Run scenarios as JUnit tests with full IDE support
+- **Spring Boot Integration**: Inject `@LocalServerPort`, `@Autowired` in bindings
+- **JSONPath Assertions**: Validate response data with JSONPath expressions
+- **Variable Extraction**: Extract values from responses for use in subsequent calls
+
+## Quick Start
+
+### 1. Add Dependencies
+
+```kotlin
+// build.gradle.kts
+dependencies {
+    testImplementation("io.github.ktakashi:lemon-check-junit:1.0.0")
+    
+    // Optional: For Spring Boot integration
+    testImplementation("io.github.ktakashi:lemon-check-spring:1.0.0")
+}
+```
+
+### 2. Create a Scenario File
+
+Create `src/test/resources/scenarios/pet-api.scenario`:
+
+```
+# Pet API Scenarios
+
+scenario: List all pets
+  when I request all pets
+    call ^listPets
+  then I get a successful response
+    assert status 200
+    assert $.pets notEmpty
+
+scenario: Create a new pet
+  when I create a pet
+    call ^createPet
+      body: {"name": "Fluffy", "category": "cat", "status": "available"}
+  then the pet is created
+    assert status 201
+    assert $.name equals "Fluffy"
+    extract $.id => petId
+
+scenario: Get pet by ID
+  when I request the pet
+    call ^getPetById
+      petId: {{petId}}
+  then I see the pet details
+    assert status 200
+    assert $.name equals "Fluffy"
+```
+
+### 3. Create a Test Class
+
+#### Without Spring Integration
+
+```java
+@Suite
+@IncludeEngines("lemoncheck")
+@LemonCheckScenarios(locations = "scenarios/*.scenario")
+@LemonCheckConfiguration(bindings = PetBindings.class, openApiSpec = "petstore.yaml")
+public class PetApiTest {
+}
+```
+
+```java
+public class PetBindings implements LemonCheckBindings {
+    
+    @Override
+    public Map<String, Object> getBindings() {
+        return Map.of("baseUrl", "http://localhost:8080/api");
+    }
+    
+    @Override
+    public String getOpenApiSpec() {
+        return "petstore.yaml";
+    }
+}
+```
+
+#### With Spring Boot Integration
+
+```java
+@Suite
+@IncludeEngines("lemoncheck")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@LemonCheckContextConfiguration
+@LemonCheckScenarios(locations = "scenarios/*.scenario")
+@LemonCheckConfiguration(bindings = PetBindings.class, openApiSpec = "petstore.yaml")
+public class PetApiTest {
+}
+```
+
+```java
+@Component
+@Lazy  // Required for @LocalServerPort
+public class PetBindings implements LemonCheckBindings {
+    
+    @LocalServerPort
+    private int port;
+    
+    @Override
+    public Map<String, Object> getBindings() {
+        return Map.of("baseUrl", "http://localhost:" + port + "/api");
+    }
+    
+    @Override
+    public String getOpenApiSpec() {
+        return "petstore.yaml";
+    }
+    
+    @Override
+    public void configure(Configuration config) {
+        config.setBaseUrl("http://localhost:" + port + "/api");
+    }
+}
+```
+
+### 4. Run Tests
+
+```bash
+./gradlew test
+```
+
+## Scenario File Syntax
+
+### Basic Structure
+
+```
+scenario: <Scenario Name>
+  given <precondition description>
+    <actions>
+  when <action description>
+    <actions>
+  then <expected outcome>
+    <actions>
+```
+
+### API Calls
+
+Reference operations by their OpenAPI `operationId` with `^` prefix:
+
+```
+call ^operationId
+  pathParam: value
+  queryParam: value
+  body: {"json": "payload"}
+```
+
+### Path Parameters
+
+```
+call ^getPetById
+  petId: 123
+```
+
+### Query Parameters
+
+```
+call ^listPets
+  status: available
+  limit: 10
+```
+
+### Request Body
+
+```
+call ^createPet
+  body: {"name": "Fluffy", "status": "available"}
+```
+
+### Assertions
+
+| Assertion | Description |
+|-----------|-------------|
+| `assert status <code>` | Check HTTP status code |
+| `assert $.path equals <value>` | Check JSONPath value equals |
+| `assert $.path notEmpty` | Check JSONPath result is not empty |
+| `assert $.path contains <text>` | Check value contains text |
+
+### Variable Extraction
+
+Extract values for use in later scenarios:
+
+```
+extract $.id => petId
+```
+
+Use variables with double braces:
+
+```
+call ^getPetById
+  petId: {{petId}}
+```
+
+## Module Overview
+
+| Module | Description |
+|--------|-------------|
+| `lemon-check/core` | Scenario parser, executor, assertions |
+| `lemon-check/junit` | JUnit 5 TestEngine integration |
+| `lemon-check/spring` | Spring TestContext integration |
+| `samples/petstore` | Complete working example |
+
+## Annotations Reference
+
+| Annotation | Module | Purpose |
+|------------|--------|---------|
+| `@LemonCheckScenarios` | junit | Specify scenario file locations |
+| `@LemonCheckConfiguration` | junit | Configure bindings class and OpenAPI spec |
+| `@LemonCheckSpec` | junit | Specify additional OpenAPI specs |
+| `@LemonCheckContextConfiguration` | spring | Enable Spring context integration |
+
+## Spring Integration Notes
+
+### @Lazy Requirement
+
+When using `@LocalServerPort`, the bindings class must be annotated with `@Lazy`:
+
+```java
+@Component
+@Lazy  // Port is set after server starts
+public class MyBindings implements LemonCheckBindings {
+    @LocalServerPort
+    private int port;
+}
+```
+
+### Test Isolation
+
+- Scenarios in the same test class share the Spring context
+- Database changes persist across scenarios
+- Control execution order with filename prefixes: `01-setup.scenario`, `99-cleanup.scenario`
+
+## Example Project
+
+See the complete working example in [samples/petstore](samples/petstore):
+
+```
+samples/petstore/
+├── src/main/java/           # Spring Boot application
+├── src/test/java/           # Test classes
+│   └── PetstoreScenarioTest.java
+│   └── PetstoreBindings.java
+└── src/test/resources/
+    ├── petstore.yaml        # OpenAPI specification
+    └── scenarios/           # Scenario files
+        ├── 01-get-pet.scenario
+        ├── create-pet.scenario
+        └── 99-delete-pet.scenario
+```
+
+## Building from Source
+
+```bash
+git clone https://github.com/ktakashi/lemon-check.git
+cd lemon-check
+./gradlew build
+```
+
+## Requirements
+
+- Java 21 or higher
+- Kotlin 2.x (for Kotlin DSL scenarios)
+- JUnit Platform 5.10+
+- Spring Boot 3.x (for Spring integration)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
