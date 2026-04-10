@@ -177,10 +177,39 @@ call ^listPets
 
 ### Request Body
 
+#### Inline Body
+
 ```
 call ^createPet
   body: {"name": "Fluffy", "status": "available"}
 ```
+
+#### External Body File
+
+For large or reusable request bodies, use external files with `bodyFile`:
+
+```
+call ^createPet
+  bodyFile: "classpath:templates/create-pet.json"
+```
+
+**Supported path formats:**
+- `classpath:path/to/file.json` - Load from classpath
+- `file:./relative/path.json` - Load from file system (relative)
+- `/absolute/path.json` - Load from absolute path
+
+**Variable interpolation** is supported in external body files. Use `{{variableName}}` syntax:
+
+**templates/create-pet.json:**
+```json
+{
+  "name": "{{petName}}",
+  "category": "{{category}}",
+  "status": "available"
+}
+```
+
+Variables from previous extractions or example rows are automatically substituted.
 
 ### Assertions
 

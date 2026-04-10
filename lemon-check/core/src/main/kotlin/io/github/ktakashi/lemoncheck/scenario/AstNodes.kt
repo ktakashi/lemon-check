@@ -131,6 +131,7 @@ data class CallNode(
     val parameters: Map<String, ValueNode> = emptyMap(),
     val headers: Map<String, ValueNode> = emptyMap(),
     val body: ValueNode? = null,
+    val bodyFile: String? = null,
     override val location: SourceLocation,
 ) : ActionNode()
 
@@ -151,6 +152,7 @@ data class AssertNode(
     val path: String? = null,
     val expected: ValueNode? = null,
     val headerName: String? = null,
+    val negate: Boolean = false,
     override val location: SourceLocation,
 ) : ActionNode()
 

@@ -8,6 +8,7 @@ package io.github.ktakashi.lemoncheck.model
  * @property jsonPath JSONPath for body assertions
  * @property headerName Header name for header assertions
  * @property pattern Regex pattern for matching assertions
+ * @property negate When true, the assertion result is inverted (NOT)
  */
 data class Assertion(
     val type: AssertionType,
@@ -15,6 +16,7 @@ data class Assertion(
     val jsonPath: String? = null,
     val headerName: String? = null,
     val pattern: String? = null,
+    val negate: Boolean = false,
 )
 
 /**

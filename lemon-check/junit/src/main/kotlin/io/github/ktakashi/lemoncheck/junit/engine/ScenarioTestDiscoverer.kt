@@ -99,8 +99,9 @@ object ScenarioTestDiscoverer {
         fileDescriptor: ScenarioFileDescriptor,
         content: ScenarioFileContent,
     ) {
-        // Add standalone scenarios
+        // Add standalone scenarios (expanding outlines)
         content.standaloneScenarios
+            .flatMap { scenario -> expandScenarioIfOutline(scenario) }
             .map { scenario -> createScenarioDescriptor(fileDescriptor.uniqueId, scenario) }
             .forEach { fileDescriptor.addChild(it) }
 
@@ -108,6 +109,27 @@ object ScenarioTestDiscoverer {
         content.features
             .map { feature -> createFeatureDescriptor(fileDescriptor.uniqueId, feature) }
             .forEach { fileDescriptor.addChild(it) }
+    }
+
+    /**
+     * Expand a scenario outline into individual scenarios per example row.
+     * Non-outline scenarios are returned as-is.
+     */
+    private fun expandScenarioIfOutline(
+        scenario: io.github.ktakashi.lemoncheck.model.Scenario,
+    ): List<io.github.ktakashi.lemoncheck.model.Scenario> {
+        val examples = scenario.examples
+        if (examples.isNullOrEmpty()) {
+            return listOf(scenario)
+        }
+
+        // Expand into one scenario per example row
+        return examples.mapIndexed { index, row ->
+            scenario.copy(
+                name = "${scenario.name} (Example ${index + 1})",
+                examples = listOf(row), // Keep only this row's data
+            )
+        }
     }
 
     private fun createScenarioDescriptor(

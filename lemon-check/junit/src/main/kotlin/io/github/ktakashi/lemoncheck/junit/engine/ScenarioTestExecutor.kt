@@ -176,6 +176,10 @@ class ScenarioTestExecutor(
 
         return runCatching {
             val sourceFile = File(fileContext.scenarioPath)
+
+            // Add example row values to context if this is an outline scenario
+            initializeContextWithExamples(scenarioDescriptor.scenario, fileContext.sharedContext)
+
             fileContext.executor.execute(scenarioDescriptor.scenario, fileContext.sharedContext, sourceFile)
         }.fold(
             onSuccess = { result -> handleScenarioResult(scenarioDescriptor, result, listener) },
@@ -184,6 +188,31 @@ class ScenarioTestExecutor(
                 true
             },
         )
+    }
+
+    /**
+     * Initialize execution context with example row values for scenario outlines.
+     * For non-outline scenarios, this is a no-op.
+     */
+    private fun initializeContextWithExamples(
+        scenario: io.github.ktakashi.lemoncheck.model.Scenario,
+        context: ExecutionContext?,
+    ) {
+        context ?: return
+        val examples = scenario.examples ?: return
+        if (examples.isEmpty()) return
+
+        // Use the first (and only) example row - outlines are expanded to one row per scenario
+        val row = examples.first()
+        row.values.forEach { (key, value) ->
+            // Interpolate any variables in example values using existing context
+            val resolvedValue =
+                when (value) {
+                    is String -> context.interpolate(value)
+                    else -> value
+                }
+            context[key] = resolvedValue
+        }
     }
 
     private fun handleScenarioResult(

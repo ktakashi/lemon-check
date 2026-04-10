@@ -20,6 +20,7 @@ import io.github.ktakashi.lemoncheck.plugin.adapter.ScenarioContextAdapter
 import io.github.ktakashi.lemoncheck.plugin.adapter.ScenarioResultAdapter
 import io.github.ktakashi.lemoncheck.plugin.adapter.StepContextAdapter
 import io.github.ktakashi.lemoncheck.plugin.adapter.StepResultAdapter
+import io.github.ktakashi.lemoncheck.util.FileLoader
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
@@ -94,17 +95,15 @@ class ScenarioExecutor(
     ): List<StepResult> {
         val stepResults = mutableListOf<StepResult>()
         var stepIndex = 0
-        var continueExecution = true
-
         // Execute background steps
-        continueExecution =
+        var continueExecution =
             executeStepsWithContinuation(
                 scenario.background,
                 context,
                 scenarioContext,
                 stepResults,
                 stepIndex,
-                continueExecution,
+                true,
             ) { stepIndex++ }
 
         // Execute scenario steps
@@ -306,8 +305,8 @@ class ScenarioExecutor(
         // Merge headers immutably
         val headers = configuration.defaultHeaders + spec.defaultHeaders + step.headers
 
-        // Resolve body with variable interpolation
-        val body = step.body?.let { context.interpolate(it) }
+        // Resolve body: prefer inline body, fall back to bodyFile
+        val body = resolveBody(step, context)
 
         // Log request if enabled
         logRequest(resolvedOp.method, url, headers, body)
@@ -343,7 +342,7 @@ class ScenarioExecutor(
         context: ExecutionContext,
     ): StepResult {
         val extractedValues = extractValues(response, step, context)
-        val assertionResults = runAssertions(response, step.assertions)
+        val assertionResults = runAssertions(response, step.assertions, context)
         val allPassed = assertionResults.all { it.passed }
 
         return StepResult(
@@ -398,6 +397,29 @@ class ScenarioExecutor(
             }
         }
 
+    /**
+     * Resolve the request body from either inline body or external file.
+     *
+     * Priority:
+     * 1. Inline body (step.body) takes precedence
+     * 2. External file (step.bodyFile) is used as fallback
+     *
+     * Variable interpolation is applied to the final body content.
+     */
+    private fun resolveBody(
+        step: Step,
+        context: ExecutionContext,
+    ): String? {
+        // Inline body takes precedence
+        step.body?.let { return context.interpolate(it) }
+
+        // Fall back to body file
+        return step.bodyFile?.let { path ->
+            val content = FileLoader.load(path)
+            context.interpolate(content)
+        }
+    }
+
     private fun extractValues(
         response: HttpResponse<String>,
         step: Step,
@@ -417,24 +439,45 @@ class ScenarioExecutor(
     private fun runAssertions(
         response: HttpResponse<String>,
         assertions: List<Assertion>,
-    ): List<AssertionResult> = assertions.map { assertion -> runAssertion(response, assertion) }
+        context: ExecutionContext,
+    ): List<AssertionResult> = assertions.map { assertion -> runAssertion(response, assertion, context) }
 
     private fun runAssertion(
         response: HttpResponse<String>,
         assertion: Assertion,
-    ): AssertionResult =
-        when (assertion.type) {
-            AssertionType.STATUS_CODE -> assertStatusCode(response, assertion)
-            AssertionType.BODY_CONTAINS -> assertBodyContains(response, assertion)
-            AssertionType.BODY_EQUALS -> assertBodyEquals(response, assertion)
-            AssertionType.BODY_MATCHES -> assertBodyMatches(response, assertion)
-            AssertionType.BODY_ARRAY_SIZE -> assertBodyArraySize(response, assertion)
-            AssertionType.BODY_ARRAY_NOT_EMPTY -> assertBodyArrayNotEmpty(response, assertion)
-            AssertionType.HEADER_EXISTS -> assertHeaderExists(response, assertion)
-            AssertionType.HEADER_EQUALS -> assertHeaderEquals(response, assertion)
-            AssertionType.MATCHES_SCHEMA -> AssertionResult(assertion, true, "Schema validation not implemented yet")
-            AssertionType.RESPONSE_TIME -> AssertionResult(assertion, true, "Response time assertion not implemented yet")
+        context: ExecutionContext,
+    ): AssertionResult {
+        val baseResult =
+            when (assertion.type) {
+                AssertionType.STATUS_CODE -> assertStatusCode(response, assertion)
+                AssertionType.BODY_CONTAINS -> assertBodyContains(response, assertion, context)
+                AssertionType.BODY_EQUALS -> assertBodyEquals(response, assertion, context)
+                AssertionType.BODY_MATCHES -> assertBodyMatches(response, assertion, context)
+                AssertionType.BODY_ARRAY_SIZE -> assertBodyArraySize(response, assertion)
+                AssertionType.BODY_ARRAY_NOT_EMPTY -> assertBodyArrayNotEmpty(response, assertion)
+                AssertionType.HEADER_EXISTS -> assertHeaderExists(response, assertion)
+                AssertionType.HEADER_EQUALS -> assertHeaderEquals(response, assertion, context)
+                AssertionType.MATCHES_SCHEMA -> AssertionResult(assertion, true, "Schema validation not implemented yet")
+                AssertionType.RESPONSE_TIME -> AssertionResult(assertion, true, "Response time assertion not implemented yet")
+            }
+
+        // Apply negation if the assertion has negate flag
+        return if (assertion.negate) {
+            baseResult.copy(
+                passed = !baseResult.passed,
+                message =
+                    if (!baseResult.passed) {
+                        // Was failed, now passes with negation
+                        "NOT: ${baseResult.message}"
+                    } else {
+                        // Was passed, now fails with negation - need to show failure message
+                        "Negated assertion failed: expected condition to NOT be true\n${baseResult.message}"
+                    },
+            )
+        } else {
+            baseResult
         }
+    }
 
     private fun assertStatusCode(
         response: HttpResponse<String>,
@@ -461,15 +504,28 @@ class ScenarioExecutor(
     private fun assertBodyContains(
         response: HttpResponse<String>,
         assertion: Assertion,
+        context: ExecutionContext,
     ): AssertionResult {
         val body = response.body() ?: ""
-        val substring = assertion.expected as? String ?: ""
+        val rawSubstring = assertion.expected as? String ?: ""
+        val substring = context.interpolate(rawSubstring)
         val passed = body.contains(substring)
+
+        val message =
+            if (passed) {
+                "Body contains '$substring'"
+            } else {
+                buildString {
+                    append("Assertion failed: body does not contain expected string\n")
+                    append("  Expected to find: '$substring'\n")
+                    append("  Actual body (first 200 chars): ${body.take(200)}")
+                }
+            }
 
         return AssertionResult(
             assertion = assertion,
             passed = passed,
-            message = if (passed) "Body contains '$substring'" else "Body does not contain '$substring'",
+            message = message,
             actual = body.take(200),
         )
     }
@@ -477,19 +533,36 @@ class ScenarioExecutor(
     private fun assertBodyEquals(
         response: HttpResponse<String>,
         assertion: Assertion,
+        context: ExecutionContext,
     ): AssertionResult {
         val body = response.body() ?: ""
         val jsonPath = assertion.jsonPath ?: "$"
-        val expected = assertion.expected
+        val rawExpected = assertion.expected
+        // Interpolate expected value if it's a string
+        val expected =
+            when (rawExpected) {
+                is String -> context.interpolate(rawExpected)
+                else -> rawExpected
+            }
 
         return runCatching { JsonPath.read<Any>(body, jsonPath) }
             .fold(
                 onSuccess = { actual ->
                     val passed = valuesEqual(actual, expected)
+                    val message =
+                        if (passed) {
+                            "$jsonPath equals $expected"
+                        } else {
+                            buildString {
+                                append("Assertion failed at $jsonPath\n")
+                                append("  Expected: $expected\n")
+                                append("  Actual:   $actual")
+                            }
+                        }
                     AssertionResult(
                         assertion = assertion,
                         passed = passed,
-                        message = if (passed) "$jsonPath equals $expected" else "Expected $expected at $jsonPath but got $actual",
+                        message = message,
                         actual = actual,
                     )
                 },
@@ -535,10 +608,12 @@ class ScenarioExecutor(
     private fun assertBodyMatches(
         response: HttpResponse<String>,
         assertion: Assertion,
+        context: ExecutionContext,
     ): AssertionResult {
         val body = response.body() ?: ""
         val jsonPath = assertion.jsonPath ?: "$"
-        val pattern = assertion.pattern ?: ""
+        val rawPattern = assertion.pattern ?: ""
+        val pattern = context.interpolate(rawPattern)
 
         return runCatching {
             val actual = JsonPath.read<Any>(body, jsonPath)?.toString() ?: ""
@@ -633,9 +708,11 @@ class ScenarioExecutor(
     private fun assertHeaderEquals(
         response: HttpResponse<String>,
         assertion: Assertion,
+        context: ExecutionContext,
     ): AssertionResult {
         val headerName = assertion.headerName ?: ""
-        val expected = assertion.expected as? String ?: ""
+        val rawExpected = assertion.expected as? String ?: ""
+        val expected = context.interpolate(rawExpected)
         val actual = response.headers().firstValue(headerName).orElse(null)
         val passed = actual == expected
 

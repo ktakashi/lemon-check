@@ -12,7 +12,10 @@ import io.github.ktakashi.lemoncheck.scenario.SourceLocation
  * @property pathParams Path parameters for the API call
  * @property queryParams Query parameters for the API call
  * @property headers HTTP headers to include
- * @property body Request body content
+ * @property body Request body content (inline)
+ * @property bodyFile External file reference for request body.
+ *                    Supports: classpath:path/to/file.json, file:./relative/path.json, or /absolute/path.json
+ *                    Variables in the file content are interpolated at runtime.
  * @property extractions Values to extract from response
  * @property assertions Assertions to verify on response
  * @property autoAssert Whether to generate assertions from OpenAPI spec
@@ -28,6 +31,7 @@ data class Step(
     val queryParams: Map<String, Any> = emptyMap(),
     val headers: Map<String, String> = emptyMap(),
     val body: String? = null,
+    val bodyFile: String? = null,
     val extractions: List<Extraction> = emptyList(),
     val assertions: List<Assertion> = emptyList(),
     val autoAssert: Boolean = true,

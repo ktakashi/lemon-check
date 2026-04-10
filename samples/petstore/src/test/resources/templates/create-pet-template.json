@@ -1,0 +1,6 @@
+{
+  "name": "{{petName}}",
+  "status": "available",
+  "category": "test",
+  "price": 99.99
+}

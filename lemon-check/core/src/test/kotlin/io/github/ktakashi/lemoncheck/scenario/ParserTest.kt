@@ -343,7 +343,7 @@ class ParserTest {
 
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
         assertNotNull(result.ast!!.parameters)
-        assertEquals("http://localhost:8080", result.ast.parameters!!.values["baseUrl"])
+        assertEquals("http://localhost:8080", result.ast.parameters.values["baseUrl"])
         assertEquals(60L, result.ast.parameters.values["timeout"])
         assertEquals(true, result.ast.parameters.values["shareVariablesAcrossScenarios"])
     }
@@ -365,7 +365,7 @@ class ParserTest {
 
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
         assertNotNull(result.ast!!.parameters)
-        assertEquals("Bearer test-token", result.ast.parameters!!.values["header.Authorization"])
+        assertEquals("Bearer test-token", result.ast.parameters.values["header.Authorization"])
         assertEquals(true, result.ast.parameters.values["logRequests"])
     }
 
@@ -389,7 +389,7 @@ class ParserTest {
 
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
         assertNotNull(result.ast!!.parameters)
-        assertEquals("test", result.ast.parameters!!.values["environment"])
+        assertEquals("test", result.ast.parameters.values["environment"])
         assertEquals(1, result.ast.fragments.size)
         assertEquals(1, result.ast.scenarios.size)
     }
@@ -424,7 +424,7 @@ class ParserTest {
         assertEquals("Pet Operations", feature.name)
         assertEquals(setOf("api", "feature"), feature.tags)
         assertNotNull(feature.background)
-        assertEquals(1, feature.background!!.steps.size)
+        assertEquals(1, feature.background.steps.size)
         assertEquals(2, feature.scenarios.size)
 
         // First scenario inherits feature tags
@@ -747,6 +747,142 @@ class ParserTest {
         assertEquals(AssertionKind.BODY_EQUALS, assertions[1].assertionType)
         assertEquals(AssertionKind.BODY_ARRAY_NOT_EMPTY, assertions[2].assertionType)
         assertEquals(AssertionKind.HEADER_EQUALS, assertions[3].assertionType)
+    }
+
+    // =========================================================================
+    // Body File Parsing Tests
+    // Tests for external body file references
+    // =========================================================================
+
+    @Test
+    fun `should parse bodyFile with classpath prefix`() {
+        val source =
+            """
+            scenario: External body test
+              when I create a pet
+                call ^createPet
+                  bodyFile: "classpath:templates/create-pet.json"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callAction = step.actions.filterIsInstance<CallNode>().first()
+        assertEquals("classpath:templates/create-pet.json", callAction.bodyFile)
+    }
+
+    @Test
+    fun `should parse bodyFile with file prefix`() {
+        val source =
+            """
+            scenario: File prefix test
+              when I create a pet
+                call ^createPet
+                  bodyFile: "file:./templates/body.json"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callAction = step.actions.filterIsInstance<CallNode>().first()
+        assertEquals("file:./templates/body.json", callAction.bodyFile)
+    }
+
+    @Test
+    fun `should parse bodyFile with inline body having priority in step`() {
+        // When both body and bodyFile are specified, body should be in the AST but bodyFile is also captured
+        val source =
+            """
+            scenario: Both body types
+              when I create a pet
+                call ^createPet
+                  body: {"name": "inline"}
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callAction = step.actions.filterIsInstance<CallNode>().first()
+        assertNotNull(callAction.body)
+        // Body takes precedence, bodyFile should be null
+        assertEquals(null, callAction.bodyFile)
+    }
+
+    // =========================================================================
+    // Assertion Error Case Tests
+    // Tests for strict assertion parsing that should fail fast
+    // =========================================================================
+
+    @Test
+    fun `should fail on unknown assertion type`() {
+        val source =
+            """
+            scenario: Unknown assertion type
+              then: check something
+                assert foo "bar"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(!result.isSuccess || result.errors.isNotEmpty(), "Parse should fail for unknown assertion type")
+        assertTrue(result.errors.any { it.message.contains("Unknown assertion type") })
+    }
+
+    @Test
+    fun `should fail on unknown JSON path action`() {
+        val source =
+            """
+            scenario: Unknown JSON path action
+              then: check something
+                assert $.name invalid "value"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(!result.isSuccess || result.errors.isNotEmpty(), "Parse should fail for unknown JSON path action")
+        assertTrue(
+            result.errors.any { it.message.contains("Unknown assertion action") },
+            "Error should mention 'Unknown assertion action', got: ${result.errors}",
+        )
+    }
+
+    @Test
+    fun `should parse negated contains assertion correctly`() {
+        val source =
+            """
+            scenario: Negated contains
+              then: check not contains
+                assert not contains "error"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertEquals(1, assertions.size)
+        assertEquals(AssertionKind.BODY_CONTAINS, assertions[0].assertionType)
+        assertTrue(assertions[0].negate, "Assertion should have negate=true")
+    }
+
+    @Test
+    fun `should parse negated equals assertion with not after path`() {
+        val source =
+            """
+            scenario: Negated equals
+              then: check not equals
+                assert $.status not equals "error"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertEquals(1, assertions.size)
+        assertEquals(AssertionKind.BODY_EQUALS, assertions[0].assertionType)
+        assertTrue(assertions[0].negate, "Assertion should have negate=true")
     }
 
     /**

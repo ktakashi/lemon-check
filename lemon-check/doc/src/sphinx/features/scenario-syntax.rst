@@ -79,7 +79,8 @@ Parameter Type Description                      Example
 Path           Replace path variable            ``petId: 123``
 Query          Add query string parameter       ``status: "available"``
 Header         Add HTTP header                  ``header_Authorization: "Bearer {{token}}"``
-Body           Set request body                 ``body: {"name": "Max"}``
+Body           Set request body (inline)        ``body: {"name": "Max"}``
+BodyFile       Set request body (external file) ``bodyFile: "classpath:templates/pet.json"``
 ============== ================================ ==================================
 
 Example with all parameter types:
@@ -92,6 +93,41 @@ Example with all parameter types:
         status: "available"
         header_Authorization: "Bearer {{token}}"
         body: {"name": "Max", "category": "dog"}
+
+External Body Files
+^^^^^^^^^^^^^^^^^^^
+
+For large or reusable request bodies, use ``bodyFile`` to load content from external files:
+
+.. code-block:: text
+
+    when: I create a pet with template
+      call ^createPet
+        bodyFile: "classpath:templates/create-pet.json"
+
+**Supported path formats:**
+
+* ``classpath:path/to/file.json`` - Load from classpath (recommended)
+* ``file:./relative/path.json`` - Load from file system (relative to working directory)
+* ``/absolute/path.json`` - Load from absolute file path
+
+**Variable interpolation** is supported in external body files. Use ``{{variableName}}`` syntax:
+
+**templates/create-pet.json:**
+
+.. code-block:: json
+
+    {
+      "name": "{{petName}}",
+      "category": "{{category}}",
+      "status": "available"
+    }
+
+Variables from previous extractions are automatically substituted when the file is loaded.
+
+.. note::
+
+    If both ``body`` and ``bodyFile`` are specified, the inline ``body`` takes precedence.
 
 Assertions
 ----------

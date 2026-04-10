@@ -1,0 +1,5 @@
+{
+  "name": "{{petName}}",
+  "status": "available",
+  "category": "test"
+}

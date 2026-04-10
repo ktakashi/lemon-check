@@ -552,7 +552,7 @@ class Parser(
                 when (current().type) {
                     TokenType.CALL -> parseCallAction()?.let { actions.add(it) }
                     TokenType.EXTRACT -> parseExtractAction()?.let { actions.add(it) }
-                    TokenType.ASSERT -> actions.add(parseAssertAction())
+                    TokenType.ASSERT -> parseAssertAction()?.let { actions.add(it) }
                     TokenType.INCLUDE -> parseIncludeAction()?.let { actions.add(it) }
                     TokenType.NEWLINE -> advance()
                     TokenType.DEDENT, TokenType.GIVEN, TokenType.WHEN, TokenType.THEN, TokenType.AND, TokenType.BUT, TokenType.EOF -> break
@@ -599,6 +599,7 @@ class Parser(
         val parameters = mutableMapOf<String, ValueNode>()
         val headers = mutableMapOf<String, ValueNode>()
         var body: ValueNode? = null
+        var bodyFile: String? = null
 
         // Parse optional parameters block
         skipNewlines()
@@ -617,14 +618,20 @@ class Parser(
                             skipWhitespace()
                         }
 
-                        val value = parseValue()
-                        if (value != null) {
-                            when {
-                                paramName.startsWith("header_") || paramName.startsWith("Header_") -> {
+                        when {
+                            paramName.startsWith("header_") || paramName.startsWith("Header_") -> {
+                                val value = parseValue()
+                                if (value != null) {
                                     headers[paramName.removePrefix("header_").removePrefix("Header_")] = value
                                 }
-                                paramName == "body" -> body = value
-                                else -> parameters[paramName] = value
+                            }
+                            paramName == "body" -> body = parseValue()
+                            paramName == "bodyFile" -> bodyFile = parseBodyFilePath()
+                            else -> {
+                                val value = parseValue()
+                                if (value != null) {
+                                    parameters[paramName] = value
+                                }
                             }
                         }
                     }
@@ -644,8 +651,44 @@ class Parser(
             parameters = parameters,
             headers = headers,
             body = body,
+            bodyFile = bodyFile,
             location = loc,
         )
+    }
+
+    /**
+     * Parse a body file path.
+     * Supports: classpath:path/to/file.json, file:./path.json, or /absolute/path.json
+     */
+    private fun parseBodyFilePath(): String? {
+        // Use STRING token value if present (quoted path)
+        if (current().type == TokenType.STRING) {
+            val value = current().value
+            advance()
+            return value
+        }
+
+        // Otherwise build path from tokens until newline/dedent
+        val sb = StringBuilder()
+
+        while (!isAtEnd() && current().type != TokenType.NEWLINE && current().type != TokenType.DEDENT) {
+            when (current().type) {
+                TokenType.IDENTIFIER, TokenType.OPERATION_ID -> sb.append(current().value)
+                TokenType.COLON -> sb.append(':')
+                TokenType.DOT -> sb.append('.')
+                TokenType.NUMBER -> sb.append(current().value)
+                else -> {
+                    // For other token types, try to append the raw value
+                    val value = current().value
+                    if (value.isNotBlank() && value !in listOf("{", "}", "[", "]", "(", ")", ",", "|")) {
+                        sb.append(value)
+                    }
+                }
+            }
+            advance()
+        }
+
+        return sb.toString().takeIf { it.isNotBlank() }
     }
 
     private fun parseExtractAction(): ExtractNode? {
@@ -689,10 +732,18 @@ class Parser(
         )
     }
 
-    private fun parseAssertAction(): AssertNode {
+    private fun parseAssertAction(): AssertNode? {
         val loc = currentLocation()
         advance() // consume 'assert'
         skipWhitespace()
+
+        // Check for "not" keyword at the beginning
+        var negate = false
+        if (current().value.lowercase() == "not") {
+            negate = true
+            advance()
+            skipWhitespace()
+        }
 
         // Determine assertion type
         val assertionKind: AssertionKind
@@ -701,6 +752,7 @@ class Parser(
         var headerName: String? = null
 
         val typeOrPath = current().value.lowercase()
+        val typeOrPathLoc = currentLocation()
         advance()
         skipWhitespace()
 
@@ -735,32 +787,46 @@ class Parser(
                 path = typeOrPath
                 skipWhitespace()
 
+                // Check for "not" after the JSON path (e.g., "assert $.name not equals ...")
+                if (current().value.lowercase() == "not") {
+                    negate = true
+                    advance()
+                    skipWhitespace()
+                }
+
+                val actionKeyword = current().value.lowercase()
                 when {
-                    current().type == TokenType.EQUALS || current().value.lowercase() == "equals" -> {
+                    current().type == TokenType.EQUALS || actionKeyword == "equals" -> {
                         advance()
                         skipWhitespace()
                         assertionKind = AssertionKind.BODY_EQUALS
                         expected = parseValue()
                     }
-                    current().value.lowercase() == "matches" -> {
+                    actionKeyword == "matches" -> {
                         advance()
                         skipWhitespace()
                         assertionKind = AssertionKind.BODY_MATCHES
                         expected = parseValue()
                     }
-                    current().value.lowercase() == "size" || current().value.lowercase() == "arraysize" -> {
+                    actionKeyword == "size" || actionKeyword == "arraysize" -> {
                         advance()
                         skipWhitespace()
                         assertionKind = AssertionKind.BODY_ARRAY_SIZE
                         expected = parseValue()
                     }
-                    current().value.lowercase() == "notempty" -> {
+                    actionKeyword == "notempty" -> {
                         advance()
                         assertionKind = AssertionKind.BODY_ARRAY_NOT_EMPTY
                     }
                     else -> {
-                        assertionKind = AssertionKind.BODY_EQUALS
-                        expected = parseValue()
+                        errors.add(
+                            ParseError(
+                                "Unknown assertion action '$actionKeyword' for JSON path. " +
+                                    "Expected: equals, matches, size, arraysize, or notempty",
+                                currentLocation(),
+                            ),
+                        )
+                        return null
                     }
                 }
             }
@@ -769,8 +835,14 @@ class Parser(
                 expected = parseValue()
             }
             else -> {
-                assertionKind = AssertionKind.BODY_CONTAINS
-                expected = StringValueNode(typeOrPath, loc)
+                errors.add(
+                    ParseError(
+                        "Unknown assertion type '$typeOrPath'. " +
+                            "Expected: status, header, contains, \$.<jsonpath>, schema, or responsetime",
+                        typeOrPathLoc,
+                    ),
+                )
+                return null
             }
         }
 
@@ -779,6 +851,7 @@ class Parser(
             path = path,
             expected = expected,
             headerName = headerName,
+            negate = negate,
             location = loc,
         )
     }

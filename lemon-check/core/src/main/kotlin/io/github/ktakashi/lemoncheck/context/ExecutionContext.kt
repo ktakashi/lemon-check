@@ -100,9 +100,20 @@ class ExecutionContext {
      * Variables can be referenced using:
      * - Mustache-style: {{variableName}}
      * - Dollar-style: ${variableName} or $variableName
+     *
+     * Escaping:
+     * - Use \\{{ to produce literal {{
+     * - Use \\$ to produce literal $
      */
     fun interpolate(template: String): String {
-        var result = template
+        // First, temporarily replace escaped sequences with placeholders
+        val escapePlaceholder1 = "\u0001ESCAPED_OPEN_BRACE\u0001"
+        val escapePlaceholder2 = "\u0001ESCAPED_DOLLAR\u0001"
+
+        var result =
+            template
+                .replace("\\{{", escapePlaceholder1)
+                .replace("\\$", escapePlaceholder2)
 
         // Replace {{name}} patterns (mustache-style, used in scenario files)
         val mustachePattern = Regex("""\{\{(\w+)}}""")
@@ -128,6 +139,9 @@ class ExecutionContext {
                 variables[varName]?.toString() ?: match.value
             }
 
+        // Restore escaped sequences as literals
         return result
+            .replace(escapePlaceholder1, "{{")
+            .replace(escapePlaceholder2, "$")
     }
 }

@@ -298,6 +298,7 @@ class ScenarioLoader {
                     queryParams = queryParams,
                     headers = headers,
                     body = body,
+                    bodyFile = call.bodyFile,
                     extractions = currentExtractions.toList(),
                     assertions = currentAssertions.toList(),
                     sourceLocation = call.location,
@@ -391,6 +392,7 @@ class ScenarioLoader {
             expected = node.expected?.let { extractValue(it) },
             headerName = node.headerName,
             pattern = if (type == AssertionType.BODY_MATCHES) node.expected?.let { extractStringValue(it) } else null,
+            negate = node.negate,
         )
     }
 
