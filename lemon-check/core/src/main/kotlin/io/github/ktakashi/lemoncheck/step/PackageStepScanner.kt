@@ -49,23 +49,21 @@ class PackageStepScanner {
     ): List<Class<*>> {
         val path = packageName.replace('.', '/')
         val resources = classLoader.getResources(path)
-        val classes = mutableListOf<Class<*>>()
 
-        while (resources.hasMoreElements()) {
-            val resource = resources.nextElement()
-            when (resource.protocol) {
-                "file" -> {
-                    val directory = File(resource.toURI())
-                    classes.addAll(findClassesInDirectory(directory, packageName, classLoader))
+        return generateSequence { resources.takeIf { it.hasMoreElements() }?.nextElement() }
+            .flatMap { resource ->
+                when (resource.protocol) {
+                    "file" -> {
+                        val directory = File(resource.toURI())
+                        findClassesInDirectory(directory, packageName, classLoader).asSequence()
+                    }
+                    "jar" -> {
+                        val connection = resource.openConnection() as JarURLConnection
+                        findClassesInJar(connection.jarFile, packageName, classLoader).asSequence()
+                    }
+                    else -> emptySequence()
                 }
-                "jar" -> {
-                    val connection = resource.openConnection() as JarURLConnection
-                    classes.addAll(findClassesInJar(connection.jarFile, packageName, classLoader))
-                }
-            }
-        }
-
-        return classes
+            }.toList()
     }
 
     private fun findClassesInDirectory(
@@ -73,35 +71,23 @@ class PackageStepScanner {
         packageName: String,
         classLoader: ClassLoader,
     ): List<Class<*>> {
-        if (!directory.exists()) {
-            return emptyList()
-        }
+        if (!directory.exists()) return emptyList()
 
-        val classes = mutableListOf<Class<*>>()
         val files = directory.listFiles() ?: return emptyList()
 
-        for (file in files) {
-            if (file.isDirectory) {
-                classes.addAll(
-                    findClassesInDirectory(
-                        file,
-                        "$packageName.${file.name}",
-                        classLoader,
-                    ),
-                )
-            } else if (file.name.endsWith(".class")) {
-                val className = "$packageName.${file.name.removeSuffix(".class")}"
-                try {
-                    classes.add(classLoader.loadClass(className))
-                } catch (e: ClassNotFoundException) {
-                    // Skip classes that can't be loaded
-                } catch (e: NoClassDefFoundError) {
-                    // Skip classes with missing dependencies
+        return files.flatMap { file ->
+            when {
+                file.isDirectory ->
+                    findClassesInDirectory(file, "$packageName.${file.name}", classLoader)
+                file.name.endsWith(".class") -> {
+                    val className = "$packageName.${file.name.removeSuffix(".class")}"
+                    listOfNotNull(
+                        runCatching { classLoader.loadClass(className) }.getOrNull(),
+                    )
                 }
+                else -> emptyList()
             }
         }
-
-        return classes
     }
 
     private fun findClassesInJar(
@@ -109,25 +95,15 @@ class PackageStepScanner {
         packageName: String,
         classLoader: ClassLoader,
     ): List<Class<*>> {
-        val classes = mutableListOf<Class<*>>()
         val path = packageName.replace('.', '/')
 
-        for (entry in jarFile.entries()) {
-            if (entry.name.startsWith(path) && entry.name.endsWith(".class")) {
-                val className =
-                    entry.name
-                        .removeSuffix(".class")
-                        .replace('/', '.')
-                try {
-                    classes.add(classLoader.loadClass(className))
-                } catch (e: ClassNotFoundException) {
-                    // Skip classes that can't be loaded
-                } catch (e: NoClassDefFoundError) {
-                    // Skip classes with missing dependencies
-                }
-            }
-        }
-
-        return classes
+        return jarFile
+            .entries()
+            .asSequence()
+            .filter { it.name.startsWith(path) && it.name.endsWith(".class") }
+            .mapNotNull { entry ->
+                val className = entry.name.removeSuffix(".class").replace('/', '.')
+                runCatching { classLoader.loadClass(className) }.getOrNull()
+            }.toList()
     }
 }

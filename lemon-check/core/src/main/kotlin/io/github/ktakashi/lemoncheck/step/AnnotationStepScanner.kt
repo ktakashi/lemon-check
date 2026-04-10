@@ -19,27 +19,22 @@ class AnnotationStepScanner {
         clazz: Class<*>,
         instance: Any? = null,
     ): List<StepDefinition> {
-        val definitions = mutableListOf<StepDefinition>()
         val actualInstance = instance ?: createInstance(clazz)
 
-        for (method in clazz.declaredMethods) {
-            val annotation = method.getAnnotation(Step::class.java) ?: continue
-
-            if (!Modifier.isPublic(method.modifiers)) {
-                method.isAccessible = true
+        return clazz.declaredMethods
+            .mapNotNull { method ->
+                method.getAnnotation(Step::class.java)?.let { annotation ->
+                    if (!Modifier.isPublic(method.modifiers)) {
+                        method.isAccessible = true
+                    }
+                    StepDefinition(
+                        pattern = annotation.pattern,
+                        method = method,
+                        instance = if (Modifier.isStatic(method.modifiers)) null else actualInstance,
+                        description = annotation.description,
+                    )
+                }
             }
-
-            definitions.add(
-                StepDefinition(
-                    pattern = annotation.pattern,
-                    method = method,
-                    instance = if (Modifier.isStatic(method.modifiers)) null else actualInstance,
-                    description = annotation.description,
-                ),
-            )
-        }
-
-        return definitions
     }
 
     /**
@@ -59,14 +54,11 @@ class AnnotationStepScanner {
     fun scanInstances(vararg instances: Any): List<StepDefinition> = instances.flatMap { scan(it.javaClass, it) }
 
     private fun createInstance(clazz: Class<*>): Any? =
-        try {
+        runCatching {
             val constructor = clazz.getDeclaredConstructor()
             if (!Modifier.isPublic(constructor.modifiers)) {
                 constructor.isAccessible = true
             }
             constructor.newInstance()
-        } catch (e: Exception) {
-            // Can't create instance, steps may be static
-            null
-        }
+        }.getOrNull()
 }

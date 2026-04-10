@@ -250,11 +250,8 @@ class ScenarioExecutor(
                     queryParams = resolveParams(step.queryParams, context),
                 )
 
-            // Merge headers
-            val headers = mutableMapOf<String, String>()
-            headers.putAll(configuration.defaultHeaders)
-            headers.putAll(spec.defaultHeaders)
-            headers.putAll(step.headers)
+            // Merge headers immutably
+            val headers = configuration.defaultHeaders + spec.defaultHeaders + step.headers
 
             // Resolve body with variable interpolation
             val body = step.body?.let { context.interpolate(it) }
@@ -331,23 +328,17 @@ class ScenarioExecutor(
         response: HttpResponse<String>,
         step: Step,
         context: ExecutionContext,
-    ): Map<String, Any?> {
-        val extracted = mutableMapOf<String, Any?>()
-
-        for (extraction in step.extractions) {
-            try {
-                val body = response.body() ?: ""
-                val value = JsonPath.read<Any>(body, extraction.jsonPath)
-                context[extraction.variableName] = value
-                extracted[extraction.variableName] = value
-            } catch (_: Exception) {
-                // Extraction failed - store null
-                extracted[extraction.variableName] = null
-            }
+    ): Map<String, Any?> =
+        step.extractions.associate { extraction ->
+            val value =
+                runCatching {
+                    val body = response.body() ?: ""
+                    JsonPath.read<Any>(body, extraction.jsonPath).also {
+                        context[extraction.variableName] = it
+                    }
+                }.getOrNull()
+            extraction.variableName to value
         }
-
-        return extracted
-    }
 
     private fun runAssertions(
         response: HttpResponse<String>,

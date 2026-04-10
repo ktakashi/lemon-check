@@ -66,33 +66,14 @@ class SpringStepDiscovery {
      * @param context The Spring ApplicationContext
      * @return List of discovered StepDefinitions
      */
-    fun discoverSteps(context: ApplicationContext): List<StepDefinition> {
-        val definitions = mutableListOf<StepDefinition>()
-
-        // Get all bean names
-        val beanNames = context.beanDefinitionNames
-
-        for (beanName in beanNames) {
-            try {
-                val bean = context.getBean(beanName)
-                val beanClass = bean.javaClass
-
-                // Check if any method has @Step annotation
-                val hasStepMethods =
-                    beanClass.declaredMethods.any {
-                        it.isAnnotationPresent(Step::class.java)
-                    }
-
-                if (hasStepMethods) {
-                    // Use the Spring-managed bean instance
-                    val stepDefinitions = annotationScanner.scan(beanClass, bean)
-                    definitions.addAll(stepDefinitions)
-                }
-            } catch (e: Exception) {
-                // Skip beans that can't be accessed (lazy init, scope issues, etc.)
-            }
-        }
-
-        return definitions
-    }
+    fun discoverSteps(context: ApplicationContext): List<StepDefinition> =
+        context.beanDefinitionNames
+            .mapNotNull { beanName ->
+                runCatching {
+                    val bean = context.getBean(beanName)
+                    val beanClass = bean.javaClass
+                    val hasStepMethods = beanClass.declaredMethods.any { it.isAnnotationPresent(Step::class.java) }
+                    if (hasStepMethods) annotationScanner.scan(beanClass, bean) else null
+                }.getOrNull()
+            }.flatten()
 }

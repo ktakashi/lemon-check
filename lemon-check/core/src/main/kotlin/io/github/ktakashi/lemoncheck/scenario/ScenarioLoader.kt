@@ -51,19 +51,12 @@ class ScenarioLoader {
      * @param directory Path to directory containing .scenario files
      * @return List of parsed Scenario objects
      */
-    fun loadScenariosFromDirectory(directory: Path): List<Scenario> {
-        val scenarios = mutableListOf<Scenario>()
-
+    fun loadScenariosFromDirectory(directory: Path): List<Scenario> =
         Files
             .walk(directory)
             .filter { it.toString().endsWith(".scenario") }
-            .forEach { path ->
-                val loadedScenarios = loadScenariosFromFile(path)
-                scenarios.addAll(loadedScenarios)
-            }
-
-        return scenarios
-    }
+            .flatMap { loadScenariosFromFile(it).stream() }
+            .toList()
 
     /**
      * Load scenarios from a single file.
@@ -151,16 +144,11 @@ class ScenarioLoader {
             throw ScenarioParseException("Failed to parse scenario file:\n$errorMessages")
         }
 
-        val scenarios = mutableListOf<Scenario>()
-
-        // Transform standalone scenarios
-        scenarios.addAll(result.ast!!.scenarios.map { transformScenario(it) })
-
-        // Transform scenarios from features (with optional background steps prepended)
+        // Transform and combine scenarios
+        val standaloneScenarios = result.ast!!.scenarios.map { transformScenario(it) }
         val featureScenarios = result.ast.features.flatMap { transformFeature(it) }
-        scenarios.addAll(featureScenarios)
 
-        return scenarios
+        return standaloneScenarios + featureScenarios
     }
 
     /**
@@ -169,19 +157,12 @@ class ScenarioLoader {
      * @param directory Path to directory containing .fragment files
      * @return Map of fragment name to Fragment object
      */
-    fun loadFragmentsFromDirectory(directory: Path): Map<String, Fragment> {
-        val fragments = mutableMapOf<String, Fragment>()
-
+    fun loadFragmentsFromDirectory(directory: Path): Map<String, Fragment> =
         Files
             .walk(directory)
             .filter { it.toString().endsWith(".fragment") }
-            .forEach { path ->
-                val loadedFragments = loadFragmentsFromFile(path)
-                fragments.putAll(loadedFragments)
-            }
-
-        return fragments
-    }
+            .map { loadFragmentsFromFile(it) }
+            .reduce(emptyMap()) { acc, map -> acc + map }
 
     /**
      * Load fragments from a single file.

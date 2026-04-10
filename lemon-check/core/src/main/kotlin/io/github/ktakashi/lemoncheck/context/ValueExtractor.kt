@@ -22,18 +22,22 @@ class ValueExtractor {
         body: String,
         jsonPath: String,
     ): Any? =
-        try {
-            JsonPath.read(body, jsonPath)
-        } catch (_: PathNotFoundException) {
-            null
-        } catch (e: Exception) {
-            throw ExtractionException(
-                variableName = "unknown",
-                jsonPath = jsonPath,
-                responseBody = body,
-                cause = e,
+        runCatching { JsonPath.read<Any>(body, jsonPath) }
+            .fold(
+                onSuccess = { it },
+                onFailure = { e ->
+                    when (e) {
+                        is PathNotFoundException -> null
+                        else ->
+                            throw ExtractionException(
+                                variableName = "unknown",
+                                jsonPath = jsonPath,
+                                responseBody = body,
+                                cause = e,
+                            )
+                    }
+                },
             )
-        }
 
     /**
      * Extract a value and store in context.
@@ -86,22 +90,14 @@ class ValueExtractor {
         body: String,
         extractions: List<Extraction>,
         context: ExecutionContext,
-    ): Map<String, Any?> {
-        val results = mutableMapOf<String, Any?>()
-
-        for (extraction in extractions) {
-            try {
-                val value = extract(body, extraction.jsonPath)
-                if (value != null) context[extraction.variableName] = value
-                results[extraction.variableName] = value
-            } catch (_: ExtractionException) {
-                // Store null and continue
-                results[extraction.variableName] = null
-            }
+    ): Map<String, Any?> =
+        extractions.associate { extraction ->
+            val value =
+                runCatching { extract(body, extraction.jsonPath) }
+                    .getOrNull()
+            value?.let { context[extraction.variableName] = it }
+            extraction.variableName to value
         }
-
-        return results
-    }
 
     /**
      * Extract a typed value.
@@ -143,11 +139,5 @@ class ValueExtractor {
     fun pathExists(
         body: String,
         jsonPath: String,
-    ): Boolean =
-        try {
-            val result = extract(body, jsonPath)
-            result != null
-        } catch (_: Exception) {
-            false
-        }
+    ): Boolean = runCatching { extract(body, jsonPath) != null }.getOrElse { false }
 }

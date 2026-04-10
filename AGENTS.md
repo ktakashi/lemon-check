@@ -196,6 +196,55 @@ fun execute(
 ): ScenarioResult
 ```
 
+### 11. Functional Programming Style
+
+Prefer functional programming patterns for clean, maintainable code:
+
+```kotlin
+// GOOD: Use runCatching with fold for error handling
+fun execute(scenario: Scenario): ScenarioResult =
+    runCatching { executeInternal(scenario) }
+        .fold(
+            onSuccess = { it },
+            onFailure = { ScenarioResult.failed(it.message ?: "Unknown error") }
+        )
+
+// GOOD: Use getOrElse for fallback values
+val config = loadConfig().getOrElse { defaultConfig() }
+
+// GOOD: Chain operations with map/filter/forEach
+scenarios
+    .filter { it.isEnabled }
+    .map { executeScenario(it) }
+    .forEach { reportResult(it) }
+
+// GOOD: Avoid mutable state - prefer immutable transformations
+val results = scenarios.map { execute(it) }  // Not: results.add(execute(it))
+
+// GOOD: Use small focused functions with single responsibility
+private fun buildContext() = ExecutionContext()
+private fun executeSteps(steps: List<Step>) = steps.map { executeStep(it) }
+private fun aggregateResults(results: List<StepResult>) = ScenarioResult(results)
+
+// GOOD: Extract context objects as immutable data classes
+private data class FileExecutionContext(
+    val executor: ScenarioExecutor,
+    val sharedContext: ExecutionContext?,
+    val scenarioPath: String,
+)
+
+// GOOD: Use onSuccess/onFailure for side effects
+runCatching { cleanup() }
+    .onFailure { logger.warn("Cleanup failed: ${it.message}") }
+```
+
+**Key principles:**
+- Prefer `runCatching`/`fold` over try-catch where appropriate
+- Use immutable data structures and transformations
+- Keep functions small and focused (< 30 lines ideal)
+- Avoid side effects in pure functions
+- Use data classes for context/state objects
+
 ## ktlint Usage
 
 ### Check Code Formatting

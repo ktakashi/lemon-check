@@ -58,7 +58,7 @@ class FragmentScope internal constructor(
         block: FragmentStepScope.() -> Unit,
     ) {
         val stepScope = FragmentStepScope(type, description)
-        stepScope.block()
+        block(stepScope)
         steps.add(stepScope.build())
     }
 
@@ -96,7 +96,7 @@ class FragmentStepScope internal constructor(
     ) {
         this.operationId = operationId
         val callScope = CallScope()
-        callScope.block()
+        block(callScope)
         pathParams.putAll(callScope.pathParams)
         queryParams.putAll(callScope.queryParams)
         headers.putAll(callScope.headers)

@@ -91,7 +91,7 @@ class ScenarioScope internal constructor(
         block: StepScope.() -> Unit,
     ) {
         val stepScope = StepScope(type, description, suite)
-        stepScope.block()
+        block(stepScope)
         steps.add(stepScope.build())
     }
 

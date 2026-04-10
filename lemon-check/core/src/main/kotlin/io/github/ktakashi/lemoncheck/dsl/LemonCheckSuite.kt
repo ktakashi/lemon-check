@@ -62,7 +62,7 @@ class LemonCheckSuite internal constructor() {
         block: ScenarioScope.() -> Unit,
     ): Scenario {
         val scope = ScenarioScope(name, tags, this)
-        scope.block()
+        block(scope)
         val scenario = scope.build()
         scenarios.add(scenario)
         return scenario
@@ -77,7 +77,7 @@ class LemonCheckSuite internal constructor() {
         block: ScenarioOutlineScope.() -> Unit,
     ): List<Scenario> {
         val scope = ScenarioOutlineScope(name, tags, this)
-        scope.block()
+        block(scope)
         val expandedScenarios = scope.build()
         scenarios.addAll(expandedScenarios)
         return expandedScenarios
@@ -91,7 +91,7 @@ class LemonCheckSuite internal constructor() {
         block: FragmentScope.() -> Unit,
     ): Fragment {
         val scope = FragmentScope(name)
-        scope.block()
+        block(scope)
         val fragment = scope.build()
         fragments[name] = fragment
         return fragment

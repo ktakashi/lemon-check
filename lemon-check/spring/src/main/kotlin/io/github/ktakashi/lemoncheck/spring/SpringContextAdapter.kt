@@ -32,10 +32,10 @@ class SpringContextAdapter(
      * and prepares it for dependency injection. After this call,
      * the Spring ApplicationContext is available and beans can be retrieved.
      *
-     * @throws IllegalStateException if Spring context initialization fails
+     * @throws ConfigurationException if Spring context initialization fails
      */
     fun initializeContext() {
-        try {
+        runCatching {
             // Create TestContextManager for the test class
             testContextManager = TestContextManager(testClass)
 
@@ -48,7 +48,7 @@ class SpringContextAdapter(
 
             // Prepare test instance triggers dependency injection
             testContextManager!!.prepareTestInstance(instance)
-        } catch (e: Exception) {
+        }.onFailure {
             throw ConfigurationException(
                 "Failed to initialize Spring context for test class: ${testClass.name}. " +
                     "Ensure the class has @SpringBootTest annotation and a valid Spring configuration.",
@@ -65,19 +65,14 @@ class SpringContextAdapter(
      */
     fun <T : Any> getBean(beanClass: Class<T>): T {
         val context = getApplicationContext()
-        return try {
-            // Try getBeansOfType first, then get the first bean
-            val beans = context.getBeansOfType(beanClass)
-            if (beans.isEmpty()) {
-                throw ConfigurationException(
+        return runCatching {
+            context.getBeansOfType(beanClass).values.firstOrNull()
+                ?: throw ConfigurationException(
                     "Bindings class '${beanClass.name}' is not registered as a Spring bean. " +
                         "Add @Component annotation to the class or define a @Bean method.",
                 )
-            }
-            beans.values.first()
-        } catch (e: ConfigurationException) {
-            throw e
-        } catch (e: Exception) {
+        }.getOrElse { e ->
+            if (e is ConfigurationException) throw e
             throw ConfigurationException(
                 "Bindings class '${beanClass.name}' is not registered as a Spring bean. " +
                     "Add @Component annotation to the class or define a @Bean method.",
@@ -108,14 +103,9 @@ class SpringContextAdapter(
      * release Spring context resources following standard TestContext semantics.
      */
     fun cleanup() {
-        try {
-            testContextManager?.afterTestClass()
-        } catch (e: Exception) {
-            // Log but don't fail - cleanup exceptions shouldn't break test results
-            System.err.println("Warning: Spring context cleanup warning: ${e.message}")
-        } finally {
-            testContextManager = null
-            testInstance = null
-        }
+        runCatching { testContextManager?.afterTestClass() }
+            .onFailure { System.err.println("Warning: Spring context cleanup warning: ${it.message}") }
+        testContextManager = null
+        testInstance = null
     }
 }

@@ -48,7 +48,7 @@ class StepScope internal constructor(
     ) {
         this.operationId = operationId
         val callScope = CallScope()
-        callScope.block()
+        block(callScope)
         pathParams.putAll(callScope.pathParams)
         queryParams.putAll(callScope.queryParams)
         headers.putAll(callScope.headers)

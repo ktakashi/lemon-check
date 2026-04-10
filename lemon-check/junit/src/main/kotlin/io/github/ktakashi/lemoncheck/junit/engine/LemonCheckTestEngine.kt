@@ -99,7 +99,7 @@ class LemonCheckTestEngine : TestEngine {
         // For now, rely on explicit class selectors
         request
             .getSelectorsByType(PackageSelector::class.java)
-            .flatMap { emptyList<Class<*>>() }
+            .flatMap { emptyList() }
 
     private fun executeClassDescriptor(
         classDescriptor: ClassTestDescriptor,

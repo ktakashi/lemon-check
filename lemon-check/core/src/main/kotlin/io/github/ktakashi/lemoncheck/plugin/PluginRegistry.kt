@@ -95,9 +95,7 @@ class PluginRegistry {
      * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchTestExecutionStart() {
-        for (plugin in sortedPlugins) {
-            plugin.onTestExecutionStart()
-        }
+        sortedPlugins.forEach { it.onTestExecutionStart() }
     }
 
     /**
@@ -108,9 +106,7 @@ class PluginRegistry {
      * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchTestExecutionEnd() {
-        for (plugin in sortedPlugins) {
-            plugin.onTestExecutionEnd()
-        }
+        sortedPlugins.forEach { it.onTestExecutionEnd() }
     }
 
     /**
@@ -120,9 +116,7 @@ class PluginRegistry {
      * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchScenarioStart(context: ScenarioContext) {
-        for (plugin in sortedPlugins) {
-            plugin.onScenarioStart(context)
-        }
+        sortedPlugins.forEach { it.onScenarioStart(context) }
     }
 
     /**
@@ -136,9 +130,7 @@ class PluginRegistry {
         context: ScenarioContext,
         result: ScenarioResult,
     ) {
-        for (plugin in sortedPlugins) {
-            plugin.onScenarioEnd(context, result)
-        }
+        sortedPlugins.forEach { it.onScenarioEnd(context, result) }
     }
 
     /**
@@ -148,9 +140,7 @@ class PluginRegistry {
      * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchStepStart(context: StepContext) {
-        for (plugin in sortedPlugins) {
-            plugin.onStepStart(context)
-        }
+        sortedPlugins.forEach { it.onStepStart(context) }
     }
 
     /**
@@ -163,9 +153,7 @@ class PluginRegistry {
         context: StepContext,
         result: StepResult,
     ) {
-        for (plugin in sortedPlugins) {
-            plugin.onStepEnd(context, result)
-        }
+        sortedPlugins.forEach { it.onStepEnd(context, result) }
     }
 
     /**
