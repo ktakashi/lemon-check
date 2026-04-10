@@ -71,6 +71,7 @@ abstract class ReportPlugin(
                     },
                 tags = context.tags,
                 metadata = context.metadata,
+                sourceFile = context.scenarioFile.fileName?.toString(),
             )
         scenarioReports.add(entry)
     }

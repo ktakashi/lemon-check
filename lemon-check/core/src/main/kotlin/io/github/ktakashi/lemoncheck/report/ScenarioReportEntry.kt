@@ -15,6 +15,7 @@ import java.time.Duration
  * @property steps Execution details for all steps in the scenario
  * @property tags Scenario tags for filtering and organization
  * @property metadata Additional scenario metadata
+ * @property sourceFile Name of the source scenario file (for grouping in reports)
  */
 data class ScenarioReportEntry(
     val name: String,
@@ -23,4 +24,5 @@ data class ScenarioReportEntry(
     val steps: List<StepReportEntry>,
     val tags: Set<String> = emptySet(),
     val metadata: Map<String, String> = emptyMap(),
+    val sourceFile: String? = null,
 )

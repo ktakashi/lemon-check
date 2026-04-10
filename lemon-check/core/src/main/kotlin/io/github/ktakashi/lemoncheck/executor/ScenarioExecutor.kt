@@ -46,10 +46,12 @@ class ScenarioExecutor(
      * @param scenario The scenario to execute
      * @param sharedContext Optional shared context for cross-scenario variable sharing.
      *                      If provided, variables from previous scenarios are available.
+     * @param sourceFile Optional source file for the scenario (used in reports for grouping).
      */
     fun execute(
         scenario: Scenario,
         sharedContext: ExecutionContext? = null,
+        sourceFile: java.io.File? = null,
     ): ScenarioResult {
         val startTime = Instant.now()
         // Use shared context if provided, otherwise create a fresh one
@@ -59,7 +61,7 @@ class ScenarioExecutor(
         var continueExecution = true
 
         // Create plugin context
-        val scenarioContext = ScenarioContextAdapter(scenario, context, startTime)
+        val scenarioContext = ScenarioContextAdapter(scenario, context, startTime, sourceFile)
 
         // Dispatch plugin: onScenarioStart
         pluginRegistry?.dispatchScenarioStart(scenarioContext)

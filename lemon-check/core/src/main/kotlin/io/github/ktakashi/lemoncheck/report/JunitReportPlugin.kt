@@ -45,52 +45,71 @@ class JunitReportPlugin(
                     """timestamp="${TIMESTAMP_FORMAT.format(report.timestamp)}">""",
             )
 
-            // Each scenario as a testsuite
-            for (scenario in report.scenarios) {
-                val stepTotal = scenario.steps.size
-                val stepFailures = scenario.steps.count { it.status == ResultStatus.FAILED }
-                val stepErrors = scenario.steps.count { it.status == ResultStatus.ERROR }
-                val stepSkipped = scenario.steps.count { it.status == ResultStatus.SKIPPED }
+            // Group scenarios by source file
+            val scenariosByFile = report.scenarios.groupBy { it.sourceFile ?: "unknown" }
+
+            // Each file as a testsuite
+            for ((fileName, scenarios) in scenariosByFile) {
+                val fileTotal = scenarios.size
+                val fileFailures = scenarios.count { it.status == ResultStatus.FAILED }
+                val fileErrors = scenarios.count { it.status == ResultStatus.ERROR }
+                val fileSkipped = scenarios.count { it.status == ResultStatus.SKIPPED }
+                val fileDuration = scenarios.sumOf { it.duration.toMillis() }
 
                 appendLine(
-                    """  <testsuite name="${escapeXml(scenario.name)}" """ +
-                        """tests="$stepTotal" """ +
-                        """failures="$stepFailures" """ +
-                        """errors="$stepErrors" """ +
-                        """skipped="$stepSkipped" """ +
-                        """time="${formatSeconds(scenario.duration.toMillis())}">""",
+                    """  <testsuite name="${escapeXml(fileName)}" """ +
+                        """tests="$fileTotal" """ +
+                        """failures="$fileFailures" """ +
+                        """errors="$fileErrors" """ +
+                        """skipped="$fileSkipped" """ +
+                        """time="${formatSeconds(fileDuration)}">""",
                 )
 
-                // Each step as a testcase
-                for (step in scenario.steps) {
-                    val className = suiteName
-                    val testName = escapeXml(step.description)
-                    val time = formatSeconds(step.duration.toMillis())
+                // Each scenario as a testcase
+                for (scenario in scenarios) {
+                    val className = fileName
+                    val testName = escapeXml(scenario.name)
+                    val time = formatSeconds(scenario.duration.toMillis())
 
-                    when (step.status) {
+                    when (scenario.status) {
                         ResultStatus.PASSED -> {
                             appendLine("""    <testcase name="$testName" classname="$className" time="$time"/>""")
                         }
                         ResultStatus.FAILED -> {
                             appendLine("""    <testcase name="$testName" classname="$className" time="$time">""")
-                            step.failure?.let { failure ->
-                                appendLine(
-                                    """      <failure message="${escapeXml(failure.message)}" """ +
-                                        """type="${escapeXml(failure.assertionType)}">""",
-                                )
-                                appendLine("""Expected: ${escapeXml(failure.expected?.toString() ?: "null")}""")
-                                appendLine("""Actual: ${escapeXml(failure.actual?.toString() ?: "null")}""")
-                                failure.diff?.let { diff ->
-                                    appendLine("Diff:")
-                                    appendLine(escapeXml(diff))
+                            // Include info about failed steps
+                            val failedSteps =
+                                scenario.steps.filter { it.status == ResultStatus.FAILED }
+                            if (failedSteps.isNotEmpty()) {
+                                val firstFailure = failedSteps.first()
+                                firstFailure.failure?.let { failure ->
+                                    appendLine(
+                                        """      <failure message="${escapeXml(failure.message)}" """ +
+                                            """type="${escapeXml(failure.assertionType)}">""",
+                                    )
+                                    appendLine("""Expected: ${escapeXml(failure.expected?.toString() ?: "null")}""")
+                                    appendLine("""Actual: ${escapeXml(failure.actual?.toString() ?: "null")}""")
+                                    failure.diff?.let { diff ->
+                                        appendLine("Diff:")
+                                        appendLine(escapeXml(diff))
+                                    }
+                                    appendLine("      </failure>")
+                                } ?: run {
+                                    appendLine("""      <failure message="Scenario failed" type="AssertionError"/>""")
                                 }
-                                appendLine("      </failure>")
                             }
                             appendLine("    </testcase>")
                         }
                         ResultStatus.ERROR -> {
                             appendLine("""    <testcase name="$testName" classname="$className" time="$time">""")
-                            appendLine("""      <error message="Unexpected error occurred" type="Error"/>""")
+                            val errorSteps = scenario.steps.filter { it.status == ResultStatus.ERROR }
+                            val errorMsg =
+                                if (errorSteps.isNotEmpty()) {
+                                    errorSteps.first().failure?.message ?: "Unexpected error occurred"
+                                } else {
+                                    "Unexpected error occurred"
+                                }
+                            appendLine("""      <error message="${escapeXml(errorMsg)}" type="Error"/>""")
                             appendLine("    </testcase>")
                         }
                         ResultStatus.SKIPPED -> {

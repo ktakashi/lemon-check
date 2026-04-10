@@ -345,7 +345,9 @@ class LemonCheckTestEngine : TestEngine {
                     listener.executionStarted(scenarioDescriptor)
 
                     try {
-                        val result = fileExecutor.execute(scenarioDescriptor.scenario, sharedContext)
+                        // Create File from the scenario path for report grouping
+                        val sourceFile = java.io.File(fileDescriptor.scenarioPath)
+                        val result = fileExecutor.execute(scenarioDescriptor.scenario, sharedContext, sourceFile)
 
                         when (result.status) {
                             io.github.ktakashi.lemoncheck.model.ResultStatus.PASSED -> {
