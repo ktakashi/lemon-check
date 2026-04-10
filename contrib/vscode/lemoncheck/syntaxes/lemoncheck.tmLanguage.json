@@ -1,0 +1,324 @@
+{
+  "name": "LemonCheck",
+  "scopeName": "source.lemoncheck",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#parameters-block" },
+    { "include": "#tags" },
+    { "include": "#feature-block" },
+    { "include": "#scenario-block" },
+    { "include": "#outline-block" },
+    { "include": "#fragment-block" },
+    { "include": "#background-block" },
+    { "include": "#step" },
+    { "include": "#directive" },
+    { "include": "#examples-block" }
+  ],
+  "repository": {
+    "comment": {
+      "match": "^\\s*#.*$",
+      "name": "comment.line.number-sign.lemoncheck"
+    },
+    "tags": {
+      "match": "@[\\w\\-]+",
+      "name": "entity.name.tag.lemoncheck"
+    },
+    "parameters-block": {
+      "begin": "^(parameters):",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.parameters.lemoncheck" }
+      },
+      "end": "^(?=\\S)",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#parameter-entry" }
+      ]
+    },
+    "parameter-entry": {
+      "match": "^\\s+([\\w\\.]+):\\s*(.*)$",
+      "captures": {
+        "1": { "name": "variable.parameter.lemoncheck" },
+        "2": { "name": "string.unquoted.lemoncheck" }
+      }
+    },
+    "feature-block": {
+      "match": "^(feature):\\s*(.*)$",
+      "captures": {
+        "1": { "name": "keyword.control.feature.lemoncheck" },
+        "2": { "name": "entity.name.section.feature.lemoncheck" }
+      }
+    },
+    "background-block": {
+      "match": "^\\s*(background):",
+      "captures": {
+        "1": { "name": "keyword.control.background.lemoncheck" }
+      }
+    },
+    "scenario-block": {
+      "match": "^\\s*(scenario):\\s*(.*)$",
+      "captures": {
+        "1": { "name": "keyword.control.scenario.lemoncheck" },
+        "2": { "name": "entity.name.section.scenario.lemoncheck" }
+      }
+    },
+    "outline-block": {
+      "match": "^\\s*(outline):\\s*(.*)$",
+      "captures": {
+        "1": { "name": "keyword.control.outline.lemoncheck" },
+        "2": { "name": "entity.name.section.outline.lemoncheck" }
+      }
+    },
+    "fragment-block": {
+      "match": "^(fragment):\\s*(.*)$",
+      "captures": {
+        "1": { "name": "keyword.control.fragment.lemoncheck" },
+        "2": { "name": "entity.name.section.fragment.lemoncheck" }
+      }
+    },
+    "step": {
+      "match": "^\\s*(given|when|then|and|but):?\\s*(.*)$",
+      "captures": {
+        "1": { "name": "keyword.control.step.lemoncheck" },
+        "2": { "name": "string.unquoted.step-description.lemoncheck" }
+      }
+    },
+    "directive": {
+      "patterns": [
+        { "include": "#call-directive" },
+        { "include": "#assert-directive" },
+        { "include": "#extract-directive" },
+        { "include": "#include-directive" },
+        { "include": "#body-directive" },
+        { "include": "#bodyfile-directive" },
+        { "include": "#parameter-value" }
+      ]
+    },
+    "call-directive": {
+      "match": "^\\s*(call)\\s+(?:(using)\\s+(\\w+)\\s+)?\\^([\\w\\-]+)",
+      "captures": {
+        "1": { "name": "keyword.other.call.lemoncheck" },
+        "2": { "name": "keyword.other.using.lemoncheck" },
+        "3": { "name": "variable.other.spec-name.lemoncheck" },
+        "4": { "name": "entity.name.function.operation-id.lemoncheck" }
+      }
+    },
+    "assert-directive": {
+      "patterns": [
+        { "include": "#assert-status" },
+        { "include": "#assert-header" },
+        { "include": "#assert-jsonpath" },
+        { "include": "#assert-body" },
+        { "include": "#assert-schema" },
+        { "include": "#assert-responsetime" }
+      ]
+    },
+    "assert-status": {
+      "match": "^\\s*(assert)\\s+(status(?:Code)?)\\s+(\\d+(?:xx|-\\d+)?)",
+      "captures": {
+        "1": { "name": "keyword.other.assert.lemoncheck" },
+        "2": { "name": "support.type.assertion-type.lemoncheck" },
+        "3": { "name": "constant.numeric.status-code.lemoncheck" }
+      }
+    },
+    "assert-header": {
+      "match": "^\\s*(assert)\\s+(header)\\s+([\\w\\-]+)(?:\\s*[:=]\\s*(.*))?",
+      "captures": {
+        "1": { "name": "keyword.other.assert.lemoncheck" },
+        "2": { "name": "support.type.assertion-type.lemoncheck" },
+        "3": { "name": "variable.other.header-name.lemoncheck" },
+        "4": { "name": "string.quoted.header-value.lemoncheck" }
+      }
+    },
+    "assert-jsonpath": {
+      "match": "^\\s*(assert)\\s+(\\$[\\w\\.\\[\\]\\*]+)\\s+(not\\s+)?(equals|exists|notEmpty|greaterThan|lessThan|contains|in|hasSize|size|matches|=)\\s*(.*)?",
+      "captures": {
+        "1": { "name": "keyword.other.assert.lemoncheck" },
+        "2": { "name": "variable.other.jsonpath.lemoncheck" },
+        "3": { "name": "keyword.operator.not.lemoncheck" },
+        "4": { "name": "keyword.operator.assertion.lemoncheck" },
+        "5": { 
+          "patterns": [
+            { "include": "#string-value" },
+            { "include": "#variable-interpolation" },
+            { "include": "#number" }
+          ]
+        }
+      }
+    },
+    "assert-body": {
+      "match": "^\\s*(assert)\\s+(not\\s+)?(contains)\\s+(.+)",
+      "captures": {
+        "1": { "name": "keyword.other.assert.lemoncheck" },
+        "2": { "name": "keyword.operator.not.lemoncheck" },
+        "3": { "name": "support.type.assertion-type.lemoncheck" },
+        "4": { 
+          "patterns": [
+            { "include": "#string-value" },
+            { "include": "#variable-interpolation" }
+          ]
+        }
+      }
+    },
+    "assert-schema": {
+      "match": "^\\s*(assert)\\s+(schema)\\s*$",
+      "captures": {
+        "1": { "name": "keyword.other.assert.lemoncheck" },
+        "2": { "name": "support.type.assertion-type.lemoncheck" }
+      }
+    },
+    "assert-responsetime": {
+      "match": "^\\s*(assert)\\s+(responseTime)\\s+(\\d+)",
+      "captures": {
+        "1": { "name": "keyword.other.assert.lemoncheck" },
+        "2": { "name": "support.type.assertion-type.lemoncheck" },
+        "3": { "name": "constant.numeric.lemoncheck" }
+      }
+    },
+    "extract-directive": {
+      "match": "^\\s*(extract)\\s+(\\$[\\w\\.\\[\\]\\*]+)\\s+(=>)\\s+(\\w+)",
+      "captures": {
+        "1": { "name": "keyword.other.extract.lemoncheck" },
+        "2": { "name": "variable.other.jsonpath.lemoncheck" },
+        "3": { "name": "keyword.operator.arrow.lemoncheck" },
+        "4": { "name": "variable.other.extraction-name.lemoncheck" }
+      }
+    },
+    "include-directive": {
+      "match": "^\\s*(include)\\s+([\\w\\-]+)",
+      "captures": {
+        "1": { "name": "keyword.other.include.lemoncheck" },
+        "2": { "name": "entity.name.function.fragment-name.lemoncheck" }
+      }
+    },
+    "body-directive": {
+      "begin": "^\\s*(body):\\s*(?:(>)\\s*)?",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.body.lemoncheck" },
+        "2": { "name": "keyword.operator.multiline.lemoncheck" }
+      },
+      "end": "$",
+      "patterns": [
+        { "include": "#json-body" },
+        { "include": "#variable-interpolation" }
+      ]
+    },
+    "bodyfile-directive": {
+      "match": "^\\s*(bodyFile):\\s*(.+)",
+      "captures": {
+        "1": { "name": "keyword.other.bodyfile.lemoncheck" },
+        "2": { "name": "string.unquoted.filepath.lemoncheck" }
+      }
+    },
+    "parameter-value": {
+      "match": "^\\s+(header_)?([\\w\\-]+):\\s*(.*)$",
+      "captures": {
+        "1": { "name": "support.type.header-prefix.lemoncheck" },
+        "2": { "name": "variable.parameter.lemoncheck" },
+        "3": {
+          "patterns": [
+            { "include": "#string-value" },
+            { "include": "#variable-interpolation" },
+            { "include": "#number" },
+            { "include": "#boolean" }
+          ]
+        }
+      }
+    },
+    "examples-block": {
+      "begin": "^\\s*(examples):",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.examples.lemoncheck" }
+      },
+      "end": "^(?=\\S)",
+      "patterns": [
+        { "include": "#table-row" }
+      ]
+    },
+    "table-row": {
+      "match": "^\\s*\\|(.*)\\|\\s*$",
+      "captures": {
+        "1": { "name": "string.unquoted.table-cell.lemoncheck" }
+      }
+    },
+    "variable-interpolation": {
+      "patterns": [
+        {
+          "match": "\\{\\{([\\w\\.\\-]+)\\}\\}",
+          "name": "variable.other.interpolation.lemoncheck",
+          "captures": {
+            "1": { "name": "variable.other.name.lemoncheck" }
+          }
+        },
+        {
+          "match": "\\$\\{([\\w\\.\\-]+)\\}",
+          "name": "variable.other.interpolation.lemoncheck",
+          "captures": {
+            "1": { "name": "variable.other.name.lemoncheck" }
+          }
+        },
+        {
+          "match": "\\$([a-zA-Z_][\\w]*)",
+          "name": "variable.other.interpolation.lemoncheck",
+          "captures": {
+            "1": { "name": "variable.other.name.lemoncheck" }
+          }
+        }
+      ]
+    },
+    "string-value": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.lemoncheck",
+          "patterns": [
+            { "include": "#variable-interpolation" },
+            { "match": "\\\\.", "name": "constant.character.escape.lemoncheck" }
+          ]
+        },
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "string.quoted.single.lemoncheck",
+          "patterns": [
+            { "include": "#variable-interpolation" }
+          ]
+        }
+      ]
+    },
+    "json-body": {
+      "begin": "\\{",
+      "end": "\\}",
+      "name": "meta.structure.json.lemoncheck",
+      "patterns": [
+        { "include": "#variable-interpolation" },
+        { "include": "#string-value" },
+        { "include": "#number" },
+        { "include": "#boolean" },
+        { "include": "#json-body" },
+        { "include": "#json-array" }
+      ]
+    },
+    "json-array": {
+      "begin": "\\[",
+      "end": "\\]",
+      "name": "meta.structure.array.lemoncheck",
+      "patterns": [
+        { "include": "#variable-interpolation" },
+        { "include": "#string-value" },
+        { "include": "#number" },
+        { "include": "#boolean" },
+        { "include": "#json-body" },
+        { "include": "#json-array" }
+      ]
+    },
+    "number": {
+      "match": "-?\\d+(\\.\\d+)?",
+      "name": "constant.numeric.lemoncheck"
+    },
+    "boolean": {
+      "match": "\\b(true|false)\\b",
+      "name": "constant.language.boolean.lemoncheck"
+    }
+  }
+}

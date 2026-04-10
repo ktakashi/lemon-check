@@ -1,0 +1,96 @@
+{
+  "name": "lemoncheck",
+  "displayName": "LemonCheck",
+  "description": "IDE support for LemonCheck scenario files - syntax highlighting, completion, and navigation",
+  "version": "0.3.1",
+  "publisher": "lemoncheck",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ktakashi/lemon-check"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Testing"
+  ],
+  "keywords": [
+    "lemoncheck",
+    "openapi",
+    "api",
+    "testing",
+    "bdd"
+  ],
+  "activationEvents": [
+    "onLanguage:lemoncheck"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "lemoncheck",
+        "aliases": ["LemonCheck", "lemoncheck"],
+        "extensions": [".scenario", ".fragment"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lemoncheck",
+        "scopeName": "source.lemoncheck",
+        "path": "./syntaxes/lemoncheck.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "LemonCheck",
+      "properties": {
+        "lemoncheck.openapi.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to OpenAPI spec file (relative to workspace root)"
+        },
+        "lemoncheck.openapi.paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Paths to OpenAPI spec files for multi-spec projects"
+        },
+        "lemoncheck.fragmentsPath": {
+          "type": "string",
+          "default": "src/test/resources",
+          "description": "Path to search for fragment files"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.2.0",
+    "typescript": "^5.3.3",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4"
+  }
+}
