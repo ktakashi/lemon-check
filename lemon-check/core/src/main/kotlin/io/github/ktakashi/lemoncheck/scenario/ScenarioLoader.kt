@@ -210,6 +210,7 @@ class ScenarioLoader {
             steps = steps,
             background = backgroundSteps,
             examples = examples,
+            sourceLocation = node.location,
         )
     }
 
@@ -260,6 +261,7 @@ class ScenarioLoader {
                 Step(
                     type = stepType,
                     description = node.description,
+                    sourceLocation = node.location,
                 ),
             )
         }
@@ -298,6 +300,7 @@ class ScenarioLoader {
                     body = body,
                     extractions = currentExtractions.toList(),
                     assertions = currentAssertions.toList(),
+                    sourceLocation = call.location,
                 ),
             )
             currentExtractions = mutableListOf()
@@ -333,6 +336,7 @@ class ScenarioLoader {
                             type = stepType,
                             description = "include ${action.fragmentName}",
                             fragmentName = action.fragmentName,
+                            sourceLocation = action.location,
                         ),
                     )
                 }
@@ -350,6 +354,7 @@ class ScenarioLoader {
                     description = node.description,
                     extractions = currentExtractions.toList(),
                     assertions = currentAssertions.toList(),
+                    sourceLocation = node.location,
                 ),
             )
         }
@@ -359,6 +364,7 @@ class ScenarioLoader {
                 Step(
                     type = stepType,
                     description = node.description,
+                    sourceLocation = node.location,
                 ),
             )
         }

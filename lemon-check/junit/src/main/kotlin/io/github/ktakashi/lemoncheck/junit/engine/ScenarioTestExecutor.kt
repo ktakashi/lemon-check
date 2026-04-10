@@ -392,7 +392,9 @@ class ScenarioTestExecutor(
                         val keyword =
                             step.step.type.name
                                 .lowercase()
-                        val header = "  Step ${index + 1} ($keyword): ${step.step.description}"
+                        val locationInfo =
+                            step.step.sourceLocation?.let { " at $it" } ?: ""
+                        val header = "  Step ${index + 1} ($keyword): ${step.step.description}$locationInfo"
                         val details =
                             step.assertionResults
                                 .filter { !it.passed }

@@ -1,5 +1,7 @@
 package io.github.ktakashi.lemoncheck.model
 
+import io.github.ktakashi.lemoncheck.scenario.SourceLocation
+
 /**
  * Represents a single BDD step within a scenario.
  *
@@ -15,6 +17,7 @@ package io.github.ktakashi.lemoncheck.model
  * @property assertions Assertions to verify on response
  * @property autoAssert Whether to generate assertions from OpenAPI spec
  * @property fragmentName Name of fragment to include (for fragment steps)
+ * @property sourceLocation Optional source location for error reporting
  */
 data class Step(
     val type: StepType,
@@ -29,4 +32,5 @@ data class Step(
     val assertions: List<Assertion> = emptyList(),
     val autoAssert: Boolean = true,
     val fragmentName: String? = null,
+    val sourceLocation: SourceLocation? = null,
 )

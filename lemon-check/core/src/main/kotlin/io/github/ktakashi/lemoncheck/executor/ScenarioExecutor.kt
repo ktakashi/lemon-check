@@ -13,6 +13,7 @@ import io.github.ktakashi.lemoncheck.model.Scenario
 import io.github.ktakashi.lemoncheck.model.ScenarioResult
 import io.github.ktakashi.lemoncheck.model.Step
 import io.github.ktakashi.lemoncheck.model.StepResult
+import io.github.ktakashi.lemoncheck.openapi.HttpMethod
 import io.github.ktakashi.lemoncheck.openapi.SpecRegistry
 import io.github.ktakashi.lemoncheck.plugin.PluginRegistry
 import io.github.ktakashi.lemoncheck.plugin.adapter.ScenarioContextAdapter
@@ -38,7 +39,6 @@ class ScenarioExecutor(
     private val fragmentRegistry: FragmentRegistry? = null,
 ) {
     private val httpBuilder = HttpRequestBuilder(configuration)
-    private val responseHandler = ResponseHandler()
 
     /**
      * Execute a single scenario.
@@ -54,72 +54,13 @@ class ScenarioExecutor(
         sourceFile: java.io.File? = null,
     ): ScenarioResult {
         val startTime = Instant.now()
-        // Use shared context if provided, otherwise create a fresh one
         val context = sharedContext?.createChild() ?: ExecutionContext()
-        val stepResults = mutableListOf<StepResult>()
-        var overallStatus = ResultStatus.PASSED
-        var continueExecution = true
-
-        // Create plugin context
         val scenarioContext = ScenarioContextAdapter(scenario, context, startTime, sourceFile)
 
-        // Dispatch plugin: onScenarioStart
         pluginRegistry?.dispatchScenarioStart(scenarioContext)
 
-        var stepIndex = 0
-
-        // Execute background steps first
-        for (step in scenario.background) {
-            if (!continueExecution) break
-
-            // Expand fragments if needed
-            val stepsToExecute = expandStep(step)
-            for (expandedStep in stepsToExecute) {
-                if (!continueExecution) break
-                val result = executeStepWithPlugins(expandedStep, context, scenarioContext, stepIndex++)
-                stepResults.add(result)
-                if (result.status != ResultStatus.PASSED) {
-                    overallStatus = result.status
-                    continueExecution = false
-                }
-            }
-        }
-
-        // Execute scenario steps
-        for (step in scenario.steps) {
-            if (!continueExecution) {
-                stepResults.add(
-                    StepResult(
-                        step = step,
-                        status = ResultStatus.SKIPPED,
-                    ),
-                )
-                continue
-            }
-
-            // Expand fragments if needed
-            val stepsToExecute = expandStep(step)
-            for (expandedStep in stepsToExecute) {
-                if (!continueExecution) {
-                    stepResults.add(
-                        StepResult(
-                            step = expandedStep,
-                            status = ResultStatus.SKIPPED,
-                        ),
-                    )
-                    continue
-                }
-
-                val result = executeStepWithPlugins(expandedStep, context, scenarioContext, stepIndex++)
-                stepResults.add(result)
-
-                if (result.status != ResultStatus.PASSED) {
-                    overallStatus = result.status
-                    continueExecution = false
-                }
-            }
-        }
-
+        val stepResults = executeAllSteps(scenario, context, scenarioContext)
+        val overallStatus = determineOverallStatus(stepResults)
         val duration = Duration.between(startTime, Instant.now())
 
         val scenarioResult =
@@ -131,20 +72,113 @@ class ScenarioExecutor(
                 duration = duration,
             )
 
-        // Dispatch plugin: onScenarioEnd
         pluginRegistry?.dispatchScenarioEnd(scenarioContext, ScenarioResultAdapter(scenarioResult))
 
         // Copy extracted variables back to shared context for cross-scenario sharing
         if (sharedContext != null && scenarioResult.status == ResultStatus.PASSED) {
             context.allVariables().forEach { (name, value) ->
-                if (value != null) {
-                    sharedContext[name] = value
-                }
+                value?.let { sharedContext[name] = it }
             }
         }
 
         return scenarioResult
     }
+
+    /**
+     * Execute all steps (background + scenario) and return results.
+     */
+    private fun executeAllSteps(
+        scenario: Scenario,
+        context: ExecutionContext,
+        scenarioContext: ScenarioContextAdapter,
+    ): List<StepResult> {
+        val stepResults = mutableListOf<StepResult>()
+        var stepIndex = 0
+        var continueExecution = true
+
+        // Execute background steps
+        continueExecution =
+            executeStepsWithContinuation(
+                scenario.background,
+                context,
+                scenarioContext,
+                stepResults,
+                stepIndex,
+                continueExecution,
+            ) { stepIndex++ }
+
+        // Execute scenario steps
+        for (step in scenario.steps) {
+            if (!continueExecution) {
+                // Skip remaining steps
+                stepResults.add(StepResult(step = step, status = ResultStatus.SKIPPED))
+                continue
+            }
+
+            val expandedSteps = expandStep(step)
+            for (expandedStep in expandedSteps) {
+                if (!continueExecution) {
+                    stepResults.add(StepResult(step = expandedStep, status = ResultStatus.SKIPPED))
+                    continue
+                }
+
+                val result = executeStepWithPlugins(expandedStep, context, scenarioContext, stepIndex++)
+                stepResults.add(result)
+
+                if (result.status != ResultStatus.PASSED) {
+                    continueExecution = false
+                }
+            }
+        }
+
+        return stepResults
+    }
+
+    /**
+     * Execute a list of steps with continuation control.
+     */
+    private fun executeStepsWithContinuation(
+        steps: List<Step>,
+        context: ExecutionContext,
+        scenarioContext: ScenarioContextAdapter,
+        results: MutableList<StepResult>,
+        startIndex: Int,
+        initialContinue: Boolean,
+        onStepExecuted: () -> Unit,
+    ): Boolean {
+        var continueExecution = initialContinue
+
+        for (step in steps) {
+            if (!continueExecution) break
+
+            val expandedSteps = expandStep(step)
+            for (expandedStep in expandedSteps) {
+                if (!continueExecution) break
+
+                val result = executeStepWithPlugins(expandedStep, context, scenarioContext, startIndex)
+                results.add(result)
+                onStepExecuted()
+
+                if (result.status != ResultStatus.PASSED) {
+                    continueExecution = false
+                }
+            }
+        }
+
+        return continueExecution
+    }
+
+    /**
+     * Determine overall status from step results.
+     */
+    private fun determineOverallStatus(stepResults: List<StepResult>): ResultStatus =
+        when {
+            stepResults.isEmpty() -> ResultStatus.PASSED
+            stepResults.any { it.status == ResultStatus.ERROR } -> ResultStatus.ERROR
+            stepResults.any { it.status == ResultStatus.FAILED } -> ResultStatus.FAILED
+            stepResults.all { it.status == ResultStatus.SKIPPED } -> ResultStatus.SKIPPED
+            else -> ResultStatus.PASSED
+        }
 
     private fun executeStepWithPlugins(
         step: Step,
@@ -197,119 +231,159 @@ class ScenarioExecutor(
         val stepStartTime = Instant.now()
 
         // If no operation to call, check if there are assertions or extractions to run against the last response
-        if (step.operationId == null) {
-            // If there are assertions or extractions, run them against the last response
-            if (step.assertions.isNotEmpty() || step.extractions.isNotEmpty()) {
-                val lastResponse =
-                    context.lastResponse
-                        ?: return StepResult(
-                            step = step,
-                            status = ResultStatus.ERROR,
-                            duration = Duration.between(stepStartTime, Instant.now()),
-                            error = IllegalStateException("No previous response to run assertions/extractions against"),
-                        )
+        return step.operationId?.let {
+            executeOperationStep(step, context, stepStartTime)
+        } ?: executeNonOperationStep(step, context, stepStartTime)
+    }
 
-                // Run extractions
-                val extractedValues = extractValues(lastResponse, step, context)
-
-                // Run assertions
-                val assertionResults = runAssertions(lastResponse, step.assertions)
-                val allPassed = assertionResults.all { it.passed }
-
-                return StepResult(
-                    step = step,
-                    status = if (allPassed) ResultStatus.PASSED else ResultStatus.FAILED,
-                    statusCode = lastResponse.statusCode(),
-                    responseBody = lastResponse.body(),
-                    responseHeaders = lastResponse.headers().map(),
-                    duration = Duration.between(stepStartTime, Instant.now()),
-                    extractedValues = extractedValues,
-                    assertionResults = assertionResults,
-                )
-            }
-
+    /**
+     * Execute a step that has no operationId (assertions/extractions against last response or no-op).
+     */
+    private fun executeNonOperationStep(
+        step: Step,
+        context: ExecutionContext,
+        stepStartTime: Instant,
+    ): StepResult =
+        if (step.assertions.isEmpty() && step.extractions.isEmpty()) {
             // No operation and no assertions - just pass
-            return StepResult(
+            StepResult(
                 step = step,
                 status = ResultStatus.PASSED,
                 duration = Duration.between(stepStartTime, Instant.now()),
             )
-        }
-
-        try {
-            // Resolve the operation
-            val (spec, resolvedOp) = specRegistry.resolve(step.operationId, step.specName)
-
-            // Build the URL
-            val baseUrl = configuration.baseUrl ?: spec.baseUrl
-            val url =
-                httpBuilder.buildUrl(
-                    baseUrl = baseUrl,
-                    path = resolvedOp.path,
-                    pathParams = resolveParams(step.pathParams, context),
-                    queryParams = resolveParams(step.queryParams, context),
-                )
-
-            // Merge headers immutably
-            val headers = configuration.defaultHeaders + spec.defaultHeaders + step.headers
-
-            // Resolve body with variable interpolation
-            val body = step.body?.let { context.interpolate(it) }
-
-            // Log request if enabled
-            if (configuration.logRequests) {
-                val logger = configuration.getEffectiveHttpLogger()
-                logger.logRequest(resolvedOp.method, url, headers, body)
-            }
-
-            // Record request start time for logging
-            val requestStartTime = System.currentTimeMillis()
-
-            // Execute the HTTP request
-            val response =
-                httpBuilder.execute(
-                    method = resolvedOp.method,
-                    url = url,
-                    headers = headers,
-                    body = body,
-                )
-
-            // Log response if enabled
-            if (configuration.logResponses) {
-                val logger = configuration.getEffectiveHttpLogger()
-                val durationMs = System.currentTimeMillis() - requestStartTime
-                logger.logResponse(resolvedOp.method, url, response, durationMs)
-            }
-
-            // Update context with response
-            context.updateLastResponse(response)
-
-            // Extract values
-            val extractedValues = extractValues(response, step, context)
-
-            // Run assertions
-            val assertionResults = runAssertions(response, step.assertions)
-
-            val allPassed = assertionResults.all { it.passed }
-            val stepDuration = Duration.between(stepStartTime, Instant.now())
-
-            return StepResult(
-                step = step,
-                status = if (allPassed) ResultStatus.PASSED else ResultStatus.FAILED,
-                statusCode = response.statusCode(),
-                responseBody = response.body(),
-                responseHeaders = response.headers().map(),
-                duration = stepDuration,
-                extractedValues = extractedValues,
-                assertionResults = assertionResults,
-            )
-        } catch (e: Exception) {
-            return StepResult(
+        } else {
+            // Run assertions/extractions against last response
+            context.lastResponse?.let { response ->
+                buildResultFromResponse(step, response, stepStartTime, context)
+            } ?: StepResult(
                 step = step,
                 status = ResultStatus.ERROR,
                 duration = Duration.between(stepStartTime, Instant.now()),
-                error = e,
+                error = IllegalStateException("No previous response to run assertions/extractions against"),
             )
+        }
+
+    /**
+     * Execute a step with an operationId (HTTP request).
+     */
+    private fun executeOperationStep(
+        step: Step,
+        context: ExecutionContext,
+        stepStartTime: Instant,
+    ): StepResult =
+        runCatching {
+            executeHttpRequest(step, context, stepStartTime)
+        }.getOrElse { e ->
+            StepResult(
+                step = step,
+                status = ResultStatus.ERROR,
+                duration = Duration.between(stepStartTime, Instant.now()),
+                error = e as? Exception ?: RuntimeException(e),
+            )
+        }
+
+    /**
+     * Build request context and execute HTTP request.
+     */
+    private fun executeHttpRequest(
+        step: Step,
+        context: ExecutionContext,
+        stepStartTime: Instant,
+    ): StepResult {
+        // Resolve the operation
+        val (spec, resolvedOp) = specRegistry.resolve(step.operationId!!, step.specName)
+
+        // Build the URL
+        val baseUrl = configuration.baseUrl ?: spec.baseUrl
+        val url =
+            httpBuilder.buildUrl(
+                baseUrl = baseUrl,
+                path = resolvedOp.path,
+                pathParams = resolveParams(step.pathParams, context),
+                queryParams = resolveParams(step.queryParams, context),
+            )
+
+        // Merge headers immutably
+        val headers = configuration.defaultHeaders + spec.defaultHeaders + step.headers
+
+        // Resolve body with variable interpolation
+        val body = step.body?.let { context.interpolate(it) }
+
+        // Log request if enabled
+        logRequest(resolvedOp.method, url, headers, body)
+
+        // Record request start time for logging
+        val requestStartTime = System.currentTimeMillis()
+
+        // Execute the HTTP request
+        val response =
+            httpBuilder.execute(
+                method = resolvedOp.method,
+                url = url,
+                headers = headers,
+                body = body,
+            )
+
+        // Log response if enabled
+        logResponse(resolvedOp.method, url, response, requestStartTime)
+
+        // Update context with response
+        context.updateLastResponse(response)
+
+        return buildResultFromResponse(step, response, stepStartTime, context)
+    }
+
+    /**
+     * Build a StepResult from an HTTP response.
+     */
+    private fun buildResultFromResponse(
+        step: Step,
+        response: HttpResponse<String>,
+        stepStartTime: Instant,
+        context: ExecutionContext,
+    ): StepResult {
+        val extractedValues = extractValues(response, step, context)
+        val assertionResults = runAssertions(response, step.assertions)
+        val allPassed = assertionResults.all { it.passed }
+
+        return StepResult(
+            step = step,
+            status = if (allPassed) ResultStatus.PASSED else ResultStatus.FAILED,
+            statusCode = response.statusCode(),
+            responseBody = response.body(),
+            responseHeaders = response.headers().map(),
+            duration = Duration.between(stepStartTime, Instant.now()),
+            extractedValues = extractedValues,
+            assertionResults = assertionResults,
+        )
+    }
+
+    /**
+     * Log HTTP request if enabled.
+     */
+    private fun logRequest(
+        method: HttpMethod,
+        url: String,
+        headers: Map<String, String>,
+        body: String?,
+    ) {
+        if (configuration.logRequests) {
+            configuration.getEffectiveHttpLogger().logRequest(method, url, headers, body)
+        }
+    }
+
+    /**
+     * Log HTTP response if enabled.
+     */
+    private fun logResponse(
+        method: HttpMethod,
+        url: String,
+        response: HttpResponse<String>,
+        requestStartTime: Long,
+    ) {
+        if (configuration.logResponses) {
+            val durationMs = System.currentTimeMillis() - requestStartTime
+            configuration.getEffectiveHttpLogger().logResponse(method, url, response, durationMs)
         }
     }
 
@@ -408,24 +482,26 @@ class ScenarioExecutor(
         val jsonPath = assertion.jsonPath ?: "$"
         val expected = assertion.expected
 
-        return try {
-            val actual = JsonPath.read<Any>(body, jsonPath)
-            val passed = valuesEqual(actual, expected)
-
-            AssertionResult(
-                assertion = assertion,
-                passed = passed,
-                message = if (passed) "$jsonPath equals $expected" else "Expected $expected at $jsonPath but got $actual",
-                actual = actual,
+        return runCatching { JsonPath.read<Any>(body, jsonPath) }
+            .fold(
+                onSuccess = { actual ->
+                    val passed = valuesEqual(actual, expected)
+                    AssertionResult(
+                        assertion = assertion,
+                        passed = passed,
+                        message = if (passed) "$jsonPath equals $expected" else "Expected $expected at $jsonPath but got $actual",
+                        actual = actual,
+                    )
+                },
+                onFailure = { e ->
+                    AssertionResult(
+                        assertion = assertion,
+                        passed = false,
+                        message = "Failed to evaluate JSONPath '$jsonPath': ${e.message}",
+                        actual = null,
+                    )
+                },
             )
-        } catch (e: Exception) {
-            AssertionResult(
-                assertion = assertion,
-                passed = false,
-                message = "Failed to evaluate JSONPath '$jsonPath': ${e.message}",
-                actual = null,
-            )
-        }
     }
 
     /**
@@ -464,25 +540,19 @@ class ScenarioExecutor(
         val jsonPath = assertion.jsonPath ?: "$"
         val pattern = assertion.pattern ?: ""
 
-        return try {
+        return runCatching {
             val actual = JsonPath.read<Any>(body, jsonPath)?.toString() ?: ""
             val regex = Regex(pattern)
             val passed = regex.containsMatchIn(actual)
-
-            AssertionResult(
-                assertion = assertion,
-                passed = passed,
-                message = if (passed) "$jsonPath matches pattern" else "Value at $jsonPath does not match pattern '$pattern'",
-                actual = actual,
-            )
-        } catch (e: Exception) {
-            AssertionResult(
-                assertion = assertion,
-                passed = false,
-                message = "Failed to evaluate: ${e.message}",
-                actual = null,
-            )
-        }
+            Triple(actual, passed, if (passed) "$jsonPath matches pattern" else "Value at $jsonPath does not match pattern '$pattern'")
+        }.fold(
+            onSuccess = { (actual, passed, message) ->
+                AssertionResult(assertion = assertion, passed = passed, message = message, actual = actual)
+            },
+            onFailure = { e ->
+                AssertionResult(assertion = assertion, passed = false, message = "Failed to evaluate: ${e.message}", actual = null)
+            },
+        )
     }
 
     private fun assertBodyArraySize(
@@ -493,25 +563,27 @@ class ScenarioExecutor(
         val jsonPath = assertion.jsonPath ?: "$"
         val expected = assertion.expected as? Int ?: 0
 
-        return try {
-            val array = JsonPath.read<List<*>>(body, jsonPath)
-            val actual = array.size
-            val passed = actual == expected
-
-            AssertionResult(
-                assertion = assertion,
-                passed = passed,
-                message = if (passed) "Array size is $actual" else "Expected array size $expected but got $actual",
-                actual = actual,
+        return runCatching { JsonPath.read<List<*>>(body, jsonPath) }
+            .fold(
+                onSuccess = { array ->
+                    val actual = array.size
+                    val passed = actual == expected
+                    AssertionResult(
+                        assertion = assertion,
+                        passed = passed,
+                        message = if (passed) "Array size is $actual" else "Expected array size $expected but got $actual",
+                        actual = actual,
+                    )
+                },
+                onFailure = { e ->
+                    AssertionResult(
+                        assertion = assertion,
+                        passed = false,
+                        message = "Failed to evaluate array at '$jsonPath': ${e.message}",
+                        actual = null,
+                    )
+                },
             )
-        } catch (e: Exception) {
-            AssertionResult(
-                assertion = assertion,
-                passed = false,
-                message = "Failed to evaluate array at '$jsonPath': ${e.message}",
-                actual = null,
-            )
-        }
     }
 
     private fun assertBodyArrayNotEmpty(
@@ -521,24 +593,26 @@ class ScenarioExecutor(
         val body = response.body() ?: ""
         val jsonPath = assertion.jsonPath ?: "$"
 
-        return try {
-            val array = JsonPath.read<List<*>>(body, jsonPath)
-            val passed = array.isNotEmpty()
-
-            AssertionResult(
-                assertion = assertion,
-                passed = passed,
-                message = if (passed) "Array is not empty (size: ${array.size})" else "Array at $jsonPath is empty",
-                actual = array.size,
+        return runCatching { JsonPath.read<List<*>>(body, jsonPath) }
+            .fold(
+                onSuccess = { array ->
+                    val passed = array.isNotEmpty()
+                    AssertionResult(
+                        assertion = assertion,
+                        passed = passed,
+                        message = if (passed) "Array is not empty (size: ${array.size})" else "Array at $jsonPath is empty",
+                        actual = array.size,
+                    )
+                },
+                onFailure = { e ->
+                    AssertionResult(
+                        assertion = assertion,
+                        passed = false,
+                        message = "Failed to evaluate array at '$jsonPath': ${e.message}",
+                        actual = null,
+                    )
+                },
             )
-        } catch (e: Exception) {
-            AssertionResult(
-                assertion = assertion,
-                passed = false,
-                message = "Failed to evaluate array at '$jsonPath': ${e.message}",
-                actual = null,
-            )
-        }
     }
 
     private fun assertHeaderExists(

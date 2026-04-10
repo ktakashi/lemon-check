@@ -1,5 +1,7 @@
 package io.github.ktakashi.lemoncheck.model
 
+import io.github.ktakashi.lemoncheck.scenario.SourceLocation
+
 /**
  * Represents a BDD scenario containing a sequence of steps.
  *
@@ -8,6 +10,7 @@ package io.github.ktakashi.lemoncheck.model
  * @property steps Ordered list of steps to execute
  * @property background Optional background steps run before the scenario
  * @property examples Optional example rows for scenario outline parameterization
+ * @property sourceLocation Optional source location for error reporting
  */
 data class Scenario(
     val name: String,
@@ -15,6 +18,7 @@ data class Scenario(
     val steps: List<Step> = emptyList(),
     val background: List<Step> = emptyList(),
     val examples: List<ExampleRow>? = null,
+    val sourceLocation: SourceLocation? = null,
 ) {
     init {
         require(name.isNotBlank()) { "Scenario name cannot be blank" }
