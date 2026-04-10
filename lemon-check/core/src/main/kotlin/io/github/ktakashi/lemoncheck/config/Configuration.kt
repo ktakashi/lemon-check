@@ -1,5 +1,8 @@
 package io.github.ktakashi.lemoncheck.config
 
+import io.github.ktakashi.lemoncheck.logging.HttpLogFormatter
+import io.github.ktakashi.lemoncheck.logging.HttpLogger
+import io.github.ktakashi.lemoncheck.logging.HttpLoggerFactory
 import java.time.Duration
 
 /**
@@ -14,6 +17,8 @@ import java.time.Duration
  * @property followRedirects Whether to follow HTTP redirects
  * @property logRequests Whether to log HTTP requests
  * @property logResponses Whether to log HTTP responses
+ * @property httpLogger Custom HTTP logger (default: JUL-based logger)
+ * @property logFormatter Custom log formatter (default: multi-line human-readable format)
  */
 data class Configuration(
     var baseUrl: String? = null,
@@ -26,6 +31,16 @@ data class Configuration(
     var logRequests: Boolean = false,
     var logResponses: Boolean = false,
     /**
+     * Custom HTTP logger for request/response logging.
+     * Set to null to use the default logger from HttpLoggerFactory.
+     */
+    var httpLogger: HttpLogger? = null,
+    /**
+     * Custom log formatter for formatting log messages.
+     * Only used if httpLogger is null (using the default logger).
+     */
+    var logFormatter: HttpLogFormatter? = null,
+    /**
      * Whether to share variables across scenarios.
      *
      * When enabled, variables extracted in one scenario are available in subsequent
@@ -37,6 +52,12 @@ data class Configuration(
      */
     var shareVariablesAcrossScenarios: Boolean = false,
 ) {
+    /**
+     * Get the effective HTTP logger.
+     * Returns the custom logger if set, otherwise creates one from the factory.
+     */
+    fun getEffectiveHttpLogger(): HttpLogger = httpLogger ?: HttpLoggerFactory.create()
+
     /**
      * DSL helper to set timeout in seconds.
      */

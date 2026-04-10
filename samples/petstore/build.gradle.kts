@@ -10,6 +10,15 @@ java {
     }
 }
 
+tasks.withType<Test> {
+    useJUnitPlatform {
+        includeEngines("lemoncheck")
+    }
+    testLogging {
+        showStandardStreams = true
+    }
+}
+
 dependencies {
     // Spring Boot
     implementation(libs.bundles.spring.boot)

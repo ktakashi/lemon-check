@@ -73,5 +73,7 @@ public class PetstoreBindings implements LemonCheckBindings {
     public void configure(Configuration config) {
         // Don't set a global baseUrl - use per-spec base URLs instead
         // This enables true multi-host API testing
+        config.setLogRequests(true);
+        config.setLogResponses(true);
     }
 }

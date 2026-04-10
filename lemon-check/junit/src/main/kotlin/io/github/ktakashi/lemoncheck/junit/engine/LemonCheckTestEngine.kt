@@ -313,7 +313,8 @@ class LemonCheckTestEngine : TestEngine {
                     // Initialize shared context if shareVariablesAcrossScenarios is enabled
                     val sharedContext =
                         if (fileConfig.shareVariablesAcrossScenarios) {
-                            io.github.ktakashi.lemoncheck.context.ExecutionContext()
+                            io.github.ktakashi.lemoncheck.context
+                                .ExecutionContext()
                         } else {
                             null
                         }

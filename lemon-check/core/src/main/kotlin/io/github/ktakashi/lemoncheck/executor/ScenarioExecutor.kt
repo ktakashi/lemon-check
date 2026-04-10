@@ -256,6 +256,15 @@ class ScenarioExecutor(
             // Resolve body with variable interpolation
             val body = step.body?.let { context.interpolate(it) }
 
+            // Log request if enabled
+            if (configuration.logRequests) {
+                val logger = configuration.getEffectiveHttpLogger()
+                logger.logRequest(resolvedOp.method, url, headers, body)
+            }
+
+            // Record request start time for logging
+            val requestStartTime = System.currentTimeMillis()
+
             // Execute the HTTP request
             val response =
                 httpBuilder.execute(
@@ -264,6 +273,13 @@ class ScenarioExecutor(
                     headers = headers,
                     body = body,
                 )
+
+            // Log response if enabled
+            if (configuration.logResponses) {
+                val logger = configuration.getEffectiveHttpLogger()
+                val durationMs = System.currentTimeMillis() - requestStartTime
+                logger.logResponse(resolvedOp.method, url, response, durationMs)
+            }
 
             // Update context with response
             context.updateLastResponse(response)
