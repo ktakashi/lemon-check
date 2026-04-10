@@ -228,15 +228,28 @@ class LemonCheckTestEngine : TestEngine {
             suite.configuration.baseUrl = it.toString()
         }
 
+        // Get per-spec base URLs
+        val specBaseUrls = bindings.getSpecBaseUrls()
+
         // Load OpenAPI spec if specified
         val specPath = bindings.getOpenApiSpec() ?: classDescriptor.openApiSpec
         if (!specPath.isNullOrBlank()) {
-            suite.spec(specPath)
+            val defaultBaseUrl = specBaseUrls["default"]
+            suite.spec(specPath) {
+                if (defaultBaseUrl != null) {
+                    baseUrl = defaultBaseUrl
+                }
+            }
         }
 
-        // Register additional named specs
+        // Register additional named specs with their base URLs
         bindings.getAdditionalSpecs().forEach { (name, path) ->
-            suite.spec(name, path)
+            val specBaseUrl = specBaseUrls[name]
+            suite.spec(name, path) {
+                if (specBaseUrl != null) {
+                    baseUrl = specBaseUrl
+                }
+            }
         }
 
         // Create plugin registry with user plugins
@@ -284,6 +297,17 @@ class LemonCheckTestEngine : TestEngine {
                 if (fileParameters.isNotEmpty()) {
                     // Create a modified executor and shared context for this file
                     val fileConfig = suite.configuration.withParameters(fileParameters)
+
+                    // Apply per-spec base URL overrides from parameters
+                    fileParameters.forEach { (key, value) ->
+                        if (key.startsWith("baseUrl.")) {
+                            val specName = key.removePrefix("baseUrl.")
+                            if (suite.specRegistry.specNames().contains(specName)) {
+                                suite.specRegistry.updateBaseUrl(specName, value.toString())
+                            }
+                        }
+                    }
+
                     val fileExecutor = ScenarioExecutor(suite.specRegistry, fileConfig, pluginRegistry, fragmentRegistry)
 
                     // Initialize shared context if shareVariablesAcrossScenarios is enabled

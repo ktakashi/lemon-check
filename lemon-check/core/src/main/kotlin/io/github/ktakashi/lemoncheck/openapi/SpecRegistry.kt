@@ -120,6 +120,25 @@ class SpecRegistry {
      */
     fun specNames(): Set<String> = specs.keys.toSet()
 
+    /**
+     * Update the base URL for a registered spec.
+     *
+     * This allows overriding the base URL after spec registration,
+     * useful for file-level parameters or runtime configuration.
+     *
+     * @param name The spec name to update
+     * @param newBaseUrl The new base URL
+     * @throws IllegalArgumentException if spec is not found
+     */
+    fun updateBaseUrl(
+        name: String,
+        newBaseUrl: String,
+    ) {
+        val existing = specs[name] ?: throw IllegalArgumentException("Spec '$name' not found. Available: ${specs.keys}")
+        specs[name] =
+            existing.copy(baseUrl = newBaseUrl)
+    }
+
     private fun extractBaseUrl(openApi: OpenAPI): String = openApi.servers?.firstOrNull()?.url ?: "http://localhost"
 }
 

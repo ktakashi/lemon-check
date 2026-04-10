@@ -14,9 +14,13 @@ import java.util.Map;
 
 /**
  * REST controller for pet operations.
+ * 
+ * This controller is mounted at /api/v1/pets to demonstrate multi-host API testing.
+ * The petstore API uses /api/v1 while auth API uses /auth/api/v1, allowing us to
+ * test with different base URLs.
  */
 @RestController
-@RequestMapping("/pets")
+@RequestMapping("/api/v1/pets")
 public class PetController {
 
     private final PetService petService;

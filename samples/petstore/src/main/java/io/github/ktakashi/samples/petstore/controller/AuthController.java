@@ -11,16 +11,25 @@ import java.util.UUID;
 /**
  * REST controller for authentication operations.
  * <p> <p />
+ * This controller is mounted at /auth/api/v1 to demonstrate multi-host API testing.
+ * In a real microservices environment, the auth service would run on a separate
+ * host/port, but for this sample we use a different path prefix to simulate that.
+ * <p> <p />
+ * The petstore API uses /api/v1 while auth API uses /auth/api/v1, allowing us to
+ * test with different base URLs:
+ * - default (petstore): http://localhost:PORT/api/v1
+ * - auth: http://localhost:PORT/auth/api/v1
+ * <p> <p />
  * Note: This is a simplified mock implementation for demonstration purposes.
  * In a real application, you would use Spring Security with proper authentication.
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/auth/api/v1")
 public class AuthController {
 
     /**
      * Login endpoint.
-     * POST /auth/login
+     * POST /auth/api/v1/login
      */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
@@ -50,7 +59,7 @@ public class AuthController {
 
     /**
      * Logout endpoint.
-     * POST /auth/logout
+     * POST /auth/api/v1/logout
      */
     @PostMapping("/logout")
     public ResponseEntity<?> logout() {

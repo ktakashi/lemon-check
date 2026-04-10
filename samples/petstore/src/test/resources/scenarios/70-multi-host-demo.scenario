@@ -1,0 +1,49 @@
+# Multi-Host API Testing Demo
+# This scenario demonstrates cross-service testing using multiple specs
+# with file-level base URL overrides
+
+# In a real microservices environment, you would use different hosts:
+# parameters:
+#   baseUrl.default: "http://petstore-service:8080"
+#   baseUrl.auth: "http://auth-service:8081"
+
+# For this sample, all APIs use the same host with the /api/v1 context path
+parameters:
+  shareVariablesAcrossScenarios: true
+
+# Scenario 1: Authenticate with the auth service
+scenario: Multi-host - Authenticate with auth service
+  given I have valid credentials
+    call using auth ^login
+      body: {"username": "test", "password": "test"}
+  then I receive an auth token
+    assert status 200
+    extract $.token => authToken
+    extract $.expiresIn => tokenExpiry
+
+# Scenario 2: Use the token to access the pet store API
+scenario: Multi-host - Access petstore with auth token
+  when I list pets with authentication
+    call ^listPets
+      header_Authorization: "Bearer {{authToken}}"
+  then I get the pet list
+    assert status 200
+
+# Scenario 3: Create and verify a resource across services
+scenario: Multi-host - Create pet and verify
+  when I create a pet (could be a different service in microservices)
+    call ^createPet
+      header_Authorization: "Bearer {{authToken}}"
+      body: {"name": "MultiHostTestPet", "status": "available", "category": "test", "price": 89.99}
+  then pet is created
+    assert status 201
+    extract $.id => petId
+
+# Scenario 4: Clean up
+scenario: Multi-host - Cleanup
+  when I delete the test pet
+    call ^deletePet
+      petId: {{petId}}
+      header_Authorization: "Bearer {{authToken}}"
+  then deletion succeeds
+    assert status 204

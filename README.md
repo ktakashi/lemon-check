@@ -232,6 +232,7 @@ scenario: Use the resource (variables shared across scenarios)
 
 Available parameters:
 - `baseUrl` - Override the base URL
+- `baseUrl.<specName>` - Override base URL for a specific spec (multi-host testing)
 - `timeout` - Request timeout in seconds
 - `shareVariablesAcrossScenarios` - Share extracted variables across scenarios in the file
 - `logRequests`, `logResponses` - Enable request/response logging
@@ -244,7 +245,20 @@ Register multiple OpenAPI specs in your bindings:
 ```java
 @Override
 public Map<String, String> getAdditionalSpecs() {
-    return Map.of("auth", "auth.yaml");
+    return Map.of("auth", "auth.yaml", "inventory", "inventory.yaml");
+}
+```
+
+For microservices testing with different hosts, provide per-spec base URLs:
+
+```java
+@Override
+public Map<String, String> getSpecBaseUrls() {
+    return Map.of(
+        "default", "http://petstore-service:" + petstorePort,
+        "auth", "http://auth-service:" + authPort,
+        "inventory", "http://inventory-service:" + inventoryPort
+    );
 }
 ```
 

@@ -69,6 +69,28 @@ interface LemonCheckBindings {
     fun getAdditionalSpecs(): Map<String, String> = emptyMap()
 
     /**
+     * Optional: Provide per-spec base URLs for multi-host API testing.
+     *
+     * Returns a map of spec names to their base URLs. This allows different
+     * API specifications to target different hosts or ports.
+     *
+     * Example:
+     * ```java
+     * @Override
+     * public Map<String, String> getSpecBaseUrls() {
+     *     return Map.of(
+     *         "default", "http://localhost:" + petstorePort + "/api",
+     *         "auth", "http://localhost:" + authPort + "/auth",
+     *         "inventory", "http://localhost:" + inventoryPort + "/api"
+     *     );
+     * }
+     * ```
+     *
+     * @return Map of spec names to their base URLs, or empty map to use defaults
+     */
+    fun getSpecBaseUrls(): Map<String, String> = emptyMap()
+
+    /**
      * Optional: Configure the execution context.
      *
      * Called before scenario execution begins. Use this to perform

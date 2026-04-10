@@ -182,6 +182,105 @@ automatically resolve which spec to use without the ``using`` keyword.
    to disambiguate. LemonCheck will throw an ``AmbiguousOperationException`` if
    it cannot determine which spec to use.
 
+Multi-Host API Testing
+----------------------
+
+In microservices environments, different APIs often run on different hosts or ports.
+LemonCheck supports this through per-spec base URL configuration.
+
+Configuring Per-Spec Base URLs
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Override ``getSpecBaseUrls()`` in your bindings to provide different base URLs for each spec:
+
+.. code-block:: java
+
+    @Component
+    @Lazy
+    public class MicroservicesBindings implements LemonCheckBindings {
+        
+        @Value("${petstore.host:http://localhost:8080}")
+        private String petstoreHost;
+        
+        @Value("${auth.host:http://localhost:8081}")
+        private String authHost;
+        
+        @Value("${inventory.host:http://localhost:8082}")
+        private String inventoryHost;
+        
+        @Override
+        public String getOpenApiSpec() {
+            return "petstore.yaml";
+        }
+        
+        @Override
+        public Map<String, String> getAdditionalSpecs() {
+            return Map.of(
+                "auth", "auth.yaml",
+                "inventory", "inventory.yaml"
+            );
+        }
+        
+        @Override
+        public Map<String, String> getSpecBaseUrls() {
+            return Map.of(
+                "default", petstoreHost,
+                "auth", authHost,
+                "inventory", inventoryHost
+            );
+        }
+    }
+
+Cross-Service Scenarios
+^^^^^^^^^^^^^^^^^^^^^^^
+
+With multi-host configuration, you can test scenarios that span multiple services:
+
+.. code-block:: gherkin
+
+    scenario: Cross-service order flow
+      given I am authenticated
+        call using auth ^login
+          body: {"username": "test", "password": "test"}
+      then I get a token
+        assert status 200
+        extract $.token => authToken
+      
+      when I check inventory
+        call using inventory ^checkStock
+          header_Authorization: "Bearer {{authToken}}"
+          productId: 123
+      then product is available
+        assert status 200
+        assert $.available equals true
+      
+      when I create an order
+        call ^createOrder
+          header_Authorization: "Bearer {{authToken}}"
+          body: {"productId": 123, "quantity": 1}
+      then order is created
+        assert status 201
+        extract $.orderId => orderId
+
+File-Level Base URL Overrides
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can also override per-spec base URLs using file-level parameters for testing
+against different environments:
+
+.. code-block:: text
+
+    parameters:
+      baseUrl.auth: "http://staging-auth.example.com"
+      baseUrl.default: "http://staging-api.example.com"
+
+    scenario: Test against staging
+      given I authenticate
+        call using auth ^login
+          body: {"username": "staging-user", "password": "secret"}
+      then I get access
+        assert status 200
+
 Best Practices
 --------------
 
@@ -189,3 +288,4 @@ Best Practices
 2. **Use unique operationIds**: Avoid duplicate operationIds across specs
 3. **Document spec dependencies**: Note which tests require which specs
 4. **Keep default spec focused**: Use the default for your main API operations
+5. **Use environment variables**: Configure hosts via environment variables for flexibility
