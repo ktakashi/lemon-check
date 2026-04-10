@@ -1,5 +1,6 @@
 package io.github.ktakashi.lemoncheck.spring
 
+import io.github.ktakashi.lemoncheck.exception.ConfigurationException
 import io.github.ktakashi.lemoncheck.junit.LemonCheckBindings
 import io.github.ktakashi.lemoncheck.junit.spi.BindingsProvider
 import org.springframework.boot.test.context.SpringBootTest
@@ -45,12 +46,12 @@ class SpringBindingsProvider : BindingsProvider {
      * Spring ApplicationContext via SpringContextAdapter.
      *
      * @param testClass The test class to initialize Spring context for
-     * @throws IllegalStateException if @SpringBootTest is missing or context fails to start
+     * @throws ConfigurationException if @SpringBootTest is missing or context fails to start
      */
     override fun initialize(testClass: Class<*>) {
         // Validate that @SpringBootTest is present
         if (!testClass.isAnnotationPresent(SpringBootTest::class.java)) {
-            throw IllegalStateException(
+            throw ConfigurationException(
                 "Test class '${testClass.name}' has @LemonCheckContextConfiguration but is missing @SpringBootTest. " +
                     "Add @SpringBootTest annotation to enable Spring context integration.",
             )
@@ -71,7 +72,7 @@ class SpringBindingsProvider : BindingsProvider {
      * @param testClass The test class being executed
      * @param bindingsClass The bindings class to retrieve from Spring context
      * @return The Spring-managed bindings instance with dependencies injected
-     * @throws IllegalStateException if context not initialized or bean not found
+     * @throws ConfigurationException if context not initialized or bean not found
      */
     override fun createBindings(
         testClass: Class<*>,
@@ -79,7 +80,7 @@ class SpringBindingsProvider : BindingsProvider {
     ): LemonCheckBindings {
         val adapter =
             contextAdapters[testClass]
-                ?: throw IllegalStateException(
+                ?: throw ConfigurationException(
                     "Spring context not initialized for test class: ${testClass.name}. " +
                         "Ensure initialize() was called before createBindings().",
                 )

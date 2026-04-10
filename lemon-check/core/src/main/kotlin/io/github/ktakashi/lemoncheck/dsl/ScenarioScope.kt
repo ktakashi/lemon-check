@@ -3,6 +3,7 @@ package io.github.ktakashi.lemoncheck.dsl
 import io.github.ktakashi.lemoncheck.model.Fragment
 import io.github.ktakashi.lemoncheck.model.Scenario
 import io.github.ktakashi.lemoncheck.model.Step
+import io.github.ktakashi.lemoncheck.model.StepType
 
 /**
  * DSL scope for defining a scenario.
@@ -23,7 +24,7 @@ class ScenarioScope internal constructor(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
-        addStep(io.github.ktakashi.lemoncheck.model.StepType.GIVEN, description, block)
+        addStep(StepType.GIVEN, description, block)
     }
 
     /**
@@ -34,7 +35,7 @@ class ScenarioScope internal constructor(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
-        addStep(io.github.ktakashi.lemoncheck.model.StepType.WHEN, description, block)
+        addStep(StepType.WHEN, description, block)
     }
 
     /**
@@ -44,7 +45,7 @@ class ScenarioScope internal constructor(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
-        addStep(io.github.ktakashi.lemoncheck.model.StepType.THEN, description, block)
+        addStep(StepType.THEN, description, block)
     }
 
     /**
@@ -54,7 +55,7 @@ class ScenarioScope internal constructor(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
-        addStep(io.github.ktakashi.lemoncheck.model.StepType.AND, description, block)
+        addStep(StepType.AND, description, block)
     }
 
     /**
@@ -64,7 +65,7 @@ class ScenarioScope internal constructor(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
-        addStep(io.github.ktakashi.lemoncheck.model.StepType.BUT, description, block)
+        addStep(StepType.BUT, description, block)
     }
 
     /**
@@ -85,7 +86,7 @@ class ScenarioScope internal constructor(
     }
 
     private fun addStep(
-        type: io.github.ktakashi.lemoncheck.model.StepType,
+        type: StepType,
         description: String,
         block: StepScope.() -> Unit,
     ) {

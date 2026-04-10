@@ -58,25 +58,6 @@ class ExtractionException(
     )
 
 /**
- * Thrown when an assertion fails.
- */
-class AssertionFailedException(
-    val assertionType: String,
-    val expected: Any?,
-    val actual: Any?,
-    val details: String? = null,
-) : LemonCheckException(
-        buildString {
-            append("Assertion failed: $assertionType")
-            append("\n  Expected: $expected")
-            append("\n  Actual: $actual")
-            if (details != null) {
-                append("\n  Details: $details")
-            }
-        },
-    )
-
-/**
  * Thrown when HTTP request execution fails.
  */
 class HttpExecutionException(

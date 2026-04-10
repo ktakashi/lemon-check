@@ -1,5 +1,6 @@
 package io.github.ktakashi.lemoncheck.plugin
 
+import io.github.ktakashi.lemoncheck.exception.ConfigurationException
 import io.github.ktakashi.lemoncheck.report.JsonReportPlugin
 import io.github.ktakashi.lemoncheck.report.JunitReportPlugin
 import io.github.ktakashi.lemoncheck.report.TextReportPlugin
@@ -76,7 +77,7 @@ class PluginNameResolverTest {
     @Test
     fun `throws exception for unknown plugin`() {
         val exception =
-            assertThrows<IllegalArgumentException> {
+            assertThrows<ConfigurationException> {
                 PluginNameResolver.resolve("unknown:plugin")
             }
 
@@ -87,7 +88,7 @@ class PluginNameResolverTest {
     @Test
     fun `throws exception for unknown plugin id`() {
         val exception =
-            assertThrows<IllegalArgumentException> {
+            assertThrows<ConfigurationException> {
                 PluginNameResolver.resolve("nonexistent")
             }
 
@@ -98,7 +99,7 @@ class PluginNameResolverTest {
     @Test
     fun `error message includes available plugin ids`() {
         val exception =
-            assertThrows<IllegalArgumentException> {
+            assertThrows<ConfigurationException> {
                 PluginNameResolver.resolve("nonexistent")
             }
 

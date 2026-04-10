@@ -1,5 +1,6 @@
 package io.github.ktakashi.lemoncheck.scenario
 
+import io.github.ktakashi.lemoncheck.exception.ScenarioParseException
 import io.github.ktakashi.lemoncheck.model.StepType
 import java.nio.file.Paths
 import kotlin.test.Test
@@ -53,7 +54,7 @@ class ScenarioLoaderTest {
     fun `should fail on invalid scenario file`() {
         val path = getResourcePath("invalid/random-content.scenario")
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<ScenarioParseException> {
             loader.loadScenariosFromFile(path)
         }
     }

@@ -3,6 +3,7 @@ package io.github.ktakashi.lemoncheck.executor
 import com.jayway.jsonpath.JsonPath
 import io.github.ktakashi.lemoncheck.config.Configuration
 import io.github.ktakashi.lemoncheck.context.ExecutionContext
+import io.github.ktakashi.lemoncheck.exception.ConfigurationException
 import io.github.ktakashi.lemoncheck.model.Assertion
 import io.github.ktakashi.lemoncheck.model.AssertionResult
 import io.github.ktakashi.lemoncheck.model.AssertionType
@@ -179,7 +180,7 @@ class ScenarioExecutor(
         // Look up the fragment in the registry
         val fragment =
             fragmentRegistry?.get(fragmentName)
-                ?: throw IllegalStateException(
+                ?: throw ConfigurationException(
                     "Fragment '$fragmentName' not found. " +
                         "Register it with fragmentRegistry.register() or load from a .fragment file.",
                 )

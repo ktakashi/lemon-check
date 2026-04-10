@@ -1,5 +1,6 @@
 package io.github.ktakashi.lemoncheck.spring
 
+import io.github.ktakashi.lemoncheck.exception.ConfigurationException
 import org.springframework.context.ApplicationContext
 import org.springframework.test.context.TestContextManager
 
@@ -48,10 +49,9 @@ class SpringContextAdapter(
             // Prepare test instance triggers dependency injection
             testContextManager!!.prepareTestInstance(instance)
         } catch (e: Exception) {
-            throw IllegalStateException(
+            throw ConfigurationException(
                 "Failed to initialize Spring context for test class: ${testClass.name}. " +
                     "Ensure the class has @SpringBootTest annotation and a valid Spring configuration.",
-                e,
             )
         }
     }
@@ -61,7 +61,7 @@ class SpringContextAdapter(
      *
      * @param beanClass The class of the bean to retrieve
      * @return The bean instance
-     * @throws IllegalStateException if context not initialized or bean not found
+     * @throws ConfigurationException if context not initialized or bean not found
      */
     fun <T : Any> getBean(beanClass: Class<T>): T {
         val context = getApplicationContext()
@@ -69,14 +69,18 @@ class SpringContextAdapter(
             // Try getBeansOfType first, then get the first bean
             val beans = context.getBeansOfType(beanClass)
             if (beans.isEmpty()) {
-                throw IllegalStateException("No bean of type ${beanClass.name} found")
+                throw ConfigurationException(
+                    "Bindings class '${beanClass.name}' is not registered as a Spring bean. " +
+                        "Add @Component annotation to the class or define a @Bean method.",
+                )
             }
             beans.values.first()
+        } catch (e: ConfigurationException) {
+            throw e
         } catch (e: Exception) {
-            throw IllegalStateException(
+            throw ConfigurationException(
                 "Bindings class '${beanClass.name}' is not registered as a Spring bean. " +
                     "Add @Component annotation to the class or define a @Bean method.",
-                e,
             )
         }
     }
@@ -85,12 +89,12 @@ class SpringContextAdapter(
      * Returns the Spring ApplicationContext.
      *
      * @return The application context
-     * @throws IllegalStateException if context not initialized
+     * @throws ConfigurationException if context not initialized
      */
     fun getApplicationContext(): ApplicationContext {
         val manager =
             testContextManager
-                ?: throw IllegalStateException(
+                ?: throw ConfigurationException(
                     "Spring context not initialized. Call initializeContext() first.",
                 )
 

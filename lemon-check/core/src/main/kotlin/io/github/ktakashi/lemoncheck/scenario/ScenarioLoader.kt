@@ -1,6 +1,7 @@
 package io.github.ktakashi.lemoncheck.scenario
 
 import io.github.ktakashi.lemoncheck.dsl.LemonCheckSuite
+import io.github.ktakashi.lemoncheck.exception.ScenarioParseException
 import io.github.ktakashi.lemoncheck.model.Assertion
 import io.github.ktakashi.lemoncheck.model.AssertionType
 import io.github.ktakashi.lemoncheck.model.ExampleRow
@@ -86,7 +87,7 @@ class ScenarioLoader {
 
         if (!result.isSuccess) {
             val errorMessages = result.errors.joinToString("\n") { it.toString() }
-            throw IllegalArgumentException("Failed to parse scenario file:\n$errorMessages")
+            throw ScenarioParseException("Failed to parse scenario file:\n$errorMessages")
         }
 
         val scenarios = result.ast!!.scenarios.map { transformScenario(it) }
@@ -110,7 +111,7 @@ class ScenarioLoader {
 
         if (!result.isSuccess) {
             val errorMessages = result.errors.joinToString("\n") { it.toString() }
-            throw IllegalArgumentException("Failed to parse scenario file:\n$errorMessages")
+            throw ScenarioParseException("Failed to parse scenario file:\n$errorMessages")
         }
 
         return result.ast!!.scenarios.map { transformScenario(it) }
@@ -163,7 +164,7 @@ class ScenarioLoader {
 
         if (!result.isSuccess) {
             val errorMessages = result.errors.joinToString("\n") { it.toString() }
-            throw IllegalArgumentException("Failed to parse fragment file:\n$errorMessages")
+            throw ScenarioParseException("Failed to parse fragment file:\n$errorMessages")
         }
 
         return result.ast!!.fragments.associate { it.name to transformFragment(it) }

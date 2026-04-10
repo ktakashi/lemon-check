@@ -1,5 +1,6 @@
 package io.github.ktakashi.lemoncheck.plugin
 
+import io.github.ktakashi.lemoncheck.exception.ConfigurationException
 import java.nio.file.Path
 import java.util.ServiceLoader
 
@@ -197,7 +198,7 @@ object PluginNameResolver {
             discoveredPlugins
                 .map { it.name }
                 .filter { it != it::class.simpleName } // Only show explicit names
-        throw IllegalArgumentException(
+        throw ConfigurationException(
             "Unknown plugin: '$pluginName'. " +
                 "Available plugin IDs: $availableIds. " +
                 if (availableNames.isNotEmpty()) "Available plugin names: $availableNames." else "",

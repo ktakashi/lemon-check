@@ -1,6 +1,7 @@
 package io.github.ktakashi.lemoncheck.spring
 
 import io.github.ktakashi.lemoncheck.config.Configuration
+import io.github.ktakashi.lemoncheck.exception.ConfigurationException
 import io.github.ktakashi.lemoncheck.junit.LemonCheckBindings
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -18,7 +19,7 @@ class SpringBindingsProviderErrorTest {
     @Test
     fun `initialize throws descriptive error when SpringBootTest is missing`() {
         val exception =
-            assertThrows<IllegalStateException> {
+            assertThrows<ConfigurationException> {
                 provider.initialize(MissingSpringBootTestClass::class.java)
             }
 
@@ -44,7 +45,7 @@ class SpringBindingsProviderErrorTest {
 
         try {
             val exception =
-                assertThrows<IllegalStateException> {
+                assertThrows<ConfigurationException> {
                     provider.createBindings(
                         ValidTestClassWithoutBindings::class.java,
                         NonExistentBindings::class.java,
@@ -70,7 +71,7 @@ class SpringBindingsProviderErrorTest {
     fun `createBindings throws error when context not initialized`() {
         // Try to create bindings without initializing first
         val exception =
-            assertThrows<IllegalStateException> {
+            assertThrows<ConfigurationException> {
                 provider.createBindings(
                     MissingSpringBootTestClass::class.java,
                     NonExistentBindings::class.java,

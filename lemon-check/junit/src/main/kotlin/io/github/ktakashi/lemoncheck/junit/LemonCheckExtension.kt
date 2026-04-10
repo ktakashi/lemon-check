@@ -2,6 +2,7 @@ package io.github.ktakashi.lemoncheck.junit
 
 import io.github.ktakashi.lemoncheck.config.Configuration
 import io.github.ktakashi.lemoncheck.dsl.LemonCheckSuite
+import io.github.ktakashi.lemoncheck.exception.ConfigurationException
 import io.github.ktakashi.lemoncheck.executor.ScenarioExecutor
 import io.github.ktakashi.lemoncheck.model.Scenario
 import org.junit.jupiter.api.extension.BeforeAllCallback
@@ -94,7 +95,7 @@ class LemonCheckExtension :
             LemonCheckSuite::class.java -> getSuite(extensionContext)
             ScenarioExecutor::class.java -> getExecutor(extensionContext)
             Configuration::class.java -> getSuite(extensionContext).configuration
-            else -> throw IllegalArgumentException("Unsupported parameter type: $paramType")
+            else -> throw ConfigurationException("Unsupported parameter type: $paramType")
         }
 
     override fun supportsTestTemplate(context: ExtensionContext): Boolean =
@@ -108,11 +109,11 @@ class LemonCheckExtension :
 
     private fun getSuite(context: ExtensionContext): LemonCheckSuite =
         context.getStore(NAMESPACE).get(SUITE_KEY, LemonCheckSuite::class.java)
-            ?: throw IllegalStateException("LemonCheckSuite not initialized. Is @ExtendWith(LemonCheckExtension::class) present?")
+            ?: throw ConfigurationException("LemonCheckSuite not initialized. Is @ExtendWith(LemonCheckExtension::class) present?")
 
     private fun getExecutor(context: ExtensionContext): ScenarioExecutor =
         context.getStore(NAMESPACE).get(EXECUTOR_KEY, ScenarioExecutor::class.java)
-            ?: throw IllegalStateException("ScenarioExecutor not initialized.")
+            ?: throw ConfigurationException("ScenarioExecutor not initialized.")
 
     /**
      * Context for a single scenario invocation.

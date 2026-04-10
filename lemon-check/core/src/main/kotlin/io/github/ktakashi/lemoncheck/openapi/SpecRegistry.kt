@@ -1,6 +1,7 @@
 package io.github.ktakashi.lemoncheck.openapi
 
 import io.github.ktakashi.lemoncheck.config.SpecConfiguration
+import io.github.ktakashi.lemoncheck.exception.ConfigurationException
 import io.github.ktakashi.lemoncheck.exception.OperationNotFoundException
 import io.swagger.v3.oas.models.OpenAPI
 
@@ -59,13 +60,15 @@ class SpecRegistry {
     /**
      * Get a loaded spec by name.
      */
-    fun get(name: String): LoadedSpec = specs[name] ?: throw IllegalArgumentException("Spec '$name' not found. Available: ${specs.keys}")
+    fun get(name: String): LoadedSpec =
+        specs[name]
+            ?: throw ConfigurationException("Spec '$name' not found. Available: ${specs.keys}")
 
     /**
      * Get the default spec.
      */
     fun getDefault(): LoadedSpec {
-        val name = defaultSpec ?: throw IllegalStateException("No specs registered")
+        val name = defaultSpec ?: throw ConfigurationException("No specs registered")
         return get(name)
     }
 

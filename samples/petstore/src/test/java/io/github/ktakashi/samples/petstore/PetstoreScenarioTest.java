@@ -50,7 +50,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 @LemonCheckConfiguration(
     bindings = PetstoreBindings.class, 
     openApiSpec = "petstore.yaml",
-    plugins = {"report:text", "sample:logging"}
+    plugins = {"report:text", "sample:logging"},
+    stepClasses = {PetCustomSteps.class}
 )
 @LemonCheckSpec(paths = {"petstore.yaml"})
 public class PetstoreScenarioTest {
