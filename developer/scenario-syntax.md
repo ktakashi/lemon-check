@@ -276,6 +276,13 @@ assert status 2xx         # Range: 200-299
 assert status 201-204     # Range: 201-204
 ```
 
+#### Body-Level Assertions
+```
+assert contains "expected text"         # Body contains substring
+assert not contains "unexpected text"   # Body does not contain substring
+assert schema                            # Validate against OpenAPI schema
+```
+
 #### JSONPath Assertions
 ```
 assert $.name equals "Fluffy"
@@ -287,20 +294,39 @@ assert $.status in ["available", "pending"]
 assert $.items hasSize 5
 ```
 
+#### The `not` Keyword (Negation)
+
+The `not` keyword inverts any assertion, making it a negative check. It can be placed in two positions:
+
+**At the beginning (for body-level assertions):**
+```
+assert not contains "error"              # Body does NOT contain "error"
+```
+
+**After the JSONPath (for JSONPath assertions):**
+```
+assert $.status not equals "sold"        # Field does NOT equal "sold"
+assert $.items not hasSize 0             # Array does NOT have size 0
+assert $.deleted not exists              # Field does NOT exist
+```
+
+Both positions are supported to allow natural reading: "assert body does not contain" and "assert the name does not equal".
+
 #### Operators
 
 | Operator | Description | Example |
 |----------|-------------|---------|
 | `equals` | Exact equality | `assert $.name equals "Max"` |
-| `not` | Negation | `assert $.status not equals "sold"` |
+| `not` | Negation (see above) | `assert $.status not equals "sold"` |
 | `exists` | Field exists | `assert $.id exists` |
 | `notEmpty` | Array/string not empty | `assert $.pets notEmpty` |
 | `greaterThan` | Numeric comparison | `assert $.price greaterThan 0` |
 | `lessThan` | Numeric comparison | `assert $.age lessThan 10` |
-| `contains` | Array contains / string includes | `assert $.tags contains "dog"` |
+| `contains` | Body/array contains | `assert contains "text"`, `assert $.tags contains "dog"` |
 | `in` | Value in list | `assert $.status in ["x", "y"]` |
 | `hasSize` | Array/string length | `assert $.items hasSize 3` |
 | `matches` | Regex match | `assert $.email matches ".*@.*"` |
+| `schema` | Validate against schema | `assert schema` |
 
 ### Extraction (`extract`)
 
@@ -420,6 +446,22 @@ scenario: Retrieve created resource
   then I see the pet
     assert status 200
 ```
+
+### Escaping Variable Syntax
+
+To use literal `{{` or `${` in strings without variable interpolation, escape them with a backslash:
+
+```
+# This asserts the literal text "{{petName}}" appears in the body
+assert not contains "\\{{petName}}"
+
+# In request bodies
+body: {"template": "Hello \\{{name}}"}
+```
+
+The escape sequences:
+- `\\{{` → literal `{{`
+- `\\$` → literal `$`
 
 ## Parameterized Scenarios (Scenario Outline)
 

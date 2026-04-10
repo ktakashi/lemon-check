@@ -140,6 +140,19 @@ Status Code Assertions
     assert status 200
     assert statusCode 201
 
+Body-Level Assertions
+^^^^^^^^^^^^^^^^^^^^^
+
+Check the response body for content:
+
+.. code-block:: text
+
+    # Body contains substring
+    assert contains "expected text"
+    
+    # Body does NOT contain substring (negation)
+    assert not contains "error message"
+
 JSONPath Assertions
 ^^^^^^^^^^^^^^^^^^^
 
@@ -189,6 +202,27 @@ JSONPath Assertions
     # Validate response against OpenAPI schema
     assert schema
 
+Negating Assertions with ``not``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``not`` keyword inverts any assertion, making it a negative check.
+
+**For body-level assertions** (``not`` at the beginning):
+
+.. code-block:: text
+
+    assert not contains "error"
+
+**For JSONPath assertions** (``not`` after the path):
+
+.. code-block:: text
+
+    assert $.status not equals "sold"
+    assert $.items not hasSize 0
+    assert $.deleted not exists
+
+Both positions are supported to allow natural reading.
+
 Variable Extraction
 -------------------
 
@@ -205,6 +239,25 @@ Use extracted variables with double curly braces:
 
     call ^getPetById
       petId: {{petId}}
+
+Escaping Variable Syntax
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To use literal ``{{`` or ``${`` in strings (without variable interpolation), 
+escape them with a backslash:
+
+.. code-block:: text
+
+    # This asserts the literal text "{{petName}}" appears in the body
+    assert not contains "\\{{petName}}"
+    
+    # In request bodies
+    body: {"template": "Hello \\{{name}}"}
+
+The escape sequences:
+
+* ``\\{{`` → literal ``{{``
+* ``\\$`` → literal ``$``
 
 Tags
 ----
