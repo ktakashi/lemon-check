@@ -885,6 +885,142 @@ class ParserTest {
         assertTrue(assertions[0].negate, "Assertion should have negate=true")
     }
 
+    @Test
+    fun `should parse structured body with properties`() {
+        val source =
+            """
+            scenario: Create pet with structured body
+              when I create a pet
+                call ^createPet
+                  body:
+                    name: Fluffy
+                    status: available
+                    category: dog
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val scenario = result.ast!!.scenarios[0]
+        val callAction =
+            scenario.steps[0]
+                .actions
+                .filterIsInstance<CallNode>()
+                .firstOrNull()
+        assertNotNull(callAction, "Should have call action")
+        assertNotNull(callAction.bodyProperties, "Should have body properties")
+        assertEquals(3, callAction.bodyProperties!!.size)
+        assertTrue(callAction.bodyProperties!!.containsKey("name"))
+        assertTrue(callAction.bodyProperties!!.containsKey("status"))
+        assertTrue(callAction.bodyProperties!!.containsKey("category"))
+    }
+
+    @Test
+    fun `should parse nested body properties`() {
+        val source =
+            """
+            scenario: Create pet with nested body
+              when I create a pet
+                call ^createPet
+                  body:
+                    name: Fluffy
+                    metadata:
+                      source: test
+                      version: 1.0
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val scenario = result.ast!!.scenarios[0]
+        val callAction =
+            scenario.steps[0]
+                .actions
+                .filterIsInstance<CallNode>()
+                .firstOrNull()
+        assertNotNull(callAction, "Should have call action")
+        assertNotNull(callAction.bodyProperties, "Should have body properties")
+        assertEquals(2, callAction.bodyProperties!!.size)
+
+        val metadata = callAction.bodyProperties!!["metadata"]
+        assertTrue(
+            metadata is BodyPropertyValue.Nested,
+            "Metadata should be nested",
+        )
+        val nested = (metadata as BodyPropertyValue.Nested).properties
+        assertTrue(nested.containsKey("source"))
+        assertTrue(nested.containsKey("version"))
+    }
+
+    @Test
+    fun `should parse triple-quoted multi-line body`() {
+        val source =
+            """
+            scenario: Create pet with multi-line body
+              when I create a pet
+                call ^createPet
+                  body:
+                    ${"\"\"\""}
+                    {
+                      "name": "Fluffy",
+                      "status": "available"
+                    }
+                    ${"\"\"\""}
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val scenario = result.ast!!.scenarios[0]
+        val callAction =
+            scenario.steps[0]
+                .actions
+                .filterIsInstance<CallNode>()
+                .firstOrNull()
+        assertNotNull(callAction, "Should have call action")
+        assertNotNull(callAction.body, "Should have body")
+
+        val body =
+            when (val b = callAction.body) {
+                is StringValueNode -> b.value
+                is JsonValueNode -> b.json
+                else -> null
+            }
+        assertNotNull(body, "Body value should not be null")
+        assertTrue(body.contains("\"name\": \"Fluffy\""), "Body should contain name")
+        assertTrue(
+            body.contains("\"status\": \"available\""),
+            "Body should contain status",
+        )
+    }
+
+    @Test
+    fun `should parse scenario after triple-quoted body`() {
+        val source =
+            """
+            scenario: First scenario
+              when I create a pet
+                call ^createPet
+                  body:
+                    ${"\"\"\""}
+                    {"name": "Test"}
+                    ${"\"\"\""}
+              then the pet is created
+                assert status 201
+
+            scenario: Second scenario
+              when I list pets
+                call ^listPets
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        assertEquals(2, result.ast!!.scenarios.size)
+        assertEquals("First scenario", result.ast.scenarios[0].name)
+        assertEquals("Second scenario", result.ast.scenarios[1].name)
+    }
+
     /**
      * Helper function to extract all AssertNode from a scenario.
      */

@@ -104,6 +104,11 @@ class Lexer(
             return nextToken()
         }
 
+        // Handle triple-quoted strings first (""")
+        if (c == '"' && peekAhead(1) == '"' && peekAhead(2) == '"') {
+            return scanTripleQuote()
+        }
+
         // Handle strings
         if (c == '"' || c == '\'') {
             return scanString()
@@ -244,6 +249,118 @@ class Lexer(
         return Token(TokenType.STRING, sb.toString(), loc)
     }
 
+    /**
+     * Scan a triple-quoted string.
+     * Captures all content between """ and closing """, preserving whitespace and newlines.
+     */
+    private fun scanTripleQuote(): Token {
+        val loc = currentLocation()
+        // Consume opening """
+        advance() // first "
+        advance() // second "
+        advance() // third "
+
+        // Skip the newline after opening """ if present
+        if (!isAtEnd() && peek() == '\n') {
+            advance()
+            line++
+            column = 1
+        } else if (!isAtEnd() && peek() == '\r') {
+            advance()
+            if (!isAtEnd() && peek() == '\n') {
+                advance()
+            }
+            line++
+            column = 1
+        }
+
+        val sb = StringBuilder()
+
+        // Capture content until closing """
+        while (!isAtEnd()) {
+            // Check for closing """
+            if (peek() == '"' && peekAhead(1) == '"' && peekAhead(2) == '"') {
+                break
+            }
+
+            val c = advance()
+            if (c == '\n') {
+                sb.append(c)
+                line++
+                column = 1
+            } else if (c == '\r') {
+                if (!isAtEnd() && peek() == '\n') {
+                    advance()
+                }
+                sb.append('\n')
+                line++
+                column = 1
+            } else {
+                sb.append(c)
+            }
+        }
+
+        // Consume closing """
+        if (!isAtEnd() && peek() == '"') {
+            advance() // first "
+            advance() // second "
+            advance() // third "
+        }
+
+        // Skip to end of line after closing """
+        while (!isAtEnd() && peek() != '\n' && peek() != '\r') {
+            advance()
+        }
+
+        // Mark that we should process indentation on the next token
+        if (!isAtEnd() && (peek() == '\n' || peek() == '\r')) {
+            // Consume the newline
+            advance()
+            if (!isAtEnd() && peek(-1) == '\r' && peek() == '\n') {
+                advance()
+            }
+            line++
+            column = 1
+            atLineStart = true
+        }
+
+        // Remove common indentation
+        val content = removeCommonIndentation(sb.toString())
+
+        return Token(TokenType.STRING, content, loc)
+    }
+
+    /**
+     * Remove common leading whitespace from all lines in a multi-line string.
+     */
+    private fun removeCommonIndentation(text: String): String {
+        val lines = text.split('\n')
+        if (lines.isEmpty()) return text
+
+        // Filter out empty lines for indent calculation
+        val nonEmptyLines = lines.filter { it.isNotBlank() }
+        if (nonEmptyLines.isEmpty()) {
+            return lines.joinToString("\n")
+        }
+
+        // Find minimum leading spaces
+        val minIndent =
+            nonEmptyLines.minOf { line ->
+                line.takeWhile { it == ' ' }.length
+            }
+
+        // Remove the common indentation
+        return lines
+            .map { line ->
+                if (line.length >= minIndent && line.isNotBlank()) {
+                    line.substring(minIndent)
+                } else {
+                    line
+                }
+            }.joinToString("\n")
+            .trim()
+    }
+
     private fun scanJsonPath(): Token {
         val loc = currentLocation()
         val sb = StringBuilder()
@@ -307,7 +424,7 @@ class Lexer(
         val loc = currentLocation()
         val sb = StringBuilder()
 
-        while (!isAtEnd() && (peek().isLetterOrDigit() || peek() == '_')) {
+        while (!isAtEnd() && (peek().isLetterOrDigit() || peek() == '_' || peek() == '-')) {
             sb.append(advance())
         }
 

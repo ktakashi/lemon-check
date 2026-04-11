@@ -45,6 +45,7 @@ enum class TokenType {
     COMMA,
     PIPE,
     DOT,
+    TRIPLE_QUOTE,
 
     // Special
     NEWLINE,

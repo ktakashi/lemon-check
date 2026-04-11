@@ -2,6 +2,7 @@
 # Demonstrates:
 # - body: with inline JSON (raw JSON)
 # - body: with structured properties (schema defaults merged)
+# - body: with triple-quoted multi-line JSON
 
 scenario: Create pet with raw body
   when I create a pet with raw JSON
@@ -42,3 +43,20 @@ scenario: Create pet with nested body
   then pet is created
     assert status 201
     assert $.name equals "NestedPet"
+
+scenario: Create pet with multi-line body
+  # Test triple-quoted multi-line body
+  when I create a pet with multi-line JSON
+    call ^createPet
+      body:
+        """
+        {
+          "name": "MultiLinePet",
+          "status": "available",
+          "category": "bird"
+        }
+        """
+  then pet is created
+    assert status 201
+    assert $.name equals "MultiLinePet"
+    assert $.category equals "bird"

@@ -416,7 +416,29 @@ when I create a pet
         version: 1.0
 ```
 
-#### Multi-line JSON
+#### Multi-line Body (Triple Quotes)
+
+Use triple quotes (`"""`) for multi-line raw body content. The common indentation is automatically removed:
+
+```
+when I create a pet
+  call ^createPet
+    body:
+      """
+      {
+        "name": "Fluffy",
+        "status": "available",
+        "tags": ["cute", "friendly"]
+      }
+      """
+```
+
+This sends the JSON exactly as written (with common indentation stripped). This is useful for:
+- Large JSON payloads that are hard to read on one line
+- Copying JSON from other sources
+- Complex nested structures
+
+#### Multi-line JSON (Legacy)
 
 Use `>` for multi-line raw JSON:
 ```

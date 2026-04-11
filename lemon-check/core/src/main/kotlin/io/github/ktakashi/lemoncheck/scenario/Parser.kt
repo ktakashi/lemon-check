@@ -681,19 +681,30 @@ class Parser(
     /**
      * Parse body content. Can be either:
      * - Raw JSON value on the same line
+     * - Triple-quoted multi-line body (""")
      * - Structured properties on subsequent indented lines
      */
     private fun parseBodyContent(): BodyParseResult {
-        // Check if there's a value on the same line (raw JSON)
+        // Check if there's a value on the same line (raw JSON or string)
         if (current().type != TokenType.NEWLINE && current().type != TokenType.EOF) {
             val value = parseValue()
             return BodyParseResult.Raw(value)
         }
 
-        // Check for structured properties (newline + indent)
+        // Check for content after newline + indent
         skipNewlines()
         if (current().type == TokenType.INDENT) {
             advance()
+
+            // Check if next token is a STRING (could be triple-quoted content from lexer)
+            if (current().type == TokenType.STRING) {
+                val value = parseValue()
+                if (current().type == TokenType.DEDENT) {
+                    advance()
+                }
+                return BodyParseResult.Raw(value)
+            }
+
             val properties = parseBodyProperties()
             if (current().type == TokenType.DEDENT) {
                 advance()

@@ -115,6 +115,23 @@ The structured body syntax:
 
 This allows partial data specification - unspecified fields use schema defaults.
 
+**Triple-quoted multi-line body** - Use ``"""`` for multi-line raw content:
+
+.. code-block:: text
+
+    when: I create a pet
+      call ^createPet
+        body:
+          """
+          {
+            "name": "Fluffy",
+            "status": "available",
+            "tags": ["cute", "friendly"]
+          }
+          """
+
+This sends the JSON exactly as written (with common indentation stripped).
+
 External Body Files
 ^^^^^^^^^^^^^^^^^^^
 
