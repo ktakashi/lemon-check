@@ -16,6 +16,21 @@ export class ScenarioDefinitionProvider implements vscode.DefinitionProvider {
         const lineText = document.lineAt(position).text;
         const charPos = position.character;
         
+        // Try to find spec name after "using" keyword
+        // Pattern: call using specName ^operationId
+        const usingMatch = lineText.match(/call\s+using\s+(\w+)\s+\^/);
+        if (usingMatch) {
+            const specName = usingMatch[1];
+            const usingIndex = lineText.indexOf('using');
+            const specStart = lineText.indexOf(specName, usingIndex + 5);
+            const specEnd = specStart + specName.length;
+            
+            // Check if cursor is on the spec name
+            if (charPos >= specStart && charPos <= specEnd) {
+                return this.getSpecDefinition(specName);
+            }
+        }
+        
         // Try to find operation ID at cursor position
         // Look for ^operationId pattern in the line
         const callMatch = lineText.match(/call\s+(?:using\s+\w+\s+)?\^(\w+)/);
@@ -57,19 +72,58 @@ export class ScenarioDefinitionProvider implements vscode.DefinitionProvider {
         return /\binclude\s+/.test(beforeCursor);
     }
 
+    private getSpecDefinition(specName: string): vscode.Location | null {
+        const location = this.openApiProvider.getSpecLocation(specName);
+        
+        if (location) {
+            this.scheduleRevealAtTop(location);
+            return location;
+        }
+        
+        // Show warning if spec not found
+        const allSpecs = this.openApiProvider.getSpecNames();
+        if (allSpecs.length === 0) {
+            vscode.window.showWarningMessage(
+                `LemonCheck: No OpenAPI specs loaded. Run "LemonCheck: Refresh OpenAPI" command.`
+            );
+        } else {
+            vscode.window.showWarningMessage(
+                `LemonCheck: Spec '${specName}' not found. Available: ${allSpecs.join(', ')}`
+            );
+        }
+        
+        return null;
+    }
+
+    /**
+     * Schedule a reveal-at-top after VS Code navigates to the location.
+     */
+    private scheduleRevealAtTop(location: vscode.Location): void {
+        // Use a small delay to let VS Code navigate first
+        setTimeout(async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document.uri.fsPath === location.uri.fsPath) {
+                // If we're in the right file, reveal at top
+                editor.revealRange(location.range, vscode.TextEditorRevealType.AtTop);
+            }
+        }, 100);
+    }
+
     private getOperationDefinition(operationId: string): vscode.Location | null {
         const operation = this.openApiProvider.getOperation(operationId);
         
         if (operation?.location) {
+            this.scheduleRevealAtTop(operation.location);
             return operation.location;
         }
         
         // If no exact location, at least go to the spec file
         if (operation?.specFile) {
-            return new vscode.Location(
+            const location = new vscode.Location(
                 vscode.Uri.file(operation.specFile),
                 new vscode.Position(0, 0)
             );
+            return location;
         }
         
         // If operation not found, show helpful message
@@ -92,6 +146,7 @@ export class ScenarioDefinitionProvider implements vscode.DefinitionProvider {
         const fragment = this.fragmentProvider.getFragment(fragmentName);
         
         if (fragment) {
+            this.scheduleRevealAtTop(fragment.location);
             return fragment.location;
         }
         

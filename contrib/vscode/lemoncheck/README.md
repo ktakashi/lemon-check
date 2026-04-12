@@ -26,12 +26,17 @@ Intelligent completions for:
 - **Assertion operators** - `equals`, `contains`, `notEmpty`, etc.
 - **Parameters** - Call parameters based on OpenAPI operation definition
 
-### Go to Definition (F12)
+### Go to Definition (F12 / Ctrl+Click / Cmd+Click)
 
-Navigate to:
-- **OpenAPI operations** - Click on `^operationId` to jump to the operation in your OpenAPI spec
-- **Fragments** - Click on fragment name to jump to fragment definition
-- **Variables** - Click on `{{variable}}` to jump to the `extract` statement
+Navigate directly to definitions with precise positioning:
+
+- **OpenAPI operations** - Click on `^operationId` while holding Ctrl (or Cmd on macOS) to jump to the exact line in your OpenAPI spec where the operation is defined. The target line is revealed at the **top** of the editor viewport for easy context.
+
+- **Spec names** - After `using` keyword, Ctrl+Click (Cmd+Click on macOS) on the spec name (e.g., `call using petstore`) to open the OpenAPI specification file at the beginning.
+
+- **Fragments** - Ctrl+Click (Cmd+Click on macOS) on fragment name after `include` to jump to the fragment definition.
+
+- **Variables** - Ctrl+Click (Cmd+Click on macOS) on `{{variable}}` to jump to the `extract` statement that defined it.
 
 ### Find All References (Shift+F12)
 
@@ -68,6 +73,18 @@ Hover over elements to see:
 1. Open the extension folder in VS Code
 2. Press `F5` to launch Extension Development Host
 3. Open a `.scenario` file to test
+
+### Running Tests
+
+Run the test suite:
+
+```bash
+cd contrib/vscode/lemoncheck
+npm install
+npm run test
+```
+
+This runs the extension tests in a headless VS Code instance using `@vscode/test-electron`.
 
 ## Configuration
 

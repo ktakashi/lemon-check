@@ -263,13 +263,33 @@ export class OpenApiProvider {
                 // Match operationId: value or "operationId": "value"
                 const match = line.match(/operationId['":\s]+['"]?(\w+)['"]?/);
                 if (match && match[1] === operationId) {
-                    const startPos = new vscode.Position(i, line.indexOf(operationId));
-                    const endPos = new vscode.Position(i, line.indexOf(operationId) + operationId.length);
+                    // Find the exact position of the operationId VALUE (not the key)
+                    // The match includes "operationId: " before the actual value
+                    const fullMatch = match[0];
+                    const matchIndex = line.indexOf(fullMatch);
+                    const valueStart = matchIndex + fullMatch.indexOf(operationId);
+                    
+                    const startPos = new vscode.Position(i, valueStart);
+                    const endPos = new vscode.Position(i, valueStart + operationId.length);
                     return new vscode.Location(vscode.Uri.file(filePath), new vscode.Range(startPos, endPos));
                 }
             }
         } catch (error) {
             console.error(`Failed to find operation location for ${operationId}:`, error);
+        }
+        return undefined;
+    }
+
+    /**
+     * Get the location of a spec file.
+     */
+    getSpecLocation(specName: string): vscode.Location | undefined {
+        const spec = this.specs.get(specName);
+        if (spec) {
+            return new vscode.Location(
+                vscode.Uri.file(spec.filePath),
+                new vscode.Position(0, 0)
+            );
         }
         return undefined;
     }
