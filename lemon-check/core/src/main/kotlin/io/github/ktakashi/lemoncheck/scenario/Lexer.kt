@@ -416,6 +416,17 @@ class Lexer(
             sb.append(advance())
         }
 
+        // Check for status range pattern (e.g., 1xx, 2xx, 3xx, 4xx, 5xx)
+        val value = sb.toString()
+        if (value.length == 1 && value[0] in '1'..'5') {
+            val nextTwo = peekString(2)
+            if (nextTwo.equals("xx", ignoreCase = true)) {
+                sb.append(advance()) // x
+                sb.append(advance()) // x
+                return Token(TokenType.STATUS_RANGE, sb.toString(), loc)
+            }
+        }
+
         if (!isAtEnd() && peek() == '.' && peekAhead(1)?.isDigit() == true) {
             sb.append(advance())
             while (!isAtEnd() && peek().isDigit()) {
@@ -424,6 +435,20 @@ class Lexer(
         }
 
         return Token(TokenType.NUMBER, sb.toString(), loc)
+    }
+
+    /**
+     * Peek the next n characters without advancing.
+     */
+    private fun peekString(n: Int): String {
+        val sb = StringBuilder()
+        for (i in 0 until n) {
+            val c = peekAhead(i)
+            if (c != null) {
+                sb.append(c)
+            }
+        }
+        return sb.toString()
     }
 
     private fun scanIdentifier(): Token {

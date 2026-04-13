@@ -93,6 +93,49 @@ sealed class Condition {
         val operator: ConditionOperator,
         val expected: Any? = null,
     ) : Condition()
+
+    /**
+     * Variable condition.
+     *
+     * @property name Variable name (e.g., "test.type")
+     * @property operator Comparison operator
+     * @property expected Expected value for comparison
+     */
+    data class Variable(
+        val name: String,
+        val operator: ConditionOperator,
+        val expected: Any? = null,
+    ) : Condition()
+
+    /**
+     * Negated condition.
+     *
+     * @property condition The condition to negate
+     */
+    data class Negated(
+        val condition: Condition,
+    ) : Condition()
+
+    /**
+     * Compound condition with logical operator.
+     *
+     * @property left Left operand
+     * @property operator Logical operator (AND/OR)
+     * @property right Right operand
+     */
+    data class Compound(
+        val left: Condition,
+        val operator: LogicalOperator,
+        val right: Condition,
+    ) : Condition()
+}
+
+/**
+ * Logical operators for compound conditions.
+ */
+enum class LogicalOperator {
+    AND,
+    OR,
 }
 
 /**

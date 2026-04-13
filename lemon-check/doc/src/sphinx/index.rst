@@ -18,6 +18,7 @@ LemonCheck is an OpenAPI-driven BDD-style API testing library for Kotlin and Jav
    :caption: Features
 
    features/scenario-syntax
+   features/auto-test
    features/kotlin-dsl
    features/standalone-runner
    features/parameters
@@ -47,6 +48,7 @@ Key Features
 
 * **OpenAPI-driven**: Automatically validate requests and responses against your OpenAPI spec
 * **BDD-style scenarios**: Write readable tests using a Gherkin-like DSL
+* **Auto-generated tests**: Automatically generate invalid request and security tests from OpenAPI schemas
 * **JUnit 5 integration**: Seamless integration with your existing test infrastructure
 * **Spring Boot support**: Auto-discover bindings and configuration from Spring context
 * **Plugin system**: Extend functionality with custom plugins for reporting, logging, and more

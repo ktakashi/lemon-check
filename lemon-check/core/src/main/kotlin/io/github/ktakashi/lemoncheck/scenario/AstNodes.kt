@@ -150,8 +150,33 @@ data class CallNode(
     /** Structured body properties (used with body: followed by indented properties) */
     val bodyProperties: Map<String, BodyPropertyValue>? = null,
     val bodyFile: String? = null,
+    /** Auto-test configuration for generating invalid/security tests */
+    val autoTestConfig: AutoTestConfig? = null,
     override val location: SourceLocation,
 ) : ActionNode()
+
+/**
+ * Configuration for auto-generating tests.
+ *
+ * @property types The types of tests to generate (invalid, security)
+ * @property excludes Test categories to exclude (e.g., "SQLInjection", "maxLength")
+ */
+data class AutoTestConfig(
+    val types: Set<AutoTestType>,
+    val excludes: Set<String> = emptySet(),
+    val location: SourceLocation,
+)
+
+/**
+ * Types of auto-generated tests.
+ */
+enum class AutoTestType {
+    /** Invalid request tests - violate schema constraints */
+    INVALID,
+
+    /** Security tests - injection and attack patterns */
+    SECURITY,
+}
 
 /**
  * Variable extraction action.
@@ -254,6 +279,45 @@ sealed class ConditionNode {
         val expected: ValueNode?,
         override val location: SourceLocation,
     ) : ConditionNode()
+
+    /**
+     * Variable condition.
+     * Example: `if test.type equals "invalid"`
+     */
+    data class VariableCondition(
+        val variableName: String,
+        val operator: ConditionOperator,
+        val expected: ValueNode?,
+        override val location: SourceLocation,
+    ) : ConditionNode()
+
+    /**
+     * Negated condition.
+     * Example: `if not status 200`
+     */
+    data class NegatedCondition(
+        val condition: ConditionNode,
+        override val location: SourceLocation,
+    ) : ConditionNode()
+
+    /**
+     * Compound condition with logical operators.
+     * Example: `if status 4xx and test.type equals "invalid"`
+     */
+    data class CompoundCondition(
+        val left: ConditionNode,
+        val operator: LogicalOperator,
+        val right: ConditionNode,
+        override val location: SourceLocation,
+    ) : ConditionNode()
+}
+
+/**
+ * Logical operators for compound conditions.
+ */
+enum class LogicalOperator {
+    AND,
+    OR,
 }
 
 /**
@@ -336,6 +400,18 @@ data class JsonValueNode(
     val json: String,
     override val location: SourceLocation,
 ) : ValueNode()
+
+/**
+ * Status code range value (e.g., 1xx, 2xx, 3xx, 4xx, 5xx).
+ * Represents a range of 100 status codes.
+ */
+data class StatusRangeNode(
+    val base: Int,
+    override val location: SourceLocation,
+) : ValueNode() {
+    /** Returns the IntRange for this status pattern (e.g., 4 -> 400..499) */
+    fun toRange(): IntRange = (base * 100)..(base * 100 + 99)
+}
 
 /**
  * Represents a row in scenario outline examples.

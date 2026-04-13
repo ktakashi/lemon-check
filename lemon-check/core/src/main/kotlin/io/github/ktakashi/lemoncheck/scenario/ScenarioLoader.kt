@@ -18,6 +18,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import io.github.ktakashi.lemoncheck.model.ConditionBranch as ModelConditionBranch
 import io.github.ktakashi.lemoncheck.model.ConditionOperator as ModelConditionOperator
+import io.github.ktakashi.lemoncheck.model.LogicalOperator as ModelLogicalOperator
 
 /**
  * Represents a group of scenarios within a feature block.
@@ -296,6 +297,7 @@ class ScenarioLoader {
             val headers = call.headers.mapValues { extractValue(it.value).toString() }
             val body = call.body?.let { extractStringValue(it) }
             val bodyProperties = call.bodyProperties?.let { transformBodyProperties(it) }
+            val autoTestConfig = call.autoTestConfig?.let { transformAutoTestConfig(it) }
 
             steps.add(
                 Step(
@@ -313,6 +315,7 @@ class ScenarioLoader {
                     assertions = currentAssertions.toList(),
                     conditionals = currentConditionals.toList(),
                     failMessage = currentFailMessage,
+                    autoTestConfig = autoTestConfig,
                     sourceLocation = call.location,
                 ),
             )
@@ -436,6 +439,7 @@ class ScenarioLoader {
             is NumberValueNode -> node.value
             is VariableValueNode -> $$"${$${node.name}}"
             is JsonValueNode -> node.json
+            is StatusRangeNode -> node.toRange()
         }
 
     private fun extractStringValue(node: ValueNode): String =
@@ -444,6 +448,7 @@ class ScenarioLoader {
             is NumberValueNode -> node.value.toString()
             is VariableValueNode -> $$"${$${node.name}}"
             is JsonValueNode -> node.json
+            is StatusRangeNode -> "${node.base}xx"
         }
 
     /**
@@ -501,6 +506,29 @@ class ScenarioLoader {
                     operator = node.operator?.let { transformConditionOperator(it) } ?: ModelConditionOperator.EXISTS,
                     expected = node.expected?.let { extractValue(it) },
                 )
+            is ConditionNode.VariableCondition ->
+                Condition.Variable(
+                    name = node.variableName,
+                    operator = transformConditionOperator(node.operator),
+                    expected = node.expected?.let { extractValue(it) },
+                )
+            is ConditionNode.NegatedCondition ->
+                Condition.Negated(condition = transformCondition(node.condition))
+            is ConditionNode.CompoundCondition ->
+                Condition.Compound(
+                    left = transformCondition(node.left),
+                    operator = transformLogicalOperator(node.operator),
+                    right = transformCondition(node.right),
+                )
+        }
+
+    /**
+     * Transform AST LogicalOperator to model LogicalOperator.
+     */
+    private fun transformLogicalOperator(op: LogicalOperator): ModelLogicalOperator =
+        when (op) {
+            LogicalOperator.AND -> ModelLogicalOperator.AND
+            LogicalOperator.OR -> ModelLogicalOperator.OR
         }
 
     /**
@@ -554,6 +582,15 @@ class ScenarioLoader {
             nestedConditionals = conditionals,
         )
     }
+
+    /**
+     * Transform AST AutoTestConfig to model AutoTestConfig.
+     */
+    private fun transformAutoTestConfig(config: AutoTestConfig): io.github.ktakashi.lemoncheck.model.AutoTestConfig =
+        io.github.ktakashi.lemoncheck.model.AutoTestConfig(
+            types = config.types,
+            excludes = config.excludes,
+        )
 }
 
 /**

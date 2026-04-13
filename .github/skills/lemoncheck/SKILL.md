@@ -321,6 +321,56 @@ parameters:
   header.Authorization: "Bearer test-token"
 ```
 
+## Auto-Generated Tests
+
+Generate invalid request and security tests automatically from OpenAPI schema:
+
+### Basic Usage
+```
+scenario: Auto-generated tests for createPet
+  when I create a pet with invalid data
+    call ^createPet
+      auto: [invalid security]
+      body:
+        name: "Fluffy"
+        status: "available"
+  
+  if status 4xx
+    # Test passed - invalid request rejected
+  else
+    fail "Expected 4xx for {{test.type}}: {{test.description}}"
+```
+
+### Test Types
+- `invalid` - Violates OpenAPI constraints (minLength, maxLength, pattern, required, enum, type)
+- `security` - Attack payloads (SQL injection, XSS, path traversal, command injection)
+
+### Path Parameter Tests
+```
+scenario: Auto-generated tests for getPetById
+  when I get a pet with invalid ID
+    call ^getPetById
+      auto: [invalid security]
+      petId: 1
+  
+  if status 4xx
+    # Test passed
+```
+
+### Context Variables
+- `test.type` - "invalid" or "security"
+- `test.field` - Field being tested (e.g., "name", "petId")
+- `test.description` - Human-readable description
+- `test.value` - The invalid/attack value used
+- `test.location` - Where parameter is ("request body", "path variable", "query parameter", "header")
+
+### Test Display Names
+Auto-tests appear in reports as:
+```
+[Invalid request] request body name with value <empty string>
+[Security SQL Injection] path variable petId with value ' OR '1'='1
+```
+
 ## Best Practices
 
 1. **Keep scenarios focused** - One behavior per scenario

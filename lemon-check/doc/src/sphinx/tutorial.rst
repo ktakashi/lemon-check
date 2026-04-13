@@ -165,6 +165,85 @@ When APIs can return different valid responses, use if/else:
         else
           fail "Expected 200 or 201"
 
+Auto-Generated Tests
+--------------------
+
+LemonCheck can automatically generate invalid request and security tests based on your OpenAPI schema.
+This helps ensure your API properly validates input and rejects common attack patterns.
+
+Basic Usage
+^^^^^^^^^^^
+
+Use the ``auto:`` directive in a call to generate tests:
+
+.. code-block:: text
+
+    scenario: Auto-generated tests for createPet
+      when: I create a pet with invalid data
+        call ^createPet
+          auto: [invalid security]
+          body:
+            name: "TestPet"
+            status: "available"
+      
+      if status 4xx
+        # Test passed - invalid request rejected
+      else
+        fail "Expected 4xx for {{test.type}}: {{test.description}}"
+
+Test Types
+^^^^^^^^^^
+
+* ``invalid`` - Generates tests that violate OpenAPI constraints:
+  
+  - String length violations (minLength, maxLength)
+  - Number range violations (minimum, maximum)
+  - Pattern violations
+  - Missing required fields
+  - Invalid enum values
+  - Type mismatches
+
+* ``security`` - Generates tests with common attack payloads:
+
+  - SQL injection
+  - Cross-site scripting (XSS)
+  - Path traversal
+  - Command injection
+  - LDAP injection
+
+Context Variables
+^^^^^^^^^^^^^^^^^
+
+During auto-test execution, these variables are available:
+
+=================== ================================================
+Variable            Description
+=================== ================================================
+``test.type``       Test category ("invalid" or "security")
+``test.field``      Field being tested (e.g., "name", "petId")
+``test.description``Human-readable test description
+``test.value``      The invalid/attack value used
+``test.location``   Parameter location ("request body", "path variable", etc.)
+=================== ================================================
+
+Path Parameter Tests
+^^^^^^^^^^^^^^^^^^^^
+
+Auto-tests also work with path parameters:
+
+.. code-block:: text
+
+    scenario: Auto-generated tests for getPetById
+      when: I get a pet with invalid ID
+        call ^getPetById
+          auto: [invalid security]
+          petId: 1
+      
+      if status 4xx
+        # Invalid ID rejected
+
+See :doc:`features/auto-test` for complete documentation.
+
 Running Tests
 -------------
 
@@ -225,11 +304,13 @@ You've learned how to:
 * Write BDD-style scenarios
 * Use scenario outlines with examples
 * Create custom step definitions
+* Generate auto-tests for input validation and security
 * Generate reports
 * Integrate with Spring Boot
 
 For more details, explore:
 
+* :doc:`features/auto-test` - Auto-generated invalid and security tests
 * :doc:`features/plugins` - Extend LemonCheck with plugins
 * :doc:`features/custom-steps` - All step binding mechanisms
 * :doc:`features/reporting` - Report formats and customization

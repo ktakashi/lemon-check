@@ -29,6 +29,7 @@ enum class TokenType {
     // Literals
     STRING,
     NUMBER,
+    STATUS_RANGE, // e.g., 1xx, 2xx, 3xx, 4xx, 5xx
     IDENTIFIER,
     OPERATION_ID,
     JSON_PATH,

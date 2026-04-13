@@ -1162,9 +1162,8 @@ class ParserTest {
 
         val condition = conditionals[0].ifBranch.condition
         assertTrue(condition is ConditionNode.JsonPathCondition)
-        val jsonPathCondition = condition
-        assertEquals($$"$.status", jsonPathCondition.path)
-        assertEquals(ConditionOperator.EQUALS, jsonPathCondition.operator)
+        assertEquals("$.status", condition.path)
+        assertEquals(ConditionOperator.EQUALS, condition.operator)
     }
 
     @Test
@@ -1238,4 +1237,267 @@ class ParserTest {
         scenario.steps.flatMap { step ->
             step.actions.filterIsInstance<ConditionalNode>()
         }
+
+    @Test
+    fun `should parse status range patterns (1xx to 5xx)`() {
+        val patterns = listOf("1xx" to 1, "2xx" to 2, "3xx" to 3, "4xx" to 4, "5xx" to 5)
+
+        for ((pattern, base) in patterns) {
+            val source =
+                """
+                scenario: Test status range $pattern
+                  when I make a request
+                    call ^testOperation
+                  then I get a $pattern response
+                    assert status $pattern
+                """.trimIndent()
+
+            val result = Parser.parse(source)
+
+            assertTrue(result.isSuccess, "Parse should succeed for pattern $pattern: ${result.errors}")
+            val assertions = extractAssertions(result.ast!!.scenarios[0])
+            assertEquals(1, assertions.size)
+            val assertion = assertions[0]
+            assertEquals(AssertionKind.STATUS_CODE, assertion.assertionType)
+            assertTrue(assertion.expected is StatusRangeNode, "Expected StatusRangeNode for pattern $pattern")
+            assertEquals(base, assertion.expected.base)
+        }
+    }
+
+    @Test
+    fun `should parse uppercase status range patterns`() {
+        val source =
+            """
+            scenario: Test uppercase pattern
+              when I make a request
+                call ^testOperation
+              then I get a 4XX response
+                assert status 4XX
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertTrue(assertions[0].expected is StatusRangeNode)
+        assertEquals(4, (assertions[0].expected as StatusRangeNode).base)
+    }
+
+    @Test
+    fun `should still parse exact status codes`() {
+        val source =
+            """
+            scenario: Test exact status
+              when I make a request
+                call ^testOperation
+              then I get a 201 response
+                assert status 201
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertTrue(assertions[0].expected is NumberValueNode, "Expected NumberValueNode for exact status")
+        assertEquals(201L, (assertions[0].expected as NumberValueNode).value)
+    }
+
+    @Test
+    fun `should convert status range to IntRange`() {
+        val node2xx = StatusRangeNode(2, SourceLocation(1, 1, null))
+        assertEquals(200..299, node2xx.toRange())
+
+        val node4xx = StatusRangeNode(4, SourceLocation(1, 1, null))
+        assertEquals(400..499, node4xx.toRange())
+    }
+
+    // Variable Condition Tests
+
+    @Test
+    fun `should parse variable condition`() {
+        val source =
+            """
+            scenario: Variable condition test
+              when I make a request
+                call ^testOperation
+              then check variable
+                if test.type equals "invalid"
+                  fail "Expected invalid test"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val conditionals = extractConditionals(result.ast!!.scenarios[0])
+        assertEquals(1, conditionals.size)
+
+        val conditional = conditionals[0]
+        assertTrue(conditional.ifBranch.condition is ConditionNode.VariableCondition)
+        val varCondition = conditional.ifBranch.condition
+        assertEquals("test.type", varCondition.variableName)
+        assertEquals(ConditionOperator.EQUALS, varCondition.operator)
+    }
+
+    @Test
+    fun `should parse compound condition with and`() {
+        val source =
+            """
+            scenario: Compound AND test
+              when I make a request
+                call ^testOperation
+              then check compound
+                if status 4xx and test.type equals "invalid"
+                  fail "Got 4xx with invalid test type"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val conditionals = extractConditionals(result.ast!!.scenarios[0])
+        assertEquals(1, conditionals.size)
+
+        val conditional = conditionals[0]
+        assertTrue(conditional.ifBranch.condition is ConditionNode.CompoundCondition)
+        val compound = conditional.ifBranch.condition
+        assertEquals(LogicalOperator.AND, compound.operator)
+        assertTrue(compound.left is ConditionNode.StatusCondition)
+        assertTrue(compound.right is ConditionNode.VariableCondition)
+    }
+
+    @Test
+    fun `should parse compound condition with or`() {
+        val source =
+            """
+            scenario: Compound OR test
+              when I make a request
+                call ^testOperation
+              then check compound or
+                if status 200 or status 201
+                  assert status 200
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val conditionals = extractConditionals(result.ast!!.scenarios[0])
+        assertEquals(1, conditionals.size)
+
+        val conditional = conditionals[0]
+        assertTrue(conditional.ifBranch.condition is ConditionNode.CompoundCondition)
+        val compound = conditional.ifBranch.condition
+        assertEquals(LogicalOperator.OR, compound.operator)
+        assertTrue(compound.left is ConditionNode.StatusCondition)
+        assertTrue(compound.right is ConditionNode.StatusCondition)
+    }
+
+    @Test
+    fun `should parse negated variable condition`() {
+        val source =
+            """
+            scenario: Negated variable test
+              when I make a request
+                call ^testOperation
+              then check negated
+                if not test.valid equals "true"
+                  fail "Test is not valid"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val conditionals = extractConditionals(result.ast!!.scenarios[0])
+        assertEquals(1, conditionals.size)
+
+        val conditional = conditionals[0]
+        assertTrue(conditional.ifBranch.condition is ConditionNode.NegatedCondition)
+        val negated = conditional.ifBranch.condition
+        assertTrue(negated.condition is ConditionNode.VariableCondition)
+    }
+
+    @Test
+    fun `should parse complex compound with multiple operators`() {
+        val source =
+            """
+            scenario: Complex compound test
+              when I make a request
+                call ^testOperation
+              then check complex
+                if status 4xx and test.type equals "invalid"
+                  fail "Test should fail for 4xx with invalid type"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val conditionals = extractConditionals(result.ast!!.scenarios[0])
+        assertEquals(1, conditionals.size)
+
+        val conditional = conditionals[0]
+        assertTrue(conditional.ifBranch.condition is ConditionNode.CompoundCondition)
+    }
+
+    // Auto-test excludes tests
+
+    @Test
+    fun `should parse auto-test with excludes`() {
+        val source =
+            """
+            scenario: Auto-test with excludes
+              when I make a request
+                call ^createPet
+                  auto: [invalid security]
+                  excludes: [SQLInjection maxLength]
+                  body:
+                    name: "Test"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callNode = step.actions.first() as CallNode
+        assertNotNull(callNode.autoTestConfig)
+        assertEquals(setOf(AutoTestType.INVALID, AutoTestType.SECURITY), callNode.autoTestConfig.types)
+        assertEquals(setOf("SQLInjection", "maxLength"), callNode.autoTestConfig.excludes)
+    }
+
+    @Test
+    fun `should parse auto-test excludes with comma separation`() {
+        val source =
+            """
+            scenario: Auto-test with comma excludes
+              when I test
+                call ^createPet
+                  auto: [security]
+                  excludes: [XSS, PathTraversal, CommandInjection]
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callNode = step.actions.first() as CallNode
+        assertNotNull(callNode.autoTestConfig)
+        assertEquals(setOf("XSS", "PathTraversal", "CommandInjection"), callNode.autoTestConfig.excludes)
+    }
+
+    @Test
+    fun `should parse auto-test without excludes`() {
+        val source =
+            """
+            scenario: Auto-test without excludes
+              when I test
+                call ^createPet
+                  auto: [invalid]
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callNode = step.actions.first() as CallNode
+        assertNotNull(callNode.autoTestConfig)
+        assertEquals(setOf(AutoTestType.INVALID), callNode.autoTestConfig.types)
+        assertEquals(emptySet(), callNode.autoTestConfig.excludes)
+    }
 }

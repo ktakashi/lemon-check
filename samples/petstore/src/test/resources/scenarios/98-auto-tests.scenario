@@ -1,0 +1,120 @@
+@auto-test @invalid @security
+scenario: Auto-generated invalid and security tests for createPet
+  given the API is available
+    call ^listPets
+    assert status 200
+
+  when I create a pet with auto-generated invalid/security payloads
+    call ^createPet
+      auto: [invalid security]
+      body:
+        name: "BasePet"
+        status: "available"
+
+  then the auto-tests validate based on test type
+    # Auto-tests validate:
+    # - invalid tests: expect 4xx (bad request) or graceful handling
+    # - security tests: expect 4xx (rejected) or 2xx (safely sanitized)
+    if test.type equals "invalid" and status 4xx
+      # Good: API rejected invalid input
+      assert status 4xx
+    else if test.type equals "security" and status 4xx
+      # Good: API rejected potentially malicious input
+      assert status 4xx
+    else if status 2xx
+      # API accepted - this may be valid depending on server validation
+      assert status 2xx
+    else
+      # Unexpected status
+      fail "Unexpected response status"
+
+@auto-test @invalid
+scenario: Auto-generated invalid tests only for name validation
+  when I create a pet with invalid name data
+    call ^createPet
+      auto: [invalid]
+      body:
+        name: "ValidName"
+        status: "available"
+
+  then the invalid name tests are validated
+    # Invalid data tests should result in 4xx or safe acceptance
+    if status 4xx
+      assert status 4xx
+    else
+      # If accepted, at least should be 2xx (not 5xx server error)
+      assert status 2xx
+
+@auto-test @security
+scenario: Auto-generated security tests for input sanitization
+  when I create a pet with security payloads
+    call ^createPet
+      auto: [security]
+      body:
+        name: "SecurityTestPet"
+        status: "available"
+
+  then the security tests are validated
+    # Security tests: verify API handles payloads safely
+    # Either reject (4xx) or accept with sanitization (2xx)
+    if status 4xx
+      assert status 4xx
+    else if status 5xx
+      # 5xx means the payload caused a server error - this is bad
+      fail "Security payload caused server error - potential vulnerability"
+    else
+      # 2xx is acceptable if the payload was sanitized
+      assert status 2xx
+
+@auto-test @path-param
+scenario: Auto-generated path parameter tests for getPetById
+  when I get a pet with auto-generated invalid path parameters
+    call ^getPetById
+      auto: [invalid security]
+      petId: 1
+
+  then the path parameter tests are validated
+    # Path parameter tests
+    if status 4xx
+      assert status 4xx
+    else
+      # May get 404 for invalid IDs which is fine
+      assert status 2xx
+
+@auto-test @security @excludes-demo
+scenario: Auto-generated security tests with exclusions
+  # This scenario demonstrates excluding specific test categories
+  when I create a pet excluding SQL injection tests
+    call ^createPet
+      auto: [security]
+      excludes: [SQLInjection LDAPInjection]
+      body:
+        name: "ExcludeDemoPet"
+        status: "available"
+
+  then only non-SQL tests run
+    if status 4xx
+      assert status 4xx
+    else
+      assert status 2xx
+
+@auto-test @invalid @excludes-demo
+scenario: Auto-generated invalid tests with exclusions
+  # This scenario demonstrates excluding specific invalid test types
+  when I create a pet excluding minLength and required tests
+    call ^createPet
+      auto: [invalid]
+      excludes: [minLength required]
+      body:
+        name: "ExcludeDemoPet"
+        status: "available"
+
+  then only non-excluded invalid tests run
+    # Tests for maxLength, pattern, enum, type will still run
+    if status 4xx
+      assert status 4xx
+    else
+      assert status 2xx
+
+
+

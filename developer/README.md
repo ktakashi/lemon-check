@@ -8,8 +8,9 @@ This guide provides comprehensive documentation for developers who want to under
 2. [Module Structure](modules.md)
 3. [Scenario File Syntax](scenario-syntax.md)
 4. [Class Hierarchy](class-hierarchy.md)
-5. [Development Tools](tools.md)
-6. [Contributing](contributing.md)
+5. [Auto-Test Extensibility](auto-test-extensibility.md)
+6. [Development Tools](tools.md)
+7. [Contributing](contributing.md)
 
 ## Overview
 
@@ -32,5 +33,6 @@ LemonCheck is an OpenAPI-driven BDD-style API testing library for Kotlin and Jav
 
 - [Architecture Overview](architecture.md) - Understand the high-level design
 - [Scenario Syntax Reference](scenario-syntax.md) - Learn the scenario file format
+- [Auto-Test Extensibility](auto-test-extensibility.md) - Create custom test providers
 - [Class Hierarchy](class-hierarchy.md) - Navigate the codebase
 - [Development Tools](tools.md) - Set up your development environment
