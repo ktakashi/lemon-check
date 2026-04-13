@@ -12,7 +12,8 @@
     { "include": "#background-block" },
     { "include": "#step" },
     { "include": "#directive" },
-    { "include": "#examples-block" }
+    { "include": "#examples-block" },
+    { "include": "#auto-test-directive" }
   ],
   "repository": {
     "comment": {
@@ -81,6 +82,31 @@
         "1": { "name": "keyword.control.step.lemoncheck" },
         "2": { "name": "string.unquoted.step-description.lemoncheck" }
       }
+    },
+    "auto-test-directive": {
+      "patterns": [
+        { "include": "#auto-types" },
+        { "include": "#excludes-directive" },
+        { "include": "#test-context-variable" }
+      ]
+    },
+    "auto-types": {
+      "match": "^\\s*(auto):\\s*\\[([^\\]]+)\\]",
+      "captures": {
+        "1": { "name": "keyword.other.auto.lemoncheck" },
+        "2": { "name": "entity.name.tag.auto-types.lemoncheck" }
+      }
+    },
+    "excludes-directive": {
+      "match": "^\\s*(excludes):\\s*\\[([^\\]]+)\\]",
+      "captures": {
+        "1": { "name": "keyword.other.excludes.lemoncheck" },
+        "2": { "name": "entity.name.tag.exclude-types.lemoncheck" }
+      }
+    },
+    "test-context-variable": {
+      "match": "\\b(test)\\.(type|field|description|value|location)\\b",
+      "name": "variable.other.test-context.lemoncheck"
     },
     "directive": {
       "patterns": [
@@ -194,12 +220,67 @@
     },
     "conditional-directive": {
       "patterns": [
+        { "include": "#if-compound" },
         { "include": "#if-status" },
         { "include": "#if-jsonpath" },
         { "include": "#if-header" },
+        { "include": "#if-test-type" },
         { "include": "#else-if" },
         { "include": "#else" }
       ]
+    },
+    "if-compound": {
+      "match": "^\\s*(if)\\s+(.+?)\\s+(and|or)\\s+(.+)$",
+      "captures": {
+        "1": { "name": "keyword.control.if.lemoncheck" },
+        "2": { 
+          "patterns": [
+            { "include": "#test-context-variable" },
+            { "include": "#condition-expression" }
+          ]
+        },
+        "3": { "name": "keyword.operator.logical.lemoncheck" },
+        "4": { 
+          "patterns": [
+            { "include": "#test-context-variable" },
+            { "include": "#condition-expression" }
+          ]
+        }
+      }
+    },
+    "condition-expression": {
+      "patterns": [
+        {
+          "match": "(status(?:Code)?)\\s+(\\d+(?:xx|-\\d+)?)",
+          "captures": {
+            "1": { "name": "support.type.condition-type.lemoncheck" },
+            "2": { "name": "constant.numeric.status-code.lemoncheck" }
+          }
+        },
+        {
+          "match": "(test)\\.(type|field|description|value|location)\\s+(equals|notEquals|contains)\\s+(.+)",
+          "captures": {
+            "1": { "name": "variable.other.test-context.lemoncheck" },
+            "2": { "name": "variable.other.test-property.lemoncheck" },
+            "3": { "name": "keyword.operator.condition.lemoncheck" },
+            "4": { "name": "string.unquoted.lemoncheck" }
+          }
+        }
+      ]
+    },
+    "if-test-type": {
+      "match": "^\\s*(if)\\s+(test)\\.(type|field|description|value|location)\\s+(equals|notEquals|contains)\\s+(\"[^\"]+\"|\\w+)",
+      "captures": {
+        "1": { "name": "keyword.control.if.lemoncheck" },
+        "2": { "name": "variable.other.test-context.lemoncheck" },
+        "3": { "name": "variable.other.test-property.lemoncheck" },
+        "4": { "name": "keyword.operator.condition.lemoncheck" },
+        "5": { 
+          "patterns": [
+            { "include": "#string-value" }
+          ]
+        }
+      }
     },
     "if-status": {
       "match": "^\\s*(if)\\s+(status(?:Code)?)\\s+(\\d+(?:xx|-\\d+)?)",

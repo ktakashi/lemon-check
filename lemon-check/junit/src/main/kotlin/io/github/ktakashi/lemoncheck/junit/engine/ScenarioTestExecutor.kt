@@ -190,7 +190,7 @@ class ScenarioTestExecutor(
                     }
 
             // Add example row values to context if this is an outline scenario
-            initializeContextWithExamples(scenarioDescriptor.scenario, executionContext)
+            initializeContext(scenarioDescriptor.scenario, executionContext)
 
             fileContext.executor.execute(scenarioDescriptor.scenario, executionContext, sourceFile)
         }.fold(
@@ -206,7 +206,7 @@ class ScenarioTestExecutor(
      * Initialize execution context with example row values for scenario outlines.
      * For non-outline scenarios, this is a no-op.
      */
-    private fun initializeContextWithExamples(
+    private fun initializeContext(
         scenario: io.github.ktakashi.lemoncheck.model.Scenario,
         context: ExecutionContext?,
     ) {

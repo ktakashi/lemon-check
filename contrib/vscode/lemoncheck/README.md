@@ -9,8 +9,11 @@ IDE support for LemonCheck `.scenario` and `.fragment` files.
 Full syntax highlighting for LemonCheck scenario DSL:
 - Keywords: `scenario`, `feature`, `given`, `when`, `then`, `and`, `but`
 - Directives: `call`, `assert`, `extract`, `include`, `body`, `bodyFile`
+- Auto-test: `auto:`, `excludes:` for automatic test generation
+- Conditionals: `if`, `else if`, `else` with `and`/`or` operators
 - Operation IDs: `^operationId`
 - Variables: `{{variableName}}`, `${variableName}`
+- Test context: `test.type`, `test.field`, `test.description`, `test.value`, `test.location`
 - Tags: `@smoke`, `@ignore`, etc.
 - JSONPath expressions: `$.path.to.field`
 - JSON bodies and strings
