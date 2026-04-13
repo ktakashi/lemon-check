@@ -1,5 +1,6 @@
 package io.github.ktakashi.lemoncheck.junit.engine
 
+import io.github.ktakashi.lemoncheck.autotest.AutoTestCase
 import io.github.ktakashi.lemoncheck.context.ExecutionContext
 import io.github.ktakashi.lemoncheck.dsl.LemonCheckSuite
 import io.github.ktakashi.lemoncheck.executor.ScenarioExecutor
@@ -8,6 +9,7 @@ import io.github.ktakashi.lemoncheck.junit.LemonCheckBindings
 import io.github.ktakashi.lemoncheck.junit.LemonCheckConfiguration
 import io.github.ktakashi.lemoncheck.junit.discovery.FragmentDiscovery
 import io.github.ktakashi.lemoncheck.junit.spi.BindingsProvider
+import io.github.ktakashi.lemoncheck.model.AutoTestResult
 import io.github.ktakashi.lemoncheck.model.FragmentRegistry
 import io.github.ktakashi.lemoncheck.model.ResultStatus
 import io.github.ktakashi.lemoncheck.model.ScenarioResult
@@ -229,8 +231,16 @@ class ScenarioTestExecutor(
         scenarioDescriptor: IndividualScenarioDescriptor,
         result: ScenarioResult,
         listener: EngineExecutionListener,
-    ): Boolean =
-        when (result.status) {
+    ): Boolean {
+        // Check if any step has auto-test results
+        val autoTestResults = result.stepResults.flatMap { it.autoTestResults }
+
+        if (autoTestResults.isNotEmpty()) {
+            return handleAutoTestResults(scenarioDescriptor, result, autoTestResults, listener)
+        }
+
+        // Standard result handling for non-auto-test scenarios
+        return when (result.status) {
             ResultStatus.PASSED -> {
                 listener.executionFinished(scenarioDescriptor, TestExecutionResult.successful())
                 false
@@ -248,6 +258,93 @@ class ScenarioTestExecutor(
                 true
             }
         }
+    }
+
+    /**
+     * Handle scenario results that contain auto-test results.
+     * Each auto-test is reported as a separate dynamic test directly under the scenario.
+     */
+    private fun handleAutoTestResults(
+        scenarioDescriptor: IndividualScenarioDescriptor,
+        result: ScenarioResult,
+        autoTestResults: List<AutoTestResult>,
+        listener: EngineExecutionListener,
+    ): Boolean {
+        // Phase 1: Register all dynamic tests first
+        val autoTestDescriptors = autoTestResults.mapIndexed { index, autoResult ->
+            val testCase = autoResult.testCase
+            val displayName = AutoTestDescriptor.createDisplayName(testCase)
+            val testId = scenarioDescriptor.uniqueId.append("auto-test", "${index + 1}")
+
+            val autoTestDescriptor = AutoTestDescriptor(
+                uniqueId = testId,
+                displayName = displayName,
+                testCase = testCase,
+                stepDescription = getStepDescription(result, testCase),
+            )
+
+            // Add to scenario and register
+            scenarioDescriptor.addChild(autoTestDescriptor)
+            listener.dynamicTestRegistered(autoTestDescriptor)
+
+            autoTestDescriptor to autoResult
+        }
+
+        // Phase 2: Execute all registered tests
+        var hasFailure = false
+        for ((autoTestDescriptor, autoResult) in autoTestDescriptors) {
+            listener.executionStarted(autoTestDescriptor)
+            if (autoResult.passed) {
+                listener.executionFinished(autoTestDescriptor, TestExecutionResult.successful())
+            } else {
+                hasFailure = true
+                val errorMessage = buildAutoTestFailureMessage(autoResult)
+                listener.executionFinished(
+                    autoTestDescriptor,
+                    TestExecutionResult.failed(AssertionError(errorMessage)),
+                )
+            }
+        }
+
+        // Report the scenario container result
+        val scenarioResult = if (hasFailure) {
+            TestExecutionResult.failed(
+                AssertionError("${autoTestResults.count { !it.passed }}/${autoTestResults.size} auto-tests failed"),
+            )
+        } else {
+            TestExecutionResult.successful()
+        }
+        listener.executionFinished(scenarioDescriptor, scenarioResult)
+
+        return hasFailure
+    }
+
+    private fun getStepDescription(
+        result: ScenarioResult,
+        testCase: AutoTestCase,
+    ): String {
+        return result.stepResults
+            .firstOrNull { it.autoTestResults.any { r -> r.testCase == testCase } }
+            ?.step?.description ?: "auto-test"
+    }
+
+    private fun buildAutoTestFailureMessage(autoResult: AutoTestResult): String {
+        return buildString {
+            append(AutoTestDescriptor.createDisplayName(autoResult.testCase))
+            append("\n")
+            if (autoResult.error != null) {
+                append("  Error: ${autoResult.error}")
+            } else {
+                append("  Status: ${autoResult.statusCode ?: "N/A"}")
+                autoResult.assertionResults.filter { !it.passed }.forEach { assertion ->
+                    append("\n  - ${assertion.message}")
+                }
+            }
+            if (autoResult.responseBody != null) {
+                append("\n  Response: ${autoResult.responseBody}")
+            }
+        }
+    }
 
     // Context building methods
 

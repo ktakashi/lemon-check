@@ -8,6 +8,7 @@ Lemon-Check enables you to write human-readable scenario files that test your RE
 
 - **BDD Scenario Format**: Write tests in plain text using Given/When/Then syntax
 - **OpenAPI Integration**: Validate requests/responses against your API spec
+- **Auto-Generated Tests**: Automatically generate invalid request and security tests from OpenAPI schemas
 - **JUnit 5 Engine**: Run scenarios as JUnit tests with full IDE support
 - **Spring Boot Integration**: Inject `@LocalServerPort`, `@Autowired` in bindings
 - **JSONPath Assertions**: Validate response data with JSONPath expressions
@@ -260,6 +261,35 @@ Conditions support status codes, JSON path values, and headers:
 - `if status 200`
 - `if $.count greaterThan 0`
 - `if header Content-Type equals "application/json"`
+
+### Auto-Generated Tests
+
+Automatically generate invalid request and security tests based on OpenAPI schema:
+
+```
+scenario: Auto-generated tests for createPet
+  when I create a pet with invalid input
+    call ^createPet
+      auto: [invalid security]
+      body:
+        name: "TestPet"
+        status: "available"
+  
+  if status 4xx
+    # Invalid/security test rejected - passed
+  else
+    fail "Expected 4xx for {{test.type}}: {{test.description}}"
+```
+
+Available test types:
+- `invalid` - Violates OpenAPI constraints (minLength, maxLength, pattern, required, enum)
+- `security` - Attack payloads (SQL injection, XSS, path traversal, command injection)
+
+Context variables available during auto-tests:
+- `test.type` - "invalid" or "security"
+- `test.field` - Field being tested
+- `test.description` - Human-readable description
+- `test.location` - "request body", "path variable", "query parameter", or "header"
 
 ### File-Level Parameters
 

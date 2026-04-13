@@ -137,11 +137,16 @@ object ScenarioTestDiscoverer {
         scenario: io.github.ktakashi.lemoncheck.model.Scenario,
     ): IndividualScenarioDescriptor {
         val scenarioId = parentId.append("scenario", scenario.name)
+        val hasAutoTests = scenario.steps.any { it.autoTestConfig != null }
+
         return IndividualScenarioDescriptor(
             uniqueId = scenarioId,
             displayName = scenario.name,
             scenario = scenario,
+            hasAutoTests = hasAutoTests,
         )
+        // Note: No placeholder children are added during discovery
+        // Auto-tests are added dynamically during execution
     }
 
     private fun createFeatureDescriptor(

@@ -531,6 +531,146 @@ when I create a pet
       }
 ```
 
+## Auto-Generated Tests (`auto:`)
+
+The `auto:` directive enables automatic generation of invalid request and security tests based on OpenAPI schema constraints and common attack patterns.
+
+### Syntax
+
+```
+call ^operationId
+  auto: [<test-types>]
+  <base-parameters>
+```
+
+Where `<test-types>` is a space-separated list of:
+- `invalid` - Generate tests that violate OpenAPI schema constraints
+- `security` - Generate tests with common attack payloads
+
+### Basic Example
+
+```
+scenario: Auto-generated tests for createPet
+  when I create a pet with invalid request
+    call ^createPet
+      auto: [invalid security]
+      body:
+        name: "Fluffy"
+        status: "available"
+  
+  if status 4xx and test.type equals invalid
+    # Invalid tests should return 4xx - test passed
+  else if status 4xx and test.type equals security
+    # Security tests should return 4xx - attack blocked
+  else
+    fail "Expected 4xx for {{test.type}} test: {{test.description}}"
+```
+
+### Test Types
+
+#### Invalid Tests (`invalid`)
+
+Generate tests that violate OpenAPI schema constraints:
+
+| Constraint | Test Generated |
+|------------|----------------|
+| `minLength` | String with length below minimum |
+| `maxLength` | String with length above maximum |
+| `minimum` | Number below minimum value |
+| `maximum` | Number above maximum value |
+| `pattern` | String that violates regex pattern |
+| `format` (email) | Invalid email format |
+| `format` (uuid) | Invalid UUID format |
+| `format` (date) | Invalid date format |
+| `required` | Missing required fields |
+| `enum` | Value not in allowed enum |
+| Type mismatch | Wrong type (e.g., string instead of number) |
+
+#### Security Tests (`security`)
+
+Generate tests with common attack payloads:
+
+| Category | Examples |
+|----------|----------|
+| SQL Injection | `' OR '1'='1`, `"; DROP TABLE users; --` |
+| XSS | `<script>alert('XSS')</script>`, `javascript:alert(1)` |
+| Path Traversal | `../../etc/passwd`, `....//....//etc/passwd` |
+| Command Injection | `; ls -la`, `$(whoami)`, `\`id\`` |
+| LDAP Injection | `*)(uid=*))(|(uid=*`, `admin)(&)` |
+| XXE | `<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>` |
+
+### Parameter Locations
+
+Auto-tests are generated for parameters in different locations:
+
+| Location | Description | Example |
+|----------|-------------|---------|
+| `request body` | JSON body fields | `name`, `status` |
+| `path variable` | URL path parameters | `petId` in `/pets/{petId}` |
+| `query parameter` | Query string params | `status` in `?status=available` |
+| `header` | HTTP headers | `Authorization`, `X-Api-Key` |
+
+### Context Variables
+
+During auto-test execution, these variables are set:
+
+| Variable | Description | Example Values |
+|----------|-------------|----------------|
+| `test.type` | Test category | `"invalid"`, `"security"` |
+| `test.field` | Field being tested | `"name"`, `"petId"` |
+| `test.description` | Test description | `"SQL Injection"`, `"minLength violation"` |
+| `test.value` | Attack/invalid value | `"' OR '1'='1"` |
+| `test.location` | Parameter location | `"request body"`, `"path variable"` |
+
+### Complete Example
+
+```
+scenario: Auto-generated path parameter tests for getPetById
+  when I get a pet with invalid ID
+    call ^getPetById
+      auto: [invalid security]
+      petId: 1
+  
+  if status 4xx
+    # Test passed - invalid request rejected
+  else
+    fail "Expected 4xx for [{{test.type}}] {{test.location}} test: {{test.description}}"
+
+scenario: Auto-generated create pet tests
+  when I create a pet with invalid data
+    call ^createPet
+      auto: [invalid security]
+      body:
+        name: "TestPet"
+        status: "available"
+  
+  if status 4xx and test.type equals invalid
+    # Invalid input correctly rejected
+  else if status 4xx and test.type equals security
+    # Security attack blocked
+  else if not status 2xx
+    # Unexpected error
+    fail "Unexpected error for {{test.type}}: {{test.description}}"
+```
+
+### Test Display Names
+
+Auto-tests appear in test reports with descriptive names:
+
+```
+[Invalid request] request body name with value <empty string>
+[Invalid request] path variable petId with value not-a-number
+[Security SQL Injection] request body name with value ' OR '1'='1
+[Security Path Traversal] path variable petId with value ../../etc/passwd
+```
+
+### Best Practices
+
+1. **Provide valid base parameters** - Auto-tests modify one parameter at a time while keeping others valid
+2. **Use conditional assertions** - Check `test.type` to handle invalid vs security tests differently
+3. **Expect 4xx responses** - Both invalid and security tests should be rejected by a secure API
+4. **Review generated tests** - The number of tests depends on schema constraints; complex schemas generate more tests
+
 ## Parameters Block
 
 Place at the top of the file to override default configuration:

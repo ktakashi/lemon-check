@@ -14,6 +14,8 @@ import java.time.Duration
  * @property extractedValues Values extracted from response
  * @property assertionResults Results of each assertion
  * @property error Exception if an error occurred
+ * @property message Optional message providing additional context
+ * @property autoTestResults Results from auto-generated tests (if autoTestConfig was used)
  */
 data class StepResult(
     val step: Step,
@@ -25,6 +27,8 @@ data class StepResult(
     val extractedValues: Map<String, Any?> = emptyMap(),
     val assertionResults: List<AssertionResult> = emptyList(),
     val error: Throwable? = null,
+    val message: String? = null,
+    val autoTestResults: List<AutoTestResult> = emptyList(),
 )
 
 /**

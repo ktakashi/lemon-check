@@ -13,6 +13,7 @@ import io.github.ktakashi.lemoncheck.model.ConditionOperator
 import io.github.ktakashi.lemoncheck.model.ConditionalActions
 import io.github.ktakashi.lemoncheck.model.ConditionalAssertion
 import io.github.ktakashi.lemoncheck.model.FragmentRegistry
+import io.github.ktakashi.lemoncheck.model.LogicalOperator
 import io.github.ktakashi.lemoncheck.model.ResultStatus
 import io.github.ktakashi.lemoncheck.model.Scenario
 import io.github.ktakashi.lemoncheck.model.ScenarioResult
@@ -49,6 +50,23 @@ class ScenarioExecutor(
     private val fragmentRegistry: FragmentRegistry? = null,
 ) {
     private val httpBuilder = HttpRequestBuilder(configuration)
+
+    // Lazy-initialized auto-test executor - created on first use to avoid circular dependencies
+    private val autoTestExecutor: AutoTestExecutor by lazy {
+        AutoTestExecutor(
+            specRegistry = specRegistry,
+            configuration = configuration,
+            httpBuilder = httpBuilder,
+            assertionRunner = ::runAssertions,
+            paramResolver = ::resolveParams,
+            requestLogger = { method, url, headers, body ->
+                logRequest(HttpMethod.valueOf(method), url, headers, body)
+            },
+            responseLogger = { method, url, response, startTime ->
+                logResponse(HttpMethod.valueOf(method), url, response, startTime)
+            },
+        )
+    }
 
     /**
      * Execute a single scenario.
@@ -280,7 +298,12 @@ class ScenarioExecutor(
         stepStartTime: Instant,
     ): StepResult =
         runCatching {
-            executeHttpRequest(step, context, stepStartTime)
+            // Check if this step has auto-test configuration
+            if (step.autoTestConfig != null) {
+                autoTestExecutor.executeAutoTests(step, context, stepStartTime)
+            } else {
+                executeHttpRequest(step, context, stepStartTime)
+            }
         }.getOrElse { e ->
             StepResult(
                 step = step,
@@ -740,7 +763,50 @@ class ScenarioExecutor(
             is Condition.Status -> evaluateStatusCondition(response, condition)
             is Condition.JsonPath -> evaluateJsonPathCondition(response, condition, context)
             is Condition.Header -> evaluateHeaderCondition(response, condition, context)
+            is Condition.Variable -> evaluateVariableCondition(condition, context)
+            is Condition.Negated -> !evaluateCondition(response, condition.condition, context)
+            is Condition.Compound -> {
+                val leftResult = evaluateCondition(response, condition.left, context)
+                when (condition.operator) {
+                    LogicalOperator.AND -> leftResult && evaluateCondition(response, condition.right, context)
+                    LogicalOperator.OR -> leftResult || evaluateCondition(response, condition.right, context)
+                }
+            }
         }
+
+    /**
+     * Evaluate a variable condition.
+     */
+    private fun evaluateVariableCondition(
+        condition: Condition.Variable,
+        context: ExecutionContext,
+    ): Boolean {
+        val actual: Any? = context.get<Any>(condition.name)
+        val expected = condition.expected
+
+        return when (condition.operator) {
+            ConditionOperator.EQUALS -> actual?.toString() == expected?.toString()
+            ConditionOperator.NOT_EQUALS -> actual?.toString() != expected?.toString()
+            ConditionOperator.CONTAINS -> actual?.toString()?.contains(expected?.toString() ?: "") == true
+            ConditionOperator.NOT_CONTAINS -> actual?.toString()?.contains(expected?.toString() ?: "") != true
+            ConditionOperator.MATCHES -> {
+                val pattern = expected?.toString() ?: ""
+                actual?.toString()?.matches(pattern.toRegex()) == true
+            }
+            ConditionOperator.EXISTS -> actual != null
+            ConditionOperator.NOT_EXISTS -> actual == null
+            ConditionOperator.GREATER_THAN -> {
+                val actualNum = (actual as? Number)?.toDouble() ?: actual?.toString()?.toDoubleOrNull() ?: return false
+                val expectedNum = (expected as? Number)?.toDouble() ?: expected?.toString()?.toDoubleOrNull() ?: return false
+                actualNum > expectedNum
+            }
+            ConditionOperator.LESS_THAN -> {
+                val actualNum = (actual as? Number)?.toDouble() ?: actual?.toString()?.toDoubleOrNull() ?: return false
+                val expectedNum = (expected as? Number)?.toDouble() ?: expected?.toString()?.toDoubleOrNull() ?: return false
+                actualNum < expectedNum
+            }
+        }
+    }
 
     /**
      * Evaluate a status code condition.

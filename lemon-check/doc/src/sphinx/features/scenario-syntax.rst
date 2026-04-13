@@ -577,6 +577,60 @@ Parameter                  Type    Description
 ``header.<name>``          String  Add/override default header
 ========================== ======= ========================================
 
+Auto-Generated Tests
+--------------------
+
+The ``auto:`` directive automatically generates invalid request and security tests based on OpenAPI schema constraints.
+
+Basic Syntax
+^^^^^^^^^^^^
+
+.. code-block:: text
+
+    call ^operationId
+      auto: [<test-types>]
+      <base-parameters>
+
+Where ``<test-types>`` is a space-separated list of:
+
+* ``invalid`` - Generate tests violating OpenAPI schema constraints
+* ``security`` - Generate tests with common attack payloads
+
+Example
+^^^^^^^
+
+.. code-block:: text
+
+    scenario: Auto-generated tests for createPet
+      when: I create a pet with invalid input
+        call ^createPet
+          auto: [invalid security]
+          body:
+            name: "TestPet"
+            status: "available"
+      
+      if status 4xx
+        # Test passed - invalid request rejected
+      else
+        fail "Expected 4xx for {{test.type}}: {{test.description}}"
+
+Context Variables
+^^^^^^^^^^^^^^^^^
+
+During auto-test execution, these variables are available:
+
+=================== ================================================
+Variable            Description
+=================== ================================================
+``test.type``       Test category ("invalid" or "security")
+``test.field``      Field being tested
+``test.description``Human-readable description
+``test.value``      The invalid/attack value used
+``test.location``   Parameter location ("request body", "path variable", etc.)
+=================== ================================================
+
+See :doc:`auto-test` for complete documentation of auto-generated tests.
+
 Comments
 --------
 
@@ -606,6 +660,7 @@ Best Practices
 See Also
 --------
 
+* :doc:`auto-test` - Auto-generated invalid and security tests
 * :doc:`parameters` - Detailed parameter configuration
 * :doc:`fragments` - Reusable step fragments
 * :doc:`kotlin-dsl` - Alternative Kotlin DSL approach

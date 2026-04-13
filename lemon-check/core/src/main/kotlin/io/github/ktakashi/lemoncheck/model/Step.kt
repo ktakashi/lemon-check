@@ -37,6 +37,7 @@ sealed class BodyProperty {
  * @property conditionals Conditional assertions (if/else if/else branches)
  * @property failMessage If set, fail with this message unconditionally
  * @property autoAssert Whether to generate assertions from OpenAPI spec
+ * @property autoTestConfig Configuration for auto-generating invalid/security tests
  * @property fragmentName Name of fragment to include (for fragment steps)
  * @property sourceLocation Optional source location for error reporting
  */
@@ -56,6 +57,7 @@ data class Step(
     val conditionals: List<ConditionalAssertion> = emptyList(),
     val failMessage: String? = null,
     val autoAssert: Boolean = true,
+    val autoTestConfig: AutoTestConfig? = null,
     val fragmentName: String? = null,
     val sourceLocation: SourceLocation? = null,
 )

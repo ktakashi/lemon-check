@@ -52,17 +52,21 @@ class FeatureDescriptor(
  * Test descriptor representing a single scenario within a .scenario file.
  *
  * Each scenario defined in a scenario file becomes an IndividualScenarioDescriptor.
- * This is a leaf node (TEST type) that represents an actual test case.
+ * This can be either a leaf test or a container for auto-tests.
+ * When auto-tests are present, it becomes a container with child tests.
  *
- * In JUnit reports, this appears as an individual test case.
+ * In JUnit reports, this appears as an individual test case or container.
  */
 class IndividualScenarioDescriptor(
     uniqueId: UniqueId,
     displayName: String,
     val scenario: Scenario,
+    val hasAutoTests: Boolean = false,
 ) : AbstractTestDescriptor(uniqueId, displayName) {
     /**
-     * TEST type indicates this is a leaf test case.
+     * For auto-test scenarios, use CONTAINER_AND_TEST to hold child tests.
+     * For regular scenarios, use TEST for simpler IDE handling.
      */
-    override fun getType(): TestDescriptor.Type = TestDescriptor.Type.TEST
+    override fun getType(): TestDescriptor.Type =
+        if (hasAutoTests) TestDescriptor.Type.CONTAINER_AND_TEST else TestDescriptor.Type.TEST
 }
