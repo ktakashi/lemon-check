@@ -1,0 +1,32 @@
+# This scenario demonstrates custom test providers for extensible auto-testing.
+# Two custom providers are registered in the petstore sample:
+# - EmojiTestProvider: Tests emoji characters in string fields
+# - NoSqlInjectionProvider: Tests NoSQL injection attack payloads
+#
+# These providers are automatically discovered via ServiceLoader from:
+# META-INF/services/io.github.ktakashi.lemoncheck.autotest.provider.InvalidTestProvider
+# META-INF/services/io.github.ktakashi.lemoncheck.autotest.provider.SecurityTestProvider
+
+@auto-test @custom-providers
+scenario: Auto-test with custom providers
+  given the API is available
+    call ^listPets
+    assert status 200
+
+  when I create a pet with custom test payloads
+    call ^createPet
+      auto: [invalid security]
+      excludes: [SQLInjection CommandInjection PathTraversal LDAPInjection XXE HeaderInjection]
+      body:
+        name: "BasePet"
+        status: "available"
+
+  then the auto-tests validate based on test type
+    if test.type equals "invalid" and status 4xx
+      assert status 4xx
+    else if test.type equals "security" and status 4xx
+      assert status 4xx
+    else if status 2xx
+      assert status 2xx
+    else
+      fail "Unexpected response status"

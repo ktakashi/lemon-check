@@ -1,0 +1,6 @@
+# Default security test providers
+# Note: These are registered programmatically in AutoTestProviderRegistry.
+# Users can add their own providers by creating a similar file in their project.
+#
+# Example custom provider:
+# com.example.MyCustomSecurityTestProvider

@@ -211,6 +211,191 @@ This format allows you to:
 * Understand what type of validation is missing
 * Locate the affected field and value
 
+Excluding Test Types
+--------------------
+
+Use the ``excludes:`` directive to skip specific test types:
+
+.. code-block:: text
+
+    call ^createPet
+      auto: [invalid security]
+      excludes: [SQLInjection maxLength]
+      body:
+        name: "TestPet"
+        status: "available"
+
+This generates all tests except SQL Injection and maxLength violation tests.
+
+Available Test Types to Exclude
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Invalid Tests:**
+
+* ``minLength`` - String too short
+* ``maxLength`` - String too long
+* ``pattern`` - Pattern violation
+* ``format`` - Format violation (email, uuid, etc.)
+* ``enum`` - Invalid enum value
+* ``minimum`` - Number below minimum
+* ``maximum`` - Number above maximum
+* ``type`` - Wrong type
+* ``required`` - Missing required field
+* ``minItems`` - Array too small
+* ``maxItems`` - Array too large
+
+**Security Tests:**
+
+* ``SQLInjection`` - SQL injection payloads
+* ``XSS`` - Cross-site scripting payloads
+* ``PathTraversal`` - Path traversal attacks
+* ``CommandInjection`` - Command injection payloads
+* ``LDAPInjection`` - LDAP injection payloads
+* ``XXE`` - XML External Entity attacks
+* ``HeaderInjection`` - HTTP header injection
+
+Custom Providers
+----------------
+
+LemonCheck supports custom test providers for extending auto-tests with your own
+invalid value generators and security payloads. This uses Java's ServiceLoader pattern
+for automatic discovery.
+
+Creating a Custom Invalid Test Provider
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Implement the ``InvalidTestProvider`` interface:
+
+**Java Example:**
+
+.. code-block:: java
+
+    package com.example;
+
+    import io.github.ktakashi.lemoncheck.autotest.provider.InvalidTestProvider;
+    import io.github.ktakashi.lemoncheck.autotest.provider.InvalidTestValue;
+    import io.swagger.v3.oas.models.media.Schema;
+    import java.util.List;
+
+    public class EmojiTestProvider implements InvalidTestProvider {
+        
+        @Override
+        public String getTestType() {
+            return "emoji";
+        }
+        
+        @Override
+        public int getPriority() {
+            return 100; // Higher than built-in providers (0)
+        }
+
+        @Override
+        public boolean canHandle(Schema<?> schema) {
+            return "string".equals(schema.getType());
+        }
+
+        @Override
+        public List<InvalidTestValue> generateInvalidValues(
+                String fieldName, Schema<?> schema) {
+            return List.of(
+                new InvalidTestValue(
+                    "Test 🎉 emoji 🐱 string",
+                    "String with emoji characters"
+                )
+            );
+        }
+    }
+
+**Kotlin Example:**
+
+.. code-block:: kotlin
+
+    class EmojiTestProvider : InvalidTestProvider {
+        override val testType: String = "emoji"
+        override val priority: Int = 100
+
+        override fun canHandle(schema: Schema<*>): Boolean =
+            schema.type == "string"
+
+        override fun generateInvalidValues(
+            fieldName: String,
+            schema: Schema<*>,
+        ): List<InvalidTestValue> = listOf(
+            InvalidTestValue(
+                value = "Test 🎉 emoji 🐱 string",
+                description = "String with emoji characters",
+            )
+        )
+    }
+
+Creating a Custom Security Test Provider
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Implement the ``SecurityTestProvider`` interface:
+
+**Kotlin Example:**
+
+.. code-block:: kotlin
+
+    class NoSqlInjectionProvider : SecurityTestProvider {
+        override val testType: String = "NoSQLInjection"
+        override val displayName: String = "NoSQL Injection"
+        override val priority: Int = 100
+
+        override fun applicableLocations(): Set<ParameterLocation> =
+            setOf(ParameterLocation.BODY, ParameterLocation.QUERY)
+
+        override fun generatePayloads(): List<SecurityPayload> = listOf(
+            SecurityPayload("MongoDB \$ne", "{\"\$ne\": null}"),
+            SecurityPayload("MongoDB \$where", "{\"\$where\": \"sleep(5000)\"}"),
+        )
+    }
+
+Registering Custom Providers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Create ServiceLoader configuration files in your project:
+
+**META-INF/services/io.github.ktakashi.lemoncheck.autotest.provider.InvalidTestProvider:**
+
+.. code-block:: text
+
+    com.example.EmojiTestProvider
+
+**META-INF/services/io.github.ktakashi.lemoncheck.autotest.provider.SecurityTestProvider:**
+
+.. code-block:: text
+
+    com.example.NoSqlInjectionProvider
+
+Custom providers are automatically discovered at runtime and can:
+
+* Add new test types alongside built-in ones
+* Override built-in providers (use same ``testType`` with higher ``priority``)
+* Use any JVM language (Java, Kotlin, Scala, etc.)
+
+Provider Properties
+^^^^^^^^^^^^^^^^^^^
+
+================== ============================================================
+Property           Description
+================== ============================================================
+``testType``       Unique identifier (used for ``excludes`` and deduplication)
+``displayName``    Human-readable name for test reports (security providers only)
+``priority``       Override order (higher wins); built-in = 0, custom = 100
+================== ============================================================
+
+Dependencies
+^^^^^^^^^^^^
+
+Custom providers need the OpenAPI parser for schema inspection:
+
+**Gradle:**
+
+.. code-block:: kotlin
+
+    testImplementation("io.swagger.parser.v3:swagger-parser:2.1.39")
+
 Best Practices
 --------------
 

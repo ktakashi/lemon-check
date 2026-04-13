@@ -1,13 +1,12 @@
 package io.github.ktakashi.lemoncheck.autotest
 
+import io.github.ktakashi.lemoncheck.autotest.provider.AutoTestProviderRegistry
 import io.github.ktakashi.lemoncheck.openapi.LoadedSpec
 import io.github.ktakashi.lemoncheck.openapi.SpecRegistry
 import io.github.ktakashi.lemoncheck.scenario.AutoTestType
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.media.Schema
-import java.math.BigDecimal
-import java.util.UUID
 
 /**
  * Generates auto-test cases based on OpenAPI schema constraints and security patterns.
@@ -33,30 +32,39 @@ import java.util.UUID
  * ```
  *
  * @property openApi The parsed OpenAPI specification
+ * @property registry The provider registry for extensibility
  * @see AutoTestCase The data class representing a generated test case
- * @see SecurityTestPatterns Common attack payloads for security testing
+ * @see AutoTestProviderRegistry Provider registration for custom test types
  */
 class AutoTestGenerator(
     private val openApi: OpenAPI,
+    private val registry: AutoTestProviderRegistry = AutoTestProviderRegistry.default,
 ) {
     companion object {
         /**
          * Create an AutoTestGenerator from a SpecRegistry using the default spec.
          */
-        fun fromRegistry(registry: SpecRegistry): AutoTestGenerator = AutoTestGenerator(registry.getDefault().openApi)
+        fun fromRegistry(
+            specRegistry: SpecRegistry,
+            providerRegistry: AutoTestProviderRegistry = AutoTestProviderRegistry.default,
+        ): AutoTestGenerator = AutoTestGenerator(specRegistry.getDefault().openApi, providerRegistry)
 
         /**
          * Create an AutoTestGenerator from a SpecRegistry for a specific spec.
          */
         fun fromRegistry(
-            registry: SpecRegistry,
+            specRegistry: SpecRegistry,
             specName: String,
-        ): AutoTestGenerator = AutoTestGenerator(registry.get(specName).openApi)
+            providerRegistry: AutoTestProviderRegistry = AutoTestProviderRegistry.default,
+        ): AutoTestGenerator = AutoTestGenerator(specRegistry.get(specName).openApi, providerRegistry)
 
         /**
          * Create an AutoTestGenerator from a LoadedSpec.
          */
-        fun fromSpec(spec: LoadedSpec): AutoTestGenerator = AutoTestGenerator(spec.openApi)
+        fun fromSpec(
+            spec: LoadedSpec,
+            providerRegistry: AutoTestProviderRegistry = AutoTestProviderRegistry.default,
+        ): AutoTestGenerator = AutoTestGenerator(spec.openApi, providerRegistry)
     }
 
     /**
@@ -207,180 +215,29 @@ class AutoTestGenerator(
         return schema
     }
 
-    @Suppress("UNCHECKED_CAST")
+    /**
+     * Generate constraint violation tests using registered providers.
+     */
     private fun generateConstraintViolations(
         fieldName: String,
         schema: Schema<*>,
         baseBody: Map<String, Any>,
         requiredFields: List<String>,
-    ): List<AutoTestCase> {
-        val testCases = mutableListOf<AutoTestCase>()
-        val type = schema.type ?: "string"
-
-        when (type) {
-            "string" -> {
-                // minLength violation
-                schema.minLength?.let { minLen ->
-                    if (minLen > 0) {
-                        val invalidValue = "x".repeat((minLen - 1).coerceAtLeast(0))
-                        testCases.add(
-                            createInvalidTestCase(
-                                fieldName,
-                                invalidValue,
-                                "String shorter than minLength ($minLen)",
-                                baseBody,
-                            ),
-                        )
-                    }
-                }
-
-                // maxLength violation
-                schema.maxLength?.let { maxLen ->
-                    val invalidValue = "x".repeat(maxLen + 10)
-                    testCases.add(
-                        createInvalidTestCase(
-                            fieldName,
-                            invalidValue,
-                            "String longer than maxLength ($maxLen)",
-                            baseBody,
-                        ),
-                    )
-                }
-
-                // pattern violation
-                schema.pattern?.let { pattern ->
-                    testCases.add(
-                        createInvalidTestCase(
-                            fieldName,
-                            "!!!invalid_pattern!!!",
-                            "String not matching pattern ($pattern)",
-                            baseBody,
-                        ),
-                    )
-                }
-
-                // format violations
-                schema.format?.let { format ->
-                    val invalidValue =
-                        when (format) {
-                            "email" -> "not-an-email"
-                            "uuid" -> "not-a-uuid"
-                            "uri", "url" -> "not-a-url"
-                            "date" -> "not-a-date"
-                            "date-time" -> "not-a-datetime"
-                            "ipv4" -> "not.an.ip"
-                            "ipv6" -> "not:an:ipv6"
-                            else -> null
-                        }
-                    invalidValue?.let {
-                        testCases.add(
-                            createInvalidTestCase(
-                                fieldName,
-                                it,
-                                "Invalid format ($format)",
-                                baseBody,
-                            ),
-                        )
-                    }
-                }
-
-                // enum violation
-                schema.enum?.let { enumValues ->
-                    if (enumValues.isNotEmpty()) {
-                        testCases.add(
-                            createInvalidTestCase(
-                                fieldName,
-                                "INVALID_ENUM_VALUE_${UUID.randomUUID()}",
-                                "Value not in enum",
-                                baseBody,
-                            ),
-                        )
-                    }
-                }
-            }
-
-            "integer", "number" -> {
-                // minimum violation
-                schema.minimum?.let { min ->
-                    val invalidValue = min.subtract(BigDecimal.ONE)
-                    testCases.add(
-                        createInvalidTestCase(
-                            fieldName,
-                            invalidValue,
-                            "Value below minimum ($min)",
-                            baseBody,
-                        ),
-                    )
-                }
-
-                // maximum violation
-                schema.maximum?.let { max ->
-                    val invalidValue = max.add(BigDecimal.ONE)
-                    testCases.add(
-                        createInvalidTestCase(
-                            fieldName,
-                            invalidValue,
-                            "Value above maximum ($max)",
-                            baseBody,
-                        ),
-                    )
-                }
-
-                // Type mismatch - string instead of number
-                testCases.add(
+    ): List<AutoTestCase> =
+        registry
+            .getInvalidTestProviders()
+            .filter { it.canHandle(schema) }
+            .flatMap { provider ->
+                provider.generateInvalidValues(fieldName, schema).map { invalidValue ->
                     createInvalidTestCase(
-                        fieldName,
-                        "not-a-number",
-                        "Invalid type (string instead of $type)",
-                        baseBody,
-                    ),
-                )
-            }
-
-            "boolean" -> {
-                // Invalid boolean value
-                testCases.add(
-                    createInvalidTestCase(
-                        fieldName,
-                        "not-a-boolean",
-                        "Invalid boolean value",
-                        baseBody,
-                    ),
-                )
-            }
-
-            "array" -> {
-                // minItems violation
-                schema.minItems?.let { minItems ->
-                    if (minItems > 0) {
-                        testCases.add(
-                            createInvalidTestCase(
-                                fieldName,
-                                emptyList<Any>(),
-                                "Array with fewer items than minItems ($minItems)",
-                                baseBody,
-                            ),
-                        )
-                    }
-                }
-
-                // maxItems violation
-                schema.maxItems?.let { maxItems ->
-                    val tooManyItems = (0..maxItems + 5).map { "item$it" }
-                    testCases.add(
-                        createInvalidTestCase(
-                            fieldName,
-                            tooManyItems,
-                            "Array with more items than maxItems ($maxItems)",
-                            baseBody,
-                        ),
+                        fieldName = fieldName,
+                        invalidValue = invalidValue.value,
+                        description = invalidValue.description,
+                        baseBody = baseBody,
+                        invalidType = provider.testType,
                     )
                 }
             }
-        }
-
-        return testCases
-    }
 
     private fun createInvalidTestCase(
         fieldName: String,
@@ -477,15 +334,14 @@ class AutoTestGenerator(
     }
 
     /**
-     * Generate security test cases with common attack patterns.
+     * Generate security test cases using registered providers.
      */
     @Suppress("UNCHECKED_CAST")
     private fun generateSecurityTestCases(
         schema: Schema<*>,
         baseBody: Map<String, Any>,
     ): List<AutoTestCase> {
-        val testCases = mutableListOf<AutoTestCase>()
-        val properties = schema.properties ?: return testCases
+        val properties = schema.properties ?: return emptyList()
 
         // Find string fields to test
         val stringFields =
@@ -495,199 +351,142 @@ class AutoTestGenerator(
                     resolved.type == "string" || resolved.type == null
                 }.keys
 
-        stringFields.forEach { fieldName ->
-            SecurityTestPatterns.getAllPatterns().forEach { pattern ->
-                val modifiedBody = baseBody.toMutableMap()
-                modifiedBody[fieldName] = pattern.payload
-                testCases.add(
-                    AutoTestCase(
-                        type = AutoTestType.SECURITY,
-                        fieldName = fieldName,
-                        invalidValue = pattern.payload,
-                        description = "${pattern.category}: ${pattern.name}",
-                        body = modifiedBody,
-                        tag = "security",
-                    ),
-                )
-            }
+        return stringFields.flatMap { fieldName ->
+            registry
+                .getSecurityTestProviders()
+                .filter { ParameterLocation.BODY in it.applicableLocations() }
+                .flatMap { provider ->
+                    provider.generatePayloads().map { payload ->
+                        val modifiedBody = baseBody.toMutableMap()
+                        modifiedBody[fieldName] = payload.payload
+                        AutoTestCase(
+                            type = AutoTestType.SECURITY,
+                            fieldName = fieldName,
+                            invalidValue = payload.payload,
+                            description = "${provider.displayName}: ${payload.name}",
+                            body = modifiedBody,
+                            tag = "security - ${provider.displayName}",
+                        )
+                    }
+                }
         }
-
-        return testCases
     }
 
     /**
-     * Generate invalid tests for path parameters.
+     * Generate invalid tests for path parameters using providers.
      */
     private fun generatePathParamInvalidTests(
         pathParams: List<io.swagger.v3.oas.models.parameters.Parameter>,
         baseBody: Map<String, Any>,
         basePathParams: Map<String, Any?>,
-    ): List<AutoTestCase> {
-        val testCases = mutableListOf<AutoTestCase>()
-
-        pathParams.forEach { param ->
-            val schema = param.schema ?: return@forEach
+    ): List<AutoTestCase> =
+        pathParams.flatMap { param ->
+            val schema = param.schema ?: return@flatMap emptyList()
             val resolvedSchema = resolveSchema(schema)
-            val type = resolvedSchema.type ?: "string"
 
-            when (type) {
-                "integer", "number" -> {
-                    // Invalid type - string instead of number
-                    testCases.add(
+            registry
+                .getInvalidTestProviders()
+                .filter { it.canHandle(resolvedSchema) }
+                .flatMap { provider ->
+                    provider.generateInvalidValues(param.name, resolvedSchema).map { invalidValue ->
                         createInvalidTestCase(
                             fieldName = param.name,
-                            invalidValue = "not-a-number",
-                            description = "Invalid type (string instead of $type)",
+                            invalidValue = invalidValue.value,
+                            description = invalidValue.description,
                             baseBody = baseBody,
                             location = ParameterLocation.PATH,
                             basePathParams = basePathParams,
-                        ),
-                    )
-                    // Negative value
-                    testCases.add(
-                        createInvalidTestCase(
-                            fieldName = param.name,
-                            invalidValue = -1,
-                            description = "Negative value",
-                            baseBody = baseBody,
-                            location = ParameterLocation.PATH,
-                            basePathParams = basePathParams,
-                        ),
-                    )
+                            invalidType = provider.testType,
+                        )
+                    }
                 }
-                "string" -> {
-                    // Empty string
-                    testCases.add(
-                        createInvalidTestCase(
-                            fieldName = param.name,
-                            invalidValue = "",
-                            description = "Empty string",
-                            baseBody = baseBody,
-                            location = ParameterLocation.PATH,
-                            basePathParams = basePathParams,
-                        ),
-                    )
-                }
-            }
         }
 
-        return testCases
-    }
-
     /**
-     * Generate security tests for path parameters.
+     * Generate security tests for path parameters using providers.
      */
     private fun generatePathParamSecurityTests(
         pathParams: List<io.swagger.v3.oas.models.parameters.Parameter>,
         baseBody: Map<String, Any>,
         basePathParams: Map<String, Any?>,
-    ): List<AutoTestCase> {
-        val testCases = mutableListOf<AutoTestCase>()
-
-        pathParams.forEach { param ->
-            SecurityTestPatterns.getPathTraversalPatterns().forEach { pattern ->
-                testCases.add(
-                    AutoTestCase(
-                        type = AutoTestType.SECURITY,
-                        fieldName = param.name,
-                        invalidValue = pattern.payload,
-                        description = "${pattern.category}: ${pattern.name}",
-                        location = ParameterLocation.PATH,
-                        body = baseBody,
-                        pathParams = basePathParams.toMutableMap().apply { this[param.name] = pattern.payload },
-                        tag = "security",
-                    ),
-                )
-            }
+    ): List<AutoTestCase> =
+        pathParams.flatMap { param ->
+            registry
+                .getSecurityTestProviders()
+                .filter { ParameterLocation.PATH in it.applicableLocations() }
+                .flatMap { provider ->
+                    provider.generatePayloads().map { payload ->
+                        AutoTestCase(
+                            type = AutoTestType.SECURITY,
+                            fieldName = param.name,
+                            invalidValue = payload.payload,
+                            description = "${provider.displayName}: ${payload.name}",
+                            location = ParameterLocation.PATH,
+                            body = baseBody,
+                            pathParams = basePathParams.toMutableMap().apply { this[param.name] = payload.payload },
+                            tag = "security - ${provider.displayName}",
+                        )
+                    }
+                }
         }
 
-        return testCases
-    }
-
     /**
-     * Generate invalid tests for header parameters.
+     * Generate invalid tests for header parameters using providers.
      */
     private fun generateHeaderInvalidTests(
         headerParams: List<io.swagger.v3.oas.models.parameters.Parameter>,
         baseBody: Map<String, Any>,
         baseHeaders: Map<String, String>,
-    ): List<AutoTestCase> {
-        val testCases = mutableListOf<AutoTestCase>()
-
-        headerParams.forEach { param ->
-            val schema = param.schema ?: return@forEach
+    ): List<AutoTestCase> =
+        headerParams.flatMap { param ->
+            val schema = param.schema ?: return@flatMap emptyList()
             val resolvedSchema = resolveSchema(schema)
-            val type = resolvedSchema.type ?: "string"
 
-            // Empty header value
-            testCases.add(
-                createInvalidTestCase(
-                    fieldName = param.name,
-                    invalidValue = "",
-                    description = "Empty header value",
-                    baseBody = baseBody,
-                    location = ParameterLocation.HEADER,
-                    baseHeaders = baseHeaders,
-                ),
-            )
-
-            // Invalid format if format is specified
-            resolvedSchema.format?.let { format ->
-                val invalidValue =
-                    when (format) {
-                        "uuid" -> "not-a-uuid"
-                        "date" -> "not-a-date"
-                        "date-time" -> "not-a-datetime"
-                        else -> null
-                    }
-                invalidValue?.let {
-                    testCases.add(
+            registry
+                .getInvalidTestProviders()
+                .filter { it.canHandle(resolvedSchema) }
+                .flatMap { provider ->
+                    provider.generateInvalidValues(param.name, resolvedSchema).map { invalidValue ->
                         createInvalidTestCase(
                             fieldName = param.name,
-                            invalidValue = it,
-                            description = "Invalid format ($format)",
+                            invalidValue = invalidValue.value,
+                            description = invalidValue.description,
                             baseBody = baseBody,
                             location = ParameterLocation.HEADER,
                             baseHeaders = baseHeaders,
-                        ),
-                    )
+                            invalidType = provider.testType,
+                        )
+                    }
                 }
-            }
         }
 
-        return testCases
-    }
-
     /**
-     * Generate security tests for header parameters.
+     * Generate security tests for header parameters using providers.
      */
     private fun generateHeaderSecurityTests(
         headerParams: List<io.swagger.v3.oas.models.parameters.Parameter>,
         baseBody: Map<String, Any>,
         baseHeaders: Map<String, String>,
-    ): List<AutoTestCase> {
-        val testCases = mutableListOf<AutoTestCase>()
-
-        headerParams.forEach { param ->
-            // Only test string-type headers
-            SecurityTestPatterns.getHeaderPatterns().forEach { pattern ->
-                testCases.add(
-                    AutoTestCase(
-                        type = AutoTestType.SECURITY,
-                        fieldName = param.name,
-                        invalidValue = pattern.payload,
-                        description = "${pattern.category}: ${pattern.name}",
-                        location = ParameterLocation.HEADER,
-                        body = baseBody,
-                        headers = baseHeaders.toMutableMap().apply { this[param.name] = pattern.payload },
-                        tag = "security",
-                    ),
-                )
-            }
+    ): List<AutoTestCase> =
+        headerParams.flatMap { param ->
+            registry
+                .getSecurityTestProviders()
+                .filter { ParameterLocation.HEADER in it.applicableLocations() }
+                .flatMap { provider ->
+                    provider.generatePayloads().map { payload ->
+                        AutoTestCase(
+                            type = AutoTestType.SECURITY,
+                            fieldName = param.name,
+                            invalidValue = payload.payload,
+                            description = "${provider.displayName}: ${payload.name}",
+                            location = ParameterLocation.HEADER,
+                            body = baseBody,
+                            headers = baseHeaders.toMutableMap().apply { this[param.name] = payload.payload },
+                            tag = "security - ${provider.displayName}",
+                        )
+                    }
+                }
         }
-
-        return testCases
-    }
 }
 
 /**

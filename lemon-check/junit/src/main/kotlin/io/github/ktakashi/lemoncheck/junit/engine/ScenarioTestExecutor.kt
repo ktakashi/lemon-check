@@ -271,24 +271,26 @@ class ScenarioTestExecutor(
         listener: EngineExecutionListener,
     ): Boolean {
         // Phase 1: Register all dynamic tests first
-        val autoTestDescriptors = autoTestResults.mapIndexed { index, autoResult ->
-            val testCase = autoResult.testCase
-            val displayName = AutoTestDescriptor.createDisplayName(testCase)
-            val testId = scenarioDescriptor.uniqueId.append("auto-test", "${index + 1}")
+        val autoTestDescriptors =
+            autoTestResults.mapIndexed { index, autoResult ->
+                val testCase = autoResult.testCase
+                val displayName = AutoTestDescriptor.createDisplayName(testCase)
+                val testId = scenarioDescriptor.uniqueId.append("auto-test", "${index + 1}")
 
-            val autoTestDescriptor = AutoTestDescriptor(
-                uniqueId = testId,
-                displayName = displayName,
-                testCase = testCase,
-                stepDescription = getStepDescription(result, testCase),
-            )
+                val autoTestDescriptor =
+                    AutoTestDescriptor(
+                        uniqueId = testId,
+                        displayName = displayName,
+                        testCase = testCase,
+                        stepDescription = getStepDescription(result, testCase),
+                    )
 
-            // Add to scenario and register
-            scenarioDescriptor.addChild(autoTestDescriptor)
-            listener.dynamicTestRegistered(autoTestDescriptor)
+                // Add to scenario and register
+                scenarioDescriptor.addChild(autoTestDescriptor)
+                listener.dynamicTestRegistered(autoTestDescriptor)
 
-            autoTestDescriptor to autoResult
-        }
+                autoTestDescriptor to autoResult
+            }
 
         // Phase 2: Execute all registered tests
         var hasFailure = false
@@ -307,13 +309,14 @@ class ScenarioTestExecutor(
         }
 
         // Report the scenario container result
-        val scenarioResult = if (hasFailure) {
-            TestExecutionResult.failed(
-                AssertionError("${autoTestResults.count { !it.passed }}/${autoTestResults.size} auto-tests failed"),
-            )
-        } else {
-            TestExecutionResult.successful()
-        }
+        val scenarioResult =
+            if (hasFailure) {
+                TestExecutionResult.failed(
+                    AssertionError("${autoTestResults.count { !it.passed }}/${autoTestResults.size} auto-tests failed"),
+                )
+            } else {
+                TestExecutionResult.successful()
+            }
         listener.executionFinished(scenarioDescriptor, scenarioResult)
 
         return hasFailure
@@ -322,14 +325,14 @@ class ScenarioTestExecutor(
     private fun getStepDescription(
         result: ScenarioResult,
         testCase: AutoTestCase,
-    ): String {
-        return result.stepResults
+    ): String =
+        result.stepResults
             .firstOrNull { it.autoTestResults.any { r -> r.testCase == testCase } }
-            ?.step?.description ?: "auto-test"
-    }
+            ?.step
+            ?.description ?: "auto-test"
 
-    private fun buildAutoTestFailureMessage(autoResult: AutoTestResult): String {
-        return buildString {
+    private fun buildAutoTestFailureMessage(autoResult: AutoTestResult): String =
+        buildString {
             append(AutoTestDescriptor.createDisplayName(autoResult.testCase))
             append("\n")
             if (autoResult.error != null) {
@@ -344,7 +347,6 @@ class ScenarioTestExecutor(
                 append("\n  Response: ${autoResult.responseBody}")
             }
         }
-    }
 
     // Context building methods
 

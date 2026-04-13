@@ -27,12 +27,13 @@ class AutoTestDescriptor(
          */
         fun createDisplayName(testCase: AutoTestCase): String {
             val typeLabel = "[${testCase.tag}]"
-            val location = when (testCase.location) {
-                ParameterLocation.BODY -> "request body"
-                ParameterLocation.PATH -> "path variable"
-                ParameterLocation.HEADER -> "header"
-                ParameterLocation.QUERY -> "query parameter"
-            }
+            val location =
+                when (testCase.location) {
+                    ParameterLocation.BODY -> "request body"
+                    ParameterLocation.PATH -> "path variable"
+                    ParameterLocation.HEADER -> "header"
+                    ParameterLocation.QUERY -> "query parameter"
+                }
             val valueStr = testCase.invalidValue?.toString()?.take(30) ?: "null"
             val valueSuffix = if (valueStr.length >= 30) "..." else ""
             return "$typeLabel $location ${testCase.fieldName} with value $valueStr$valueSuffix"

@@ -1,0 +1,2 @@
+# Custom invalid test provider for emoji testing (written in Java)
+io.github.ktakashi.samples.petstore.provider.EmojiTestProvider

@@ -1,0 +1,2 @@
+# Custom security test provider for NoSQL injection testing
+io.github.ktakashi.samples.petstore.provider.NoSqlInjectionProvider

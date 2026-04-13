@@ -73,7 +73,7 @@ class AutoTestGeneratorTest {
 
         assertTrue(testCases.isNotEmpty(), "Should generate at least one security test case")
         assertTrue(testCases.all { it.type == AutoTestType.SECURITY })
-        assertTrue(testCases.all { it.tag == "security" })
+        assertTrue(testCases.all { it.tag.startsWith("security - ") })
     }
 
     @Test

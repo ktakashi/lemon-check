@@ -67,6 +67,5 @@ class IndividualScenarioDescriptor(
      * For auto-test scenarios, use CONTAINER_AND_TEST to hold child tests.
      * For regular scenarios, use TEST for simpler IDE handling.
      */
-    override fun getType(): TestDescriptor.Type =
-        if (hasAutoTests) TestDescriptor.Type.CONTAINER_AND_TEST else TestDescriptor.Type.TEST
+    override fun getType(): TestDescriptor.Type = if (hasAutoTests) TestDescriptor.Type.CONTAINER_AND_TEST else TestDescriptor.Type.TEST
 }
