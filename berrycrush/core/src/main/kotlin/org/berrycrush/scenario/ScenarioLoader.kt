@@ -3,7 +3,6 @@ package org.berrycrush.scenario
 import org.berrycrush.dsl.BerryCrushSuite
 import org.berrycrush.exception.ScenarioParseException
 import org.berrycrush.model.Assertion
-import org.berrycrush.model.AssertionType
 import org.berrycrush.model.BodyProperty
 import org.berrycrush.model.Condition
 import org.berrycrush.model.ConditionalActions
@@ -53,6 +52,21 @@ data class ScenarioFileContent(
  */
 class ScenarioLoader {
     /**
+     * Parse scenario source and throw if parsing fails.
+     */
+    private fun parseOrThrow(
+        source: String,
+        fileName: String?,
+    ): Parser.ParserResult {
+        val result = Parser.parse(source, fileName)
+        if (!result.isSuccess) {
+            val errorMessages = result.errors.joinToString("\n") { it.toString() }
+            throw ScenarioParseException("Failed to parse scenario file:\n$errorMessages")
+        }
+        return result
+    }
+
+    /**
      * Load scenarios from a directory.
      *
      * @param directory Path to directory containing .scenario files
@@ -100,12 +114,7 @@ class ScenarioLoader {
         source: String,
         fileName: String? = null,
     ): ScenarioFileContent {
-        val result = Parser.parse(source, fileName)
-
-        if (!result.isSuccess) {
-            val errorMessages = result.errors.joinToString("\n") { it.toString() }
-            throw ScenarioParseException("Failed to parse scenario file:\n$errorMessages")
-        }
+        val result = parseOrThrow(source, fileName)
 
         // Transform standalone scenarios (not in any feature)
         val standaloneScenarios = result.ast!!.scenarios.map { transformScenario(it) }
@@ -144,12 +153,7 @@ class ScenarioLoader {
         source: String,
         fileName: String? = null,
     ): List<Scenario> {
-        val result = Parser.parse(source, fileName)
-
-        if (!result.isSuccess) {
-            val errorMessages = result.errors.joinToString("\n") { it.toString() }
-            throw ScenarioParseException("Failed to parse scenario file:\n$errorMessages")
-        }
+        val result = parseOrThrow(source, fileName)
 
         // Transform and combine scenarios
         val standaloneScenarios = result.ast!!.scenarios.map { transformScenario(it) }
@@ -403,30 +407,37 @@ class ScenarioLoader {
         }
     }
 
+    /**
+     * Transform AST AssertNode to model Assertion.
+     *
+     * AssertNode uses ConditionNode internally, which is converted to model Condition.
+     * This enables shared evaluation logic between assertions and conditionals.
+     */
     private fun transformAssertion(node: AssertNode): Assertion {
-        val type =
-            when (node.assertionType) {
-                AssertionKind.STATUS_CODE -> AssertionType.STATUS_CODE
-                AssertionKind.BODY_CONTAINS -> AssertionType.BODY_CONTAINS
-                AssertionKind.BODY_EQUALS -> AssertionType.BODY_EQUALS
-                AssertionKind.BODY_MATCHES -> AssertionType.BODY_MATCHES
-                AssertionKind.BODY_ARRAY_SIZE -> AssertionType.BODY_ARRAY_SIZE
-                AssertionKind.BODY_ARRAY_NOT_EMPTY -> AssertionType.BODY_ARRAY_NOT_EMPTY
-                AssertionKind.HEADER_EXISTS -> AssertionType.HEADER_EXISTS
-                AssertionKind.HEADER_EQUALS -> AssertionType.HEADER_EQUALS
-                AssertionKind.MATCHES_SCHEMA -> AssertionType.MATCHES_SCHEMA
-                AssertionKind.RESPONSE_TIME -> AssertionType.RESPONSE_TIME
-            }
-
+        val condition = transformCondition(node.condition)
         return Assertion(
-            type = type,
-            jsonPath = node.path,
-            expected = node.expected?.let { extractValue(it) },
-            headerName = node.headerName,
-            pattern = if (type == AssertionType.BODY_MATCHES) node.expected?.let { extractStringValue(it) } else null,
-            negate = node.negate,
+            condition = condition,
+            description = describeCondition(condition),
         )
     }
+
+    /**
+     * Create a human-readable description of a condition for reporting.
+     */
+    private fun describeCondition(condition: Condition): String =
+        when (condition) {
+            is Condition.Status -> "status ${condition.expected}"
+            is Condition.JsonPath -> "${condition.path} ${condition.operator.name.lowercase()} ${condition.expected ?: ""}"
+            is Condition.Header -> "header ${condition.name} ${condition.operator.name.lowercase()} ${condition.expected ?: ""}"
+            is Condition.Variable -> "${condition.name} ${condition.operator.name.lowercase()} ${condition.expected ?: ""}"
+            is Condition.BodyContains -> "body contains \"${condition.text}\""
+            is Condition.Schema -> "matches schema"
+            is Condition.ResponseTime -> "responseTime < ${condition.maxMs} ms"
+            is Condition.Negated -> "not (${describeCondition(condition.condition)})"
+            is Condition.Compound -> "(${describeCondition(
+                condition.left,
+            )}) ${condition.operator.name} (${describeCondition(condition.right)})"
+        }
 
     private fun transformExampleRow(node: ExampleRowNode): ExampleRow {
         val values = node.values.mapValues { extractValue(it.value) }
@@ -520,6 +531,12 @@ class ScenarioLoader {
                     operator = transformLogicalOperator(node.operator),
                     right = transformCondition(node.right),
                 )
+            is ConditionNode.BodyContainsCondition ->
+                Condition.BodyContains(text = extractValue(node.text))
+            is ConditionNode.SchemaCondition ->
+                Condition.Schema
+            is ConditionNode.ResponseTimeCondition ->
+                Condition.ResponseTime(maxMs = extractValue(node.maxMs))
         }
 
     /**
@@ -545,6 +562,8 @@ class ScenarioLoader {
             ConditionOperator.NOT_EXISTS -> ModelConditionOperator.NOT_EXISTS
             ConditionOperator.GREATER_THAN -> ModelConditionOperator.GREATER_THAN
             ConditionOperator.LESS_THAN -> ModelConditionOperator.LESS_THAN
+            ConditionOperator.HAS_SIZE -> ModelConditionOperator.HAS_SIZE
+            ConditionOperator.NOT_EMPTY -> ModelConditionOperator.NOT_EMPTY
         }
 
     /**

@@ -1,5 +1,6 @@
 package org.berrycrush.plugin.adapter
 
+import org.berrycrush.model.Condition
 import org.berrycrush.plugin.AssertionFailure
 import org.berrycrush.plugin.ResultStatus
 import org.berrycrush.plugin.StepResult
@@ -23,13 +24,14 @@ class StepResultAdapter(
             modelResult.assertionResults
                 .firstOrNull { !it.passed }
                 ?.let { failedAssertion ->
+                    val condition = failedAssertion.assertion.condition
                     AssertionFailure(
                         message = failedAssertion.message,
-                        expected = failedAssertion.assertion.expected,
+                        expected = getExpectedFromCondition(condition),
                         actual = failedAssertion.actual,
                         diff = null,
                         stepDescription = modelResult.step.description,
-                        assertionType = failedAssertion.assertion.type.name,
+                        assertionType = getConditionTypeName(condition),
                         requestSnapshot = null,
                         responseSnapshot = null,
                     )
@@ -37,4 +39,36 @@ class StepResultAdapter(
 
     override val error: Throwable?
         get() = modelResult.error
+
+    /**
+     * Extract expected value from a Condition for error reporting.
+     */
+    private fun getExpectedFromCondition(condition: Condition): Any? =
+        when (condition) {
+            is Condition.Status -> condition.expected
+            is Condition.JsonPath -> condition.expected
+            is Condition.Header -> condition.expected
+            is Condition.BodyContains -> condition.text
+            is Condition.ResponseTime -> condition.maxMs
+            is Condition.Variable -> condition.expected
+            is Condition.Negated -> getExpectedFromCondition(condition.condition)
+            is Condition.Compound -> null
+            is Condition.Schema -> "schema"
+        }
+
+    /**
+     * Get a human-readable type name for a Condition.
+     */
+    private fun getConditionTypeName(condition: Condition): String =
+        when (condition) {
+            is Condition.Status -> "STATUS_CODE"
+            is Condition.JsonPath -> "JSON_PATH_${condition.operator.name}"
+            is Condition.Header -> "HEADER_${condition.operator.name}"
+            is Condition.BodyContains -> "BODY_CONTAINS"
+            is Condition.Schema -> "MATCHES_SCHEMA"
+            is Condition.ResponseTime -> "RESPONSE_TIME"
+            is Condition.Variable -> "VARIABLE"
+            is Condition.Negated -> "NOT_${getConditionTypeName(condition.condition)}"
+            is Condition.Compound -> "COMPOUND"
+        }
 }

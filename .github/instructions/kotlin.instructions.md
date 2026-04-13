@@ -350,3 +350,80 @@ private fun transform(branch: ConditionBranch): ModelConditionBranch {
 - Use `Model` prefix for runtime model classes (e.g., `ModelConditionBranch`)
 - Use `Ast` prefix for AST/parsing classes (e.g., `AstConditionBranch`)
 - Be consistent across the codebase
+
+## 17. Nullable Returns and When Expressions
+
+### Prefer `?.let {}` over Explicit Null Checks
+
+When a function returns nullable and you need to process the result, prefer `?.let` over assigning to a variable and returning early:
+
+```kotlin
+// BAD: Explicit null check with early return
+fun process(): Result? {
+    val value = getValue() ?: return null
+    return Result(value.transform())
+}
+
+// GOOD: Use ?.let for cleaner flow
+fun process(): Result? =
+    getValue()?.let { value ->
+        Result(value.transform())
+    }
+```
+
+### Use `return when {}` with `else -> null`
+
+When a function returns different values based on conditions, use `return when` with explicit `else -> null` instead of returning inside each case:
+
+```kotlin
+// BAD: Return inside each case with return null at end
+fun parse(keyword: String): Node? {
+    when (keyword) {
+        "status" -> {
+            return StatusNode()
+        }
+        "header" -> {
+            return HeaderNode()
+        }
+    }
+    return null
+}
+
+// GOOD: Use expression form with else -> null
+fun parse(keyword: String): Node? = when (keyword) {
+    "status" -> StatusNode()
+    "header" -> HeaderNode()
+    else -> null
+}
+
+// GOOD: Complex processing still works
+fun parse(keyword: String): Node? = when (keyword) {
+    "status" -> {
+        advance()
+        skipWhitespace()
+        parseStatusValue()?.let { StatusNode(it) }
+    }
+    "header" -> {
+        advance()
+        HeaderNode(parseHeaderName())
+    }
+    else -> null
+}
+```
+
+### Combine Multiple Patterns
+
+```kotlin
+// GOOD: Combine ?.let and when expression
+fun parseCondition(keyword: String): Condition? = when {
+    keyword == "status" -> parseStatusValue()?.let { StatusCondition(it) }
+    keyword == "header" -> HeaderCondition(parseHeaderName())
+    keyword.startsWith("$") -> parseJsonPath()?.let { JsonPathCondition(it) }
+    else -> null
+}
+```
+
+**Key principles:**
+- Use expression-body functions (`= when {...}`) when the function is primarily a dispatch
+- Use `?.let` to transform nullable intermediate results
+- Avoid mutable `var` for tracking state that can be derived from control flow

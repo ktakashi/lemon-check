@@ -1,6 +1,5 @@
 package org.berrycrush.assertion
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.Error
 import com.networknt.schema.InputFormat
 import com.networknt.schema.Schema
@@ -8,6 +7,7 @@ import com.networknt.schema.SchemaRegistry
 import com.networknt.schema.SpecificationVersion
 import org.berrycrush.exception.SchemaValidationException
 import org.berrycrush.model.ValidationError
+import tools.jackson.databind.ObjectMapper
 import io.swagger.v3.oas.models.media.Schema as OpenApiSchema
 
 /**

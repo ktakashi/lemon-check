@@ -3,6 +3,7 @@ package org.berrycrush.openapi
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.PathItem
+import io.swagger.v3.oas.models.responses.ApiResponse
 import org.berrycrush.exception.OperationNotFoundException
 
 /**
@@ -87,6 +88,28 @@ data class ResolvedOperation(
     val method: HttpMethod,
     val operation: Operation,
 )
+
+/**
+ * Find the response definition for a given status code.
+ *
+ * Tries exact match first, then wildcard (2XX, 4XX, etc.), then default.
+ *
+ * @param statusCode The HTTP status code to find the response for
+ * @return The ApiResponse definition, or null if not found
+ */
+fun ResolvedOperation.findResponse(statusCode: Int): ApiResponse? {
+    val responses = operation.responses ?: return null
+
+    // Try exact match
+    responses[statusCode.toString()]?.let { return it }
+
+    // Try wildcard (2XX, 4XX, etc.)
+    val wildcard = "${statusCode / 100}XX"
+    responses[wildcard]?.let { return it }
+
+    // Try default
+    return responses["default"]
+}
 
 /**
  * HTTP methods supported by OpenAPI.

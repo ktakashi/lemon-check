@@ -128,6 +128,30 @@ sealed class Condition {
         val operator: LogicalOperator,
         val right: Condition,
     ) : Condition()
+
+    /**
+     * Body contains condition (assertion-specific).
+     *
+     * @property text The text that the body should contain
+     */
+    data class BodyContains(
+        val text: Any,
+    ) : Condition()
+
+    /**
+     * Schema validation condition (assertion-specific).
+     * Validates response against OpenAPI schema.
+     */
+    data object Schema : Condition()
+
+    /**
+     * Response time condition (assertion-specific).
+     *
+     * @property maxMs Maximum response time in milliseconds
+     */
+    data class ResponseTime(
+        val maxMs: Any,
+    ) : Condition()
 }
 
 /**
@@ -151,4 +175,10 @@ enum class ConditionOperator {
     NOT_EXISTS,
     GREATER_THAN,
     LESS_THAN,
+
+    /** Array/string size check */
+    HAS_SIZE,
+
+    /** Array/string not empty check */
+    NOT_EMPTY,
 }

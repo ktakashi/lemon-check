@@ -1,9 +1,10 @@
 package org.berrycrush.assertion
 
-import io.swagger.v3.oas.models.responses.ApiResponse
 import org.berrycrush.model.Assertion
-import org.berrycrush.model.AssertionType
+import org.berrycrush.model.Condition
+import org.berrycrush.model.ConditionOperator
 import org.berrycrush.openapi.ResolvedOperation
+import org.berrycrush.openapi.findResponse
 
 /**
  * Generates assertions from OpenAPI specification.
@@ -32,14 +33,14 @@ class AssertionGenerator {
         val assertions = mutableListOf<Assertion>()
 
         // Get the response definition for expected status
-        val response = findResponse(operation, expectedStatusCode)
+        val response = operation.findResponse(expectedStatusCode)
 
         // Status code assertion
         if (includeStatusCode) {
             assertions.add(
                 Assertion(
-                    type = AssertionType.STATUS_CODE,
-                    expected = expectedStatusCode,
+                    condition = Condition.Status(expectedStatusCode),
+                    description = "status $expectedStatusCode",
                 ),
             )
         }
@@ -50,9 +51,13 @@ class AssertionGenerator {
             if (contentType != null) {
                 assertions.add(
                     Assertion(
-                        type = AssertionType.HEADER_EQUALS,
-                        headerName = "Content-Type",
-                        expected = contentType,
+                        condition =
+                            Condition.Header(
+                                name = "Content-Type",
+                                operator = ConditionOperator.EQUALS,
+                                expected = contentType,
+                            ),
+                        description = "header Content-Type equals \"$contentType\"",
                     ),
                 )
             }
@@ -66,7 +71,10 @@ class AssertionGenerator {
                     ?.schema
             if (schema != null) {
                 assertions.add(
-                    Assertion(type = AssertionType.MATCHES_SCHEMA),
+                    Assertion(
+                        condition = Condition.Schema,
+                        description = "matches schema",
+                    ),
                 )
             }
         }
@@ -97,22 +105,5 @@ class AssertionGenerator {
 
         // Default to 200
         return 200
-    }
-
-    private fun findResponse(
-        operation: ResolvedOperation,
-        statusCode: Int,
-    ): ApiResponse? {
-        val responses = operation.operation.responses ?: return null
-
-        // Try exact match
-        responses[statusCode.toString()]?.let { return it }
-
-        // Try wildcard (2XX, 4XX, etc.)
-        val wildcard = "${statusCode / 100}XX"
-        responses[wildcard]?.let { return it }
-
-        // Try default
-        return responses["default"]
     }
 }

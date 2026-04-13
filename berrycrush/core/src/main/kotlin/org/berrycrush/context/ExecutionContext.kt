@@ -1,5 +1,6 @@
 package org.berrycrush.context
 
+import org.berrycrush.openapi.ResolvedOperation
 import java.net.http.HttpResponse
 import java.util.concurrent.ConcurrentHashMap
 
@@ -16,6 +17,14 @@ class ExecutionContext {
      */
     @Volatile
     var lastResponse: HttpResponse<String>? = null
+        private set
+
+    /**
+     * The current resolved operation for the executing step.
+     * Used for schema validation against the OpenAPI spec.
+     */
+    @Volatile
+    var currentOperation: ResolvedOperation? = null
         private set
 
     /**
@@ -78,11 +87,19 @@ class ExecutionContext {
     }
 
     /**
+     * Update the current operation being executed.
+     */
+    fun updateCurrentOperation(operation: ResolvedOperation?) {
+        currentOperation = operation
+    }
+
+    /**
      * Clear all variables and state.
      */
     fun clear() {
         variables.clear()
         lastResponse = null
+        currentOperation = null
     }
 
     /**

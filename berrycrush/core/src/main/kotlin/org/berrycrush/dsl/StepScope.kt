@@ -2,7 +2,8 @@ package org.berrycrush.dsl
 
 import org.berrycrush.context.ExecutionContext
 import org.berrycrush.model.Assertion
-import org.berrycrush.model.AssertionType
+import org.berrycrush.model.Condition
+import org.berrycrush.model.ConditionOperator
 import org.berrycrush.model.Extraction
 import org.berrycrush.model.Step
 import org.berrycrush.model.StepType
@@ -76,8 +77,8 @@ class StepScope internal constructor(
     fun statusCode(expected: Int) {
         assertions.add(
             Assertion(
-                type = AssertionType.STATUS_CODE,
-                expected = expected,
+                condition = Condition.Status(expected),
+                description = "status $expected",
             ),
         )
     }
@@ -88,8 +89,8 @@ class StepScope internal constructor(
     fun statusCode(range: IntRange) {
         assertions.add(
             Assertion(
-                type = AssertionType.STATUS_CODE,
-                expected = range,
+                condition = Condition.Status(range),
+                description = "status ${range.first}-${range.last}",
             ),
         )
     }
@@ -100,8 +101,8 @@ class StepScope internal constructor(
     fun bodyContains(substring: String) {
         assertions.add(
             Assertion(
-                type = AssertionType.BODY_CONTAINS,
-                expected = substring,
+                condition = Condition.BodyContains(substring),
+                description = "body contains \"$substring\"",
             ),
         )
     }
@@ -115,9 +116,13 @@ class StepScope internal constructor(
     ) {
         assertions.add(
             Assertion(
-                type = AssertionType.BODY_EQUALS,
-                jsonPath = jsonPath,
-                expected = expected,
+                condition =
+                    Condition.JsonPath(
+                        path = jsonPath,
+                        operator = ConditionOperator.EQUALS,
+                        expected = expected,
+                    ),
+                description = "$jsonPath equals $expected",
             ),
         )
     }
@@ -131,9 +136,13 @@ class StepScope internal constructor(
     ) {
         assertions.add(
             Assertion(
-                type = AssertionType.BODY_MATCHES,
-                jsonPath = jsonPath,
-                pattern = pattern,
+                condition =
+                    Condition.JsonPath(
+                        path = jsonPath,
+                        operator = ConditionOperator.MATCHES,
+                        expected = pattern,
+                    ),
+                description = "$jsonPath matches $pattern",
             ),
         )
     }
@@ -147,9 +156,13 @@ class StepScope internal constructor(
     ) {
         assertions.add(
             Assertion(
-                type = AssertionType.BODY_ARRAY_SIZE,
-                jsonPath = jsonPath,
-                expected = expected,
+                condition =
+                    Condition.JsonPath(
+                        path = jsonPath,
+                        operator = ConditionOperator.HAS_SIZE,
+                        expected = expected,
+                    ),
+                description = "$jsonPath hasSize $expected",
             ),
         )
     }
@@ -160,8 +173,13 @@ class StepScope internal constructor(
     fun bodyArrayNotEmpty(jsonPath: String) {
         assertions.add(
             Assertion(
-                type = AssertionType.BODY_ARRAY_NOT_EMPTY,
-                jsonPath = jsonPath,
+                condition =
+                    Condition.JsonPath(
+                        path = jsonPath,
+                        operator = ConditionOperator.NOT_EMPTY,
+                        expected = null,
+                    ),
+                description = "$jsonPath notEmpty",
             ),
         )
     }
@@ -172,8 +190,13 @@ class StepScope internal constructor(
     fun headerExists(name: String) {
         assertions.add(
             Assertion(
-                type = AssertionType.HEADER_EXISTS,
-                headerName = name,
+                condition =
+                    Condition.Header(
+                        name = name,
+                        operator = ConditionOperator.EXISTS,
+                        expected = null,
+                    ),
+                description = "header $name exists",
             ),
         )
     }
@@ -187,9 +210,13 @@ class StepScope internal constructor(
     ) {
         assertions.add(
             Assertion(
-                type = AssertionType.HEADER_EQUALS,
-                headerName = name,
-                expected = expected,
+                condition =
+                    Condition.Header(
+                        name = name,
+                        operator = ConditionOperator.EQUALS,
+                        expected = expected,
+                    ),
+                description = "header $name equals \"$expected\"",
             ),
         )
     }
@@ -199,7 +226,10 @@ class StepScope internal constructor(
      */
     fun matchesSchema() {
         assertions.add(
-            Assertion(type = AssertionType.MATCHES_SCHEMA),
+            Assertion(
+                condition = Condition.Schema,
+                description = "matches schema",
+            ),
         )
     }
 
@@ -209,8 +239,8 @@ class StepScope internal constructor(
     fun responseTime(maxMillis: Long) {
         assertions.add(
             Assertion(
-                type = AssertionType.RESPONSE_TIME,
-                expected = maxMillis,
+                condition = Condition.ResponseTime(maxMillis),
+                description = "responseTime < $maxMillis ms",
             ),
         )
     }
