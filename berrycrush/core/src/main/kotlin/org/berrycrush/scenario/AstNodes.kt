@@ -188,14 +188,21 @@ data class ExtractNode(
 ) : ActionNode()
 
 /**
- * Assertion action.
+ * Assertion action - wraps a condition that must be true for the assertion to pass.
+ *
+ * By using ConditionNode, assertions share the same structure as conditional checks,
+ * enabling code reuse and consistent behavior between `assert` and `if` statements.
+ *
+ * Examples:
+ * - `assert status 200` -> StatusCondition
+ * - `assert $.name equals "Fluffy"` -> JsonPathCondition
+ * - `assert header Content-Type = "application/json"` -> HeaderCondition
+ * - `assert not contains "error"` -> NegatedCondition(BodyContainsCondition)
+ * - `assert schema` -> SchemaCondition
+ * - `assert responseTime 1000` -> ResponseTimeCondition
  */
 data class AssertNode(
-    val assertionType: AssertionKind,
-    val path: String? = null,
-    val expected: ValueNode? = null,
-    val headerName: String? = null,
-    val negate: Boolean = false,
+    val condition: ConditionNode,
     override val location: SourceLocation,
 ) : ActionNode()
 
@@ -310,6 +317,32 @@ sealed class ConditionNode {
         val right: ConditionNode,
         override val location: SourceLocation,
     ) : ConditionNode()
+
+    /**
+     * Body contains condition (assertion-specific).
+     * Example: `assert contains "expected text"`
+     */
+    data class BodyContainsCondition(
+        val text: ValueNode,
+        override val location: SourceLocation,
+    ) : ConditionNode()
+
+    /**
+     * Schema validation condition (assertion-specific).
+     * Example: `assert schema`
+     */
+    data class SchemaCondition(
+        override val location: SourceLocation,
+    ) : ConditionNode()
+
+    /**
+     * Response time condition (assertion-specific).
+     * Example: `assert responseTime 1000`
+     */
+    data class ResponseTimeCondition(
+        val maxMs: ValueNode,
+        override val location: SourceLocation,
+    ) : ConditionNode()
 }
 
 /**
@@ -333,6 +366,12 @@ enum class ConditionOperator {
     NOT_EXISTS,
     GREATER_THAN,
     LESS_THAN,
+
+    /** Array/string size check: hasSize */
+    HAS_SIZE,
+
+    /** Array/string not empty check: notEmpty */
+    NOT_EMPTY,
 }
 
 /**
@@ -350,7 +389,11 @@ data class FailNode(
 
 /**
  * Types of assertions.
+ *
+ * @deprecated Use ConditionNode subtypes instead. AssertNode now wraps ConditionNode.
+ * This enum is kept for backward compatibility during migration.
  */
+@Deprecated("Use ConditionNode subtypes instead")
 enum class AssertionKind {
     STATUS_CODE,
     BODY_CONTAINS,

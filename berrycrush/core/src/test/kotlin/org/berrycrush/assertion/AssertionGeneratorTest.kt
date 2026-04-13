@@ -1,6 +1,7 @@
 package org.berrycrush.assertion
 
-import org.berrycrush.model.AssertionType
+import org.berrycrush.model.Assertion
+import org.berrycrush.model.Condition
 import org.berrycrush.openapi.OpenApiLoader
 import org.berrycrush.openapi.OperationResolver
 import kotlin.test.Test
@@ -18,6 +19,34 @@ class AssertionGeneratorTest {
         return OperationResolver(openApi)
     }
 
+    // Helper to check if assertion is a status assertion
+    private fun Assertion.isStatusAssertion(): Boolean =
+        condition is Condition.Status || (condition is Condition.Negated && condition.condition is Condition.Status)
+
+    // Helper to check if assertion is a header assertion
+    private fun Assertion.isHeaderAssertion(): Boolean {
+        val c = if (condition is Condition.Negated) condition.condition else condition
+        return c is Condition.Header
+    }
+
+    // Helper to check if assertion is a schema assertion
+    private fun Assertion.isSchemaAssertion(): Boolean =
+        condition is Condition.Schema || (condition is Condition.Negated && condition.condition is Condition.Schema)
+
+    // Helper to get expected status code
+    private fun Assertion.getExpectedStatus(): Any? =
+        when (val c = condition) {
+            is Condition.Status -> c.expected
+            is Condition.Negated -> (c.condition as? Condition.Status)?.expected
+            else -> null
+        }
+
+    // Helper to get header name
+    private fun Assertion.getHeaderName(): String? {
+        val c = if (condition is Condition.Negated) condition.condition else condition
+        return (c as? Condition.Header)?.name
+    }
+
     @Test
     fun `should generate status code assertion`() {
         val resolver = loadPetstoreResolver()
@@ -32,8 +61,8 @@ class AssertionGeneratorTest {
             )
 
         assertEquals(1, assertions.size)
-        assertEquals(AssertionType.STATUS_CODE, assertions[0].type)
-        assertEquals(200, assertions[0].expected)
+        assertTrue(assertions[0].isStatusAssertion(), "Should be a status assertion")
+        assertEquals(200, assertions[0].getExpectedStatus())
     }
 
     @Test
@@ -48,7 +77,7 @@ class AssertionGeneratorTest {
                 includeSchema = false,
             )
 
-        assertTrue(assertions.any { it.type == AssertionType.HEADER_EQUALS && it.headerName == "Content-Type" })
+        assertTrue(assertions.any { it.isHeaderAssertion() && it.getHeaderName() == "Content-Type" })
     }
 
     @Test
@@ -63,7 +92,7 @@ class AssertionGeneratorTest {
                 includeContentType = false,
             )
 
-        assertTrue(assertions.any { it.type == AssertionType.MATCHES_SCHEMA })
+        assertTrue(assertions.any { it.isSchemaAssertion() })
     }
 
     @Test
@@ -94,7 +123,7 @@ class AssertionGeneratorTest {
         val assertions = generator.generateAssertions(operation)
 
         assertTrue(assertions.size >= 2) // At least status code and content-type
-        assertTrue(assertions.any { it.type == AssertionType.STATUS_CODE })
+        assertTrue(assertions.any { it.isStatusAssertion() })
     }
 
     @Test

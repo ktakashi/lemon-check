@@ -6,6 +6,126 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ParserTest {
+    // =========================================================================
+    // Helper functions for working with new ConditionNode-based AssertNode
+    // =========================================================================
+
+    /**
+     * Check if an assertion's condition is a StatusCondition.
+     */
+    private fun AssertNode.isStatusAssertion(): Boolean = unwrapCondition() is ConditionNode.StatusCondition
+
+    /**
+     * Check if an assertion's condition is a JsonPathCondition.
+     */
+    private fun AssertNode.isJsonPathAssertion(): Boolean = unwrapCondition() is ConditionNode.JsonPathCondition
+
+    /**
+     * Check if an assertion's condition is a HeaderCondition.
+     */
+    private fun AssertNode.isHeaderAssertion(): Boolean = unwrapCondition() is ConditionNode.HeaderCondition
+
+    /**
+     * Check if an assertion's condition is a BodyContainsCondition.
+     */
+    private fun AssertNode.isBodyContainsAssertion(): Boolean = unwrapCondition() is ConditionNode.BodyContainsCondition
+
+    /**
+     * Check if an assertion's condition is a SchemaCondition.
+     */
+    private fun AssertNode.isSchemaAssertion(): Boolean = unwrapCondition() is ConditionNode.SchemaCondition
+
+    /**
+     * Check if an assertion's condition is a ResponseTimeCondition.
+     */
+    private fun AssertNode.isResponseTimeAssertion(): Boolean = unwrapCondition() is ConditionNode.ResponseTimeCondition
+
+    /**
+     * Check if an assertion is negated (wrapped in NegatedCondition).
+     */
+    private fun AssertNode.isNegated(): Boolean = condition is ConditionNode.NegatedCondition
+
+    /**
+     * Unwrap NegatedCondition to get the inner condition.
+     */
+    private fun AssertNode.unwrapCondition(): ConditionNode =
+        when (val c = condition) {
+            is ConditionNode.NegatedCondition -> c.condition
+            else -> c
+        }
+
+    /**
+     * Get the JSON path from a JsonPathCondition assertion.
+     */
+    private fun AssertNode.getJsonPath(): String? = (unwrapCondition() as? ConditionNode.JsonPathCondition)?.path
+
+    /**
+     * Get the header name from a HeaderCondition assertion.
+     */
+    private fun AssertNode.getHeaderName(): String? = (unwrapCondition() as? ConditionNode.HeaderCondition)?.headerName
+
+    /**
+     * Get the expected value from the condition.
+     */
+    private fun AssertNode.getExpected(): ValueNode? =
+        when (val c = unwrapCondition()) {
+            is ConditionNode.StatusCondition -> c.expected
+            is ConditionNode.JsonPathCondition -> c.expected
+            is ConditionNode.HeaderCondition -> c.expected
+            is ConditionNode.BodyContainsCondition -> c.text
+            is ConditionNode.ResponseTimeCondition -> c.maxMs
+            else -> null
+        }
+
+    /**
+     * Get the operator from a JsonPathCondition assertion.
+     */
+    private fun AssertNode.getOperator(): ConditionOperator? = (unwrapCondition() as? ConditionNode.JsonPathCondition)?.operator
+
+    /**
+     * Check if JSON path assertion has HAS_SIZE operator.
+     */
+    private fun AssertNode.isArraySizeAssertion(): Boolean {
+        val c = unwrapCondition()
+        return c is ConditionNode.JsonPathCondition && c.operator == ConditionOperator.HAS_SIZE
+    }
+
+    /**
+     * Check if JSON path assertion has NOT_EMPTY operator.
+     */
+    private fun AssertNode.isArrayNotEmptyAssertion(): Boolean {
+        val c = unwrapCondition()
+        return c is ConditionNode.JsonPathCondition && c.operator == ConditionOperator.NOT_EMPTY
+    }
+
+    /**
+     * Check if JSON path assertion has MATCHES operator.
+     */
+    private fun AssertNode.isMatchesAssertion(): Boolean {
+        val c = unwrapCondition()
+        return c is ConditionNode.JsonPathCondition && c.operator == ConditionOperator.MATCHES
+    }
+
+    /**
+     * Check if header assertion has EXISTS operator.
+     */
+    private fun AssertNode.isHeaderExistsAssertion(): Boolean {
+        val c = unwrapCondition()
+        return c is ConditionNode.HeaderCondition && c.operator == ConditionOperator.EXISTS
+    }
+
+    /**
+     * Check if header assertion has EQUALS operator.
+     */
+    private fun AssertNode.isHeaderEqualsAssertion(): Boolean {
+        val c = unwrapCondition()
+        return c is ConditionNode.HeaderCondition && c.operator == ConditionOperator.EQUALS
+    }
+
+    // =========================================================================
+    // Basic Parsing Tests
+    // =========================================================================
+
     @Test
     fun `should parse simple scenario`() {
         val source =
@@ -474,7 +594,7 @@ class ParserTest {
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
         assertEquals(1, assertions.size)
-        assertEquals(AssertionKind.STATUS_CODE, assertions[0].assertionType)
+        assertTrue(assertions[0].isStatusAssertion(), "Should be a status assertion")
     }
 
     @Test
@@ -490,7 +610,7 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.STATUS_CODE, assertions[0].assertionType)
+        assertTrue(assertions[0].isStatusAssertion(), "Should be a status assertion")
     }
 
     @Test
@@ -506,7 +626,7 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.BODY_CONTAINS, assertions[0].assertionType)
+        assertTrue(assertions[0].isBodyContainsAssertion(), "Should be a body contains assertion")
     }
 
     @Test
@@ -522,7 +642,7 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.BODY_CONTAINS, assertions[0].assertionType)
+        assertTrue(assertions[0].isBodyContainsAssertion(), "Should be a body contains assertion")
     }
 
     @Test
@@ -539,8 +659,8 @@ class ParserTest {
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
         assertEquals(1, assertions.size)
-        assertEquals(AssertionKind.BODY_EQUALS, assertions[0].assertionType)
-        assertEquals("$.name", assertions[0].path)
+        assertTrue(assertions[0].isJsonPathAssertion(), "Should be a JSON path assertion")
+        assertEquals("$.name", assertions[0].getJsonPath())
     }
 
     @Test
@@ -556,8 +676,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.BODY_EQUALS, assertions[0].assertionType)
-        assertEquals("$.id", assertions[0].path)
+        assertTrue(assertions[0].isJsonPathAssertion(), "Should be a JSON path assertion")
+        assertEquals("$.id", assertions[0].getJsonPath())
     }
 
     @Test
@@ -573,8 +693,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.BODY_MATCHES, assertions[0].assertionType)
-        assertEquals("$.email", assertions[0].path)
+        assertTrue(assertions[0].isMatchesAssertion(), "Should be a matches assertion")
+        assertEquals("$.email", assertions[0].getJsonPath())
     }
 
     @Test
@@ -590,8 +710,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.BODY_ARRAY_SIZE, assertions[0].assertionType)
-        assertEquals("$.items", assertions[0].path)
+        assertTrue(assertions[0].isArraySizeAssertion(), "Should be an array size assertion")
+        assertEquals("$.items", assertions[0].getJsonPath())
     }
 
     @Test
@@ -607,7 +727,7 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.BODY_ARRAY_SIZE, assertions[0].assertionType)
+        assertTrue(assertions[0].isArraySizeAssertion(), "Should be an array size assertion")
     }
 
     @Test
@@ -623,8 +743,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.BODY_ARRAY_NOT_EMPTY, assertions[0].assertionType)
-        assertEquals("$.results", assertions[0].path)
+        assertTrue(assertions[0].isArrayNotEmptyAssertion(), "Should be an array notEmpty assertion")
+        assertEquals("$.results", assertions[0].getJsonPath())
     }
 
     @Test
@@ -640,8 +760,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.HEADER_EXISTS, assertions[0].assertionType)
-        assertEquals("X-Request-Id", assertions[0].headerName)
+        assertTrue(assertions[0].isHeaderExistsAssertion(), "Should be a header exists assertion")
+        assertEquals("X-Request-Id", assertions[0].getHeaderName())
     }
 
     @Test
@@ -657,8 +777,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.HEADER_EQUALS, assertions[0].assertionType)
-        assertEquals("Content-Type", assertions[0].headerName)
+        assertTrue(assertions[0].isHeaderEqualsAssertion(), "Should be a header equals assertion")
+        assertEquals("Content-Type", assertions[0].getHeaderName())
     }
 
     @Test
@@ -674,8 +794,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.HEADER_EQUALS, assertions[0].assertionType)
-        assertEquals("Accept", assertions[0].headerName)
+        assertTrue(assertions[0].isHeaderEqualsAssertion(), "Should be a header equals assertion")
+        assertEquals("Accept", assertions[0].getHeaderName())
     }
 
     @Test
@@ -691,7 +811,7 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.MATCHES_SCHEMA, assertions[0].assertionType)
+        assertTrue(assertions[0].isSchemaAssertion(), "Should be a schema assertion")
     }
 
     @Test
@@ -707,7 +827,7 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.MATCHES_SCHEMA, assertions[0].assertionType)
+        assertTrue(assertions[0].isSchemaAssertion(), "Should be a schema assertion")
     }
 
     @Test
@@ -723,7 +843,7 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertEquals(AssertionKind.RESPONSE_TIME, assertions[0].assertionType)
+        assertTrue(assertions[0].isResponseTimeAssertion(), "Should be a response time assertion")
     }
 
     @Test
@@ -743,10 +863,10 @@ class ParserTest {
 
         val assertions = extractAssertions(result.ast!!.scenarios[0])
         assertEquals(4, assertions.size)
-        assertEquals(AssertionKind.STATUS_CODE, assertions[0].assertionType)
-        assertEquals(AssertionKind.BODY_EQUALS, assertions[1].assertionType)
-        assertEquals(AssertionKind.BODY_ARRAY_NOT_EMPTY, assertions[2].assertionType)
-        assertEquals(AssertionKind.HEADER_EQUALS, assertions[3].assertionType)
+        assertTrue(assertions[0].isStatusAssertion(), "First should be status assertion")
+        assertTrue(assertions[1].isJsonPathAssertion(), "Second should be JSON path assertion")
+        assertTrue(assertions[2].isArrayNotEmptyAssertion(), "Third should be array notEmpty assertion")
+        assertTrue(assertions[3].isHeaderEqualsAssertion(), "Fourth should be header equals assertion")
     }
 
     // =========================================================================
@@ -863,8 +983,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
         val assertions = extractAssertions(result.ast!!.scenarios[0])
         assertEquals(1, assertions.size)
-        assertEquals(AssertionKind.BODY_CONTAINS, assertions[0].assertionType)
-        assertTrue(assertions[0].negate, "Assertion should have negate=true")
+        assertTrue(assertions[0].isBodyContainsAssertion(), "Should be a body contains assertion")
+        assertTrue(assertions[0].isNegated(), "Assertion should be negated")
     }
 
     @Test
@@ -881,8 +1001,8 @@ class ParserTest {
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
         val assertions = extractAssertions(result.ast!!.scenarios[0])
         assertEquals(1, assertions.size)
-        assertEquals(AssertionKind.BODY_EQUALS, assertions[0].assertionType)
-        assertTrue(assertions[0].negate, "Assertion should have negate=true")
+        assertTrue(assertions[0].isJsonPathAssertion(), "Should be a JSON path assertion")
+        assertTrue(assertions[0].isNegated(), "Assertion should be negated")
     }
 
     @Test
@@ -1258,9 +1378,10 @@ class ParserTest {
             val assertions = extractAssertions(result.ast!!.scenarios[0])
             assertEquals(1, assertions.size)
             val assertion = assertions[0]
-            assertEquals(AssertionKind.STATUS_CODE, assertion.assertionType)
-            assertTrue(assertion.expected is StatusRangeNode, "Expected StatusRangeNode for pattern $pattern")
-            assertEquals(base, assertion.expected.base)
+            assertTrue(assertion.isStatusAssertion(), "Should be a status assertion for pattern $pattern")
+            val expected = assertion.getExpected()
+            assertTrue(expected is StatusRangeNode, "Expected StatusRangeNode for pattern $pattern")
+            assertEquals(base, expected.base)
         }
     }
 
@@ -1279,8 +1400,9 @@ class ParserTest {
 
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertTrue(assertions[0].expected is StatusRangeNode)
-        assertEquals(4, (assertions[0].expected as StatusRangeNode).base)
+        val expected = assertions[0].getExpected()
+        assertTrue(expected is StatusRangeNode)
+        assertEquals(4, expected.base)
     }
 
     @Test
@@ -1298,8 +1420,9 @@ class ParserTest {
 
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
         val assertions = extractAssertions(result.ast!!.scenarios[0])
-        assertTrue(assertions[0].expected is NumberValueNode, "Expected NumberValueNode for exact status")
-        assertEquals(201L, (assertions[0].expected as NumberValueNode).value)
+        val expected = assertions[0].getExpected()
+        assertTrue(expected is NumberValueNode, "Expected NumberValueNode for exact status")
+        assertEquals(201L, expected.value)
     }
 
     @Test
@@ -1499,5 +1622,388 @@ class ParserTest {
         assertNotNull(callNode.autoTestConfig)
         assertEquals(setOf(AutoTestType.INVALID), callNode.autoTestConfig.types)
         assertEquals(emptySet(), callNode.autoTestConfig.excludes)
+    }
+
+    // =========================================================================
+    // Shared Condition Tests - if and assert use same condition types
+    // =========================================================================
+
+    @Test
+    fun `should parse status condition shared between if and assert`() {
+        val source =
+            """
+            scenario: Shared status condition
+              when I make a request
+                call ^listPets
+                assert status 200
+                if status 200
+                  assert $.items notEmpty
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+
+        // Check assert has status condition
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isStatusAssertion())
+
+        // Check if has same status condition
+        val conditional = step.actions[2] as ConditionalNode
+        assertTrue(conditional.ifBranch.condition is ConditionNode.StatusCondition)
+        val statusCond = conditional.ifBranch.condition
+        assertEquals(200.toLong(), (statusCond.expected as NumberValueNode).value)
+    }
+
+    @Test
+    fun `should parse jsonpath condition shared between if and assert`() {
+        val source =
+            """
+            scenario: Shared jsonpath condition
+              when I check status
+                call ^getPet
+                assert $.status equals "active"
+                if $.status equals "active"
+                  assert $.id notEmpty
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+
+        // Check assert jsonpath condition
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isJsonPathAssertion())
+        assertEquals("$.status", assertNode.getJsonPath())
+        assertEquals(ConditionOperator.EQUALS, assertNode.getOperator())
+
+        // Check if has same jsonpath condition
+        val conditional = step.actions[2] as ConditionalNode
+        assertTrue(conditional.ifBranch.condition is ConditionNode.JsonPathCondition)
+        val jsonCond = conditional.ifBranch.condition
+        assertEquals("$.status", jsonCond.path)
+        assertEquals(ConditionOperator.EQUALS, jsonCond.operator)
+    }
+
+    @Test
+    fun `should parse header condition shared between if and assert`() {
+        val source =
+            """
+            scenario: Shared header condition
+              when I check content type
+                call ^getPet
+                assert header Content-Type equals "application/json"
+                if header Content-Type equals "application/json"
+                  assert $.body notEmpty
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+
+        // Check assert header condition
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isHeaderAssertion())
+        assertEquals("Content-Type", assertNode.getHeaderName())
+
+        // Check if has same header condition
+        val conditional = step.actions[2] as ConditionalNode
+        assertTrue(conditional.ifBranch.condition is ConditionNode.HeaderCondition)
+        val headerCond = conditional.ifBranch.condition
+        assertEquals("Content-Type", headerCond.headerName)
+        assertEquals(ConditionOperator.EQUALS, headerCond.operator)
+    }
+
+    // =========================================================================
+    // Response Time Assertion Tests
+    // =========================================================================
+
+    @Test
+    fun `should parse responseTime lessThan assertion condition`() {
+        val source =
+            """
+            scenario: Response time check
+              when I get pets
+                call ^listPets
+                assert responseTime 1000
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isResponseTimeAssertion())
+        val cond = assertNode.unwrapCondition() as ConditionNode.ResponseTimeCondition
+        assertEquals(1000.toLong(), (cond.maxMs as NumberValueNode).value)
+    }
+
+    @Test
+    fun `should parse responseTime greaterThan assertion condition`() {
+        val source =
+            """
+            scenario: Response time minimum check
+              when I get pets slowly
+                call ^listPets
+                assert responseTime 100
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isResponseTimeAssertion())
+    }
+
+    // =========================================================================
+    // Negation Edge Case Tests
+    // =========================================================================
+
+    @Test
+    fun `should parse negated body contains assertion condition`() {
+        val source =
+            """
+            scenario: Negated body contains
+              when I get data
+                call ^getData
+                assert not contains "error"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isNegated())
+        assertTrue(assertNode.isBodyContainsAssertion())
+    }
+
+    @Test
+    fun `should parse negation in if condition branch`() {
+        val source =
+            """
+            scenario: Negated condition in if
+              when I check
+                call ^check
+                if not status 200
+                  fail "Expected 200"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val conditional = step.actions[1] as ConditionalNode
+        assertTrue(conditional.ifBranch.condition is ConditionNode.NegatedCondition)
+        val negated = conditional.ifBranch.condition
+        assertTrue(negated.condition is ConditionNode.StatusCondition)
+    }
+
+    @Test
+    fun `should parse negation after jsonpath in assert`() {
+        val source =
+            """
+            scenario: Negation after jsonpath
+              when I check status
+                call ^getStatus
+                assert $.status not equals "deleted"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isNegated())
+        assertTrue(assertNode.isJsonPathAssertion())
+    }
+
+    // =========================================================================
+    // Header Operator Tests (extended)
+    // =========================================================================
+
+    @Test
+    fun `should parse header exists assertion with explicit exists keyword`() {
+        val source =
+            """
+            scenario: Header exists check with keyword
+              when I get resource
+                call ^getResource
+                assert header X-Request-Id exists
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isHeaderExistsAssertion())
+        assertEquals("X-Request-Id", assertNode.getHeaderName())
+    }
+
+    @Test
+    fun `should parse header equals with colon shorthand`() {
+        val source =
+            """
+            scenario: Header equals check
+              when I check cache
+                call ^getData
+                assert header Cache-Control: "no-cache"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isHeaderAssertion(), "Expected header assertion")
+        val cond = assertNode.unwrapCondition()
+        assertTrue(cond is ConditionNode.HeaderCondition, "Expected HeaderCondition, got ${cond::class.simpleName}")
+        assertEquals(ConditionOperator.EQUALS, cond.operator)
+    }
+
+    // =========================================================================
+    // Combined Assertion Tests
+    // =========================================================================
+
+    @Test
+    fun `should parse multiple different assertion types in one step`() {
+        val source =
+            """
+            scenario: Multiple assertions
+              when I create a pet
+                call ^createPet
+                assert status 201
+                assert $.id exists
+                assert header Location exists
+                assert contains "created"
+                assert schema
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        assertEquals(6, step.actions.size) // call + 5 assertions
+
+        val assertions = step.actions.drop(1).filterIsInstance<AssertNode>()
+        assertEquals(5, assertions.size)
+
+        assertTrue(assertions[0].isStatusAssertion())
+        assertTrue(assertions[1].isJsonPathAssertion())
+        assertTrue(assertions[2].isHeaderExistsAssertion())
+        assertTrue(assertions[3].isBodyContainsAssertion())
+        assertTrue(assertions[4].isSchemaAssertion())
+    }
+
+    @Test
+    fun `should parse hasSize operator in jsonpath assertion`() {
+        val source =
+            """
+            scenario: Array size check
+              when I list items
+                call ^listItems
+                assert $.items hasSize 5
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isArraySizeAssertion())
+        assertEquals(5.toLong(), (assertNode.getExpected() as NumberValueNode).value)
+    }
+
+    @Test
+    fun `should parse status range 2xx in assertion`() {
+        val source =
+            """
+            scenario: Status range check
+              when I make a request
+                call ^api
+                assert status 2xx
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val assertNode = step.actions[1] as AssertNode
+        assertTrue(assertNode.isStatusAssertion())
+        val cond = assertNode.unwrapCondition() as ConditionNode.StatusCondition
+        assertTrue(cond.expected is StatusRangeNode)
+        assertEquals(2, cond.expected.base)
+    }
+
+    // =========================================================================
+    // Unified Condition Tests - all condition types available in both if and assert
+    // =========================================================================
+
+    @Test
+    fun `should parse schema condition in if statement`() {
+        val source =
+            """
+            scenario: Schema in if
+              when I check response
+                call ^getData
+                if schema
+                  assert $.valid equals true
+                else
+                  fail "Response does not match schema"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val conditional = step.actions[1] as ConditionalNode
+        assertTrue(conditional.ifBranch.condition is ConditionNode.SchemaCondition)
+    }
+
+    @Test
+    fun `should parse contains condition in if statement`() {
+        val source =
+            """
+            scenario: Contains in if
+              when I check response
+                call ^getData
+                if contains "success"
+                  assert $.status equals "ok"
+                else
+                  fail "Expected success message"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val conditional = step.actions[1] as ConditionalNode
+        assertTrue(conditional.ifBranch.condition is ConditionNode.BodyContainsCondition)
+    }
+
+    @Test
+    fun `should parse responseTime condition in if statement`() {
+        val source =
+            """
+            scenario: ResponseTime in if
+              when I check performance
+                call ^getData
+                if responseTime 1000
+                  assert $.cached equals true
+                else
+                  assert $.cached equals false
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val conditional = step.actions[1] as ConditionalNode
+        assertTrue(conditional.ifBranch.condition is ConditionNode.ResponseTimeCondition)
     }
 }

@@ -1,12 +1,12 @@
 package org.berrycrush.executor
 
 import com.jayway.jsonpath.JsonPath
+import org.berrycrush.assertion.SchemaValidator
 import org.berrycrush.config.Configuration
 import org.berrycrush.context.ExecutionContext
 import org.berrycrush.exception.ConfigurationException
 import org.berrycrush.model.Assertion
 import org.berrycrush.model.AssertionResult
-import org.berrycrush.model.AssertionType
 import org.berrycrush.model.BodyProperty
 import org.berrycrush.model.Condition
 import org.berrycrush.model.ConditionOperator
@@ -22,6 +22,7 @@ import org.berrycrush.model.StepResult
 import org.berrycrush.openapi.HttpMethod
 import org.berrycrush.openapi.ResolvedOperation
 import org.berrycrush.openapi.SpecRegistry
+import org.berrycrush.openapi.findResponse
 import org.berrycrush.plugin.PluginRegistry
 import org.berrycrush.plugin.adapter.ScenarioContextAdapter
 import org.berrycrush.plugin.adapter.ScenarioResultAdapter
@@ -34,6 +35,7 @@ import java.time.Duration
 import java.time.Instant
 
 private val objectMapper = ObjectMapper()
+private val schemaValidator = SchemaValidator(objectMapper)
 
 /**
  * Executes BDD scenarios against API endpoints.
@@ -355,6 +357,9 @@ class ScenarioExecutor(
     ): StepResult {
         // Resolve the operation
         val (spec, resolvedOp) = specRegistry.resolve(step.operationId!!, step.specName)
+
+        // Store the resolved operation for schema validation
+        context.updateCurrentOperation(resolvedOp)
 
         // Build the URL
         val baseUrl = configuration.baseUrl ?: spec.baseUrl
@@ -804,7 +809,71 @@ class ScenarioExecutor(
                     LogicalOperator.OR -> leftResult || evaluateCondition(response, condition.right, context)
                 }
             }
+            is Condition.BodyContains -> evaluateBodyContainsCondition(response, condition, context)
+            is Condition.Schema -> evaluateSchemaCondition(response, context)
+            is Condition.ResponseTime -> evaluateResponseTimeCondition(response, condition, context)
         }
+
+    /**
+     * Evaluate a body contains condition.
+     */
+    private fun evaluateBodyContainsCondition(
+        response: HttpResponse<String>,
+        condition: Condition.BodyContains,
+        context: ExecutionContext,
+    ): Boolean {
+        val body = response.body() ?: ""
+        val text = resolveConditionValue(condition.text, context).toString()
+        return body.contains(text)
+    }
+
+    /**
+     * Evaluate a schema condition by validating the response against the OpenAPI schema.
+     *
+     * The schema is retrieved from the current operation's response definition based on
+     * the actual response status code.
+     */
+    private fun evaluateSchemaCondition(
+        response: HttpResponse<String>,
+        context: ExecutionContext,
+    ): Boolean {
+        val operation = context.currentOperation ?: return true // Can't validate without operation
+        val responseBody = response.body() ?: return true // Empty body passes validation
+
+        // Find the schema for this response status code
+        val schema = findResponseSchema(operation, response.statusCode()) ?: return true
+
+        // Validate the response body against the schema
+        val errors = schemaValidator.validate(responseBody, schema)
+        return errors.isEmpty()
+    }
+
+    /**
+     * Find the response schema for a given status code from the operation's response definitions.
+     */
+    private fun findResponseSchema(
+        operation: ResolvedOperation,
+        statusCode: Int,
+    ): io.swagger.v3.oas.models.media.Schema<*>? {
+        val response = operation.findResponse(statusCode) ?: return null
+        return response.content
+            ?.values
+            ?.firstOrNull()
+            ?.schema
+    }
+
+    /**
+     * Evaluate a response time condition.
+     * Note: This requires tracking request start time, which may not be available in conditional context.
+     */
+    private fun evaluateResponseTimeCondition(
+        response: HttpResponse<String>,
+        condition: Condition.ResponseTime,
+        context: ExecutionContext,
+    ): Boolean {
+        // TODO: Implement response time check
+        return true
+    }
 
     /**
      * Evaluate a variable condition.
@@ -815,29 +884,88 @@ class ScenarioExecutor(
     ): Boolean {
         val actual: Any? = context.get<Any>(condition.name)
         val expected = condition.expected
+        return evaluateOperator(actual, expected, condition.operator)
+    }
 
-        return when (condition.operator) {
-            ConditionOperator.EQUALS -> actual?.toString() == expected?.toString()
-            ConditionOperator.NOT_EQUALS -> actual?.toString() != expected?.toString()
-            ConditionOperator.CONTAINS -> actual?.toString()?.contains(expected?.toString() ?: "") == true
-            ConditionOperator.NOT_CONTAINS -> actual?.toString()?.contains(expected?.toString() ?: "") != true
-            ConditionOperator.MATCHES -> {
-                val pattern = expected?.toString() ?: ""
-                actual?.toString()?.matches(pattern.toRegex()) == true
-            }
+    /**
+     * Shared operator evaluation logic for variable and JSON path conditions.
+     *
+     * Reduces duplication between evaluateVariableCondition and evaluateJsonPathCondition.
+     */
+    private fun evaluateOperator(
+        actual: Any?,
+        expected: Any?,
+        operator: ConditionOperator,
+    ): Boolean =
+        when (operator) {
             ConditionOperator.EXISTS -> actual != null
             ConditionOperator.NOT_EXISTS -> actual == null
-            ConditionOperator.GREATER_THAN -> {
-                val actualNum = (actual as? Number)?.toDouble() ?: actual?.toString()?.toDoubleOrNull() ?: return false
-                val expectedNum = (expected as? Number)?.toDouble() ?: expected?.toString()?.toDoubleOrNull() ?: return false
-                actualNum > expectedNum
+            ConditionOperator.EQUALS -> actual == expected || actual?.toString() == expected?.toString()
+            ConditionOperator.NOT_EQUALS -> actual != expected && actual?.toString() != expected?.toString()
+            ConditionOperator.CONTAINS ->
+                when (actual) {
+                    is String -> actual.contains(expected?.toString() ?: "")
+                    is Collection<*> -> actual.contains(expected)
+                    else -> false
+                }
+            ConditionOperator.NOT_CONTAINS ->
+                when (actual) {
+                    is String -> !actual.contains(expected?.toString() ?: "")
+                    is Collection<*> -> !actual.contains(expected)
+                    else -> true
+                }
+            ConditionOperator.MATCHES -> {
+                val pattern = expected?.toString() ?: ""
+                actual?.toString()?.matches(pattern.toRegex()) ?: false
             }
-            ConditionOperator.LESS_THAN -> {
-                val actualNum = (actual as? Number)?.toDouble() ?: actual?.toString()?.toDoubleOrNull() ?: return false
-                val expectedNum = (expected as? Number)?.toDouble() ?: expected?.toString()?.toDoubleOrNull() ?: return false
-                actualNum < expectedNum
+            ConditionOperator.GREATER_THAN -> compareAsNumbers(actual, expected) { a, e -> a > e }
+            ConditionOperator.LESS_THAN -> compareAsNumbers(actual, expected) { a, e -> a < e }
+            ConditionOperator.HAS_SIZE -> {
+                val actualSize = sizeOf(actual) ?: return false
+                val expectedSize =
+                    (expected as? Number)?.toInt()
+                        ?: expected?.toString()?.toIntOrNull()
+                        ?: return false
+                actualSize == expectedSize
             }
+            ConditionOperator.NOT_EMPTY ->
+                when (actual) {
+                    is Collection<*> -> actual.isNotEmpty()
+                    is String -> actual.isNotEmpty()
+                    is Array<*> -> actual.isNotEmpty()
+                    else -> actual != null
+                }
         }
+
+    /**
+     * Get the size of a collection, string, or array.
+     */
+    private fun sizeOf(value: Any?): Int? =
+        when (value) {
+            is Collection<*> -> value.size
+            is String -> value.length
+            is Array<*> -> value.size
+            else -> null
+        }
+
+    /**
+     * Compare two values as numbers using the provided comparison function.
+     * Returns false if either value cannot be converted to a number.
+     */
+    private inline fun compareAsNumbers(
+        actual: Any?,
+        expected: Any?,
+        compare: (Double, Double) -> Boolean,
+    ): Boolean {
+        val actualNum =
+            (actual as? Number)?.toDouble()
+                ?: actual?.toString()?.toDoubleOrNull()
+                ?: return false
+        val expectedNum =
+            (expected as? Number)?.toDouble()
+                ?: expected?.toString()?.toDoubleOrNull()
+                ?: return false
+        return compare(actualNum, expectedNum)
     }
 
     /**
@@ -857,7 +985,7 @@ class ScenarioExecutor(
                 when {
                     pattern.contains('-') -> {
                         val (start, end) = pattern.split('-').map { it.trim().toIntOrNull() }
-                        if (start != null && end != null) actual in start..end else false
+                        start?.let { s -> end?.let { e -> actual in s..e } } ?: false
                     }
                     pattern.contains('x') -> {
                         val regex = pattern.replace("x", "\\d").toRegex()
@@ -881,41 +1009,7 @@ class ScenarioExecutor(
         val body = response.body() ?: ""
         val actualValue = runCatching { JsonPath.read<Any>(body, condition.path) }.getOrNull()
         val expectedValue = condition.expected?.let { resolveConditionValue(it, context) }
-
-        return when (condition.operator) {
-            ConditionOperator.EXISTS -> actualValue != null
-            ConditionOperator.NOT_EXISTS -> actualValue == null
-            ConditionOperator.EQUALS -> actualValue == expectedValue || actualValue?.toString() == expectedValue?.toString()
-            ConditionOperator.NOT_EQUALS -> actualValue != expectedValue && actualValue?.toString() != expectedValue?.toString()
-            ConditionOperator.CONTAINS -> {
-                when (actualValue) {
-                    is String -> actualValue.contains(expectedValue?.toString() ?: "")
-                    is Collection<*> -> actualValue.contains(expectedValue)
-                    else -> false
-                }
-            }
-            ConditionOperator.NOT_CONTAINS -> {
-                when (actualValue) {
-                    is String -> !actualValue.contains(expectedValue?.toString() ?: "")
-                    is Collection<*> -> !actualValue.contains(expectedValue)
-                    else -> true
-                }
-            }
-            ConditionOperator.MATCHES -> {
-                val pattern = expectedValue?.toString() ?: ""
-                actualValue?.toString()?.matches(pattern.toRegex()) ?: false
-            }
-            ConditionOperator.GREATER_THAN -> {
-                val actualNum = (actualValue as? Number)?.toDouble()
-                val expectedNum = (expectedValue as? Number)?.toDouble()
-                if (actualNum != null && expectedNum != null) actualNum > expectedNum else false
-            }
-            ConditionOperator.LESS_THAN -> {
-                val actualNum = (actualValue as? Number)?.toDouble()
-                val expectedNum = (expectedValue as? Number)?.toDouble()
-                if (actualNum != null && expectedNum != null) actualNum < expectedNum else false
-            }
-        }
+        return evaluateOperator(actualValue, expectedValue, condition.operator)
     }
 
     /**
@@ -938,7 +1032,9 @@ class ScenarioExecutor(
             ConditionOperator.CONTAINS -> actualValue?.contains(expectedValue?.toString() ?: "") ?: false
             ConditionOperator.NOT_CONTAINS -> !(actualValue?.contains(expectedValue?.toString() ?: "") ?: false)
             ConditionOperator.MATCHES -> actualValue?.matches((expectedValue?.toString() ?: "").toRegex()) ?: false
-            ConditionOperator.GREATER_THAN, ConditionOperator.LESS_THAN -> false // Not applicable for headers
+            ConditionOperator.GREATER_THAN, ConditionOperator.LESS_THAN,
+            ConditionOperator.HAS_SIZE, ConditionOperator.NOT_EMPTY,
+            -> false // Not applicable for headers
         }
     }
 
@@ -954,139 +1050,118 @@ class ScenarioExecutor(
             else -> value
         }
 
+    /**
+     * Run a single assertion using the shared condition evaluation logic.
+     *
+     * This ensures that `assert status 2xx` and `if status 2xx` use the exact same
+     * evaluation logic, eliminating code duplication and potential inconsistencies.
+     */
     private fun runAssertion(
         response: HttpResponse<String>,
         assertion: Assertion,
         context: ExecutionContext,
     ): AssertionResult {
-        val baseResult =
-            when (assertion.type) {
-                AssertionType.STATUS_CODE -> assertStatusCode(response, assertion)
-                AssertionType.BODY_CONTAINS -> assertBodyContains(response, assertion, context)
-                AssertionType.BODY_EQUALS -> assertBodyEquals(response, assertion, context)
-                AssertionType.BODY_MATCHES -> assertBodyMatches(response, assertion, context)
-                AssertionType.BODY_ARRAY_SIZE -> assertBodyArraySize(response, assertion)
-                AssertionType.BODY_ARRAY_NOT_EMPTY -> assertBodyArrayNotEmpty(response, assertion)
-                AssertionType.HEADER_EXISTS -> assertHeaderExists(response, assertion)
-                AssertionType.HEADER_EQUALS -> assertHeaderEquals(response, assertion, context)
-                AssertionType.MATCHES_SCHEMA -> AssertionResult(assertion, true, "Schema validation not implemented yet")
-                AssertionType.RESPONSE_TIME -> AssertionResult(assertion, true, "Response time assertion not implemented yet")
-            }
+        // Use the shared condition evaluation
+        val passed = evaluateCondition(response, assertion.condition, context)
 
-        // Apply negation if the assertion has negate flag
-        return if (assertion.negate) {
-            baseResult.copy(
-                passed = !baseResult.passed,
-                message =
-                    if (!baseResult.passed) {
-                        // Was failed, now passes with negation
-                        "NOT: ${baseResult.message}"
-                    } else {
-                        // Was passed, now fails with negation - need to show failure message
-                        "Negated assertion failed: expected condition to NOT be true\n${baseResult.message}"
-                    },
-            )
-        } else {
-            baseResult
-        }
-    }
+        // Generate appropriate message based on condition type
+        val message = generateAssertionMessage(response, assertion.condition, passed, context)
 
-    private fun assertStatusCode(
-        response: HttpResponse<String>,
-        assertion: Assertion,
-    ): AssertionResult {
-        val actual = response.statusCode()
-        val expected = assertion.expected
-
-        val passed =
-            when (expected) {
-                is Number -> actual == expected.toInt()
-                is IntRange -> actual in expected
-                else -> false
-            }
-
-        return AssertionResult(
-            assertion = assertion,
-            passed = passed,
-            message = if (passed) "Status code is $actual" else "Expected status $expected but got $actual",
-            actual = actual,
-        )
-    }
-
-    private fun assertBodyContains(
-        response: HttpResponse<String>,
-        assertion: Assertion,
-        context: ExecutionContext,
-    ): AssertionResult {
-        val body = response.body() ?: ""
-        val rawSubstring = assertion.expected as? String ?: ""
-        val substring = context.interpolate(rawSubstring)
-        val passed = body.contains(substring)
-
-        val message =
-            if (passed) {
-                "Body contains '$substring'"
-            } else {
-                buildString {
-                    append("Assertion failed: body does not contain expected string\n")
-                    append("  Expected to find: '$substring'\n")
-                    append("  Actual body (first 200 chars): ${body.take(200)}")
-                }
-            }
+        // Get actual value for reporting
+        val actual = getActualValueForCondition(response, assertion.condition, context)
 
         return AssertionResult(
             assertion = assertion,
             passed = passed,
             message = message,
-            actual = body.take(200),
+            actual = actual,
         )
     }
 
-    private fun assertBodyEquals(
+    /**
+     * Generate a human-readable message for an assertion result.
+     */
+    private fun generateAssertionMessage(
         response: HttpResponse<String>,
-        assertion: Assertion,
+        condition: Condition,
+        passed: Boolean,
         context: ExecutionContext,
-    ): AssertionResult {
-        val body = response.body() ?: ""
-        val jsonPath = assertion.jsonPath ?: "$"
-        // Interpolate expected value if it's a string
-        val expected =
-            when (val rawExpected = assertion.expected) {
-                is String -> context.interpolate(rawExpected)
-                else -> rawExpected
+    ): String =
+        when (condition) {
+            is Condition.Status -> {
+                val actual = response.statusCode()
+                if (passed) "Status code is $actual" else "Expected status ${condition.expected} but got $actual"
             }
+            is Condition.JsonPath -> {
+                val body = response.body() ?: ""
+                val actualValue = runCatching { JsonPath.read<Any>(body, condition.path) }.getOrNull()
+                val expectedValue = condition.expected?.let { resolveConditionValue(it, context) }
+                if (passed) {
+                    "${condition.path} ${condition.operator.name.lowercase()} ${expectedValue ?: ""}"
+                } else {
+                    buildString {
+                        append("Assertion failed at ${condition.path}\n")
+                        append("  Operator: ${condition.operator.name.lowercase()}\n")
+                        append("  Expected: ${expectedValue ?: "(none)"}\n")
+                        append("  Actual:   $actualValue")
+                    }
+                }
+            }
+            is Condition.Header -> {
+                val actualValue = response.headers().allValues(condition.name).firstOrNull()
+                if (passed) {
+                    "Header ${condition.name} ${condition.operator.name.lowercase()} ${condition.expected ?: ""}"
+                } else {
+                    "Header assertion failed: ${condition.name} ${condition.operator.name.lowercase()}, actual: $actualValue"
+                }
+            }
+            is Condition.BodyContains -> {
+                val text = condition.text.toString()
+                if (passed) "Body contains '$text'" else "Body does not contain '$text'"
+            }
+            is Condition.Schema -> {
+                if (passed) "Response matches schema" else "Response does not match schema"
+            }
+            is Condition.ResponseTime -> {
+                if (passed) "Response time is under ${condition.maxMs}ms" else "Response time exceeded ${condition.maxMs}ms"
+            }
+            is Condition.Variable -> {
+                val actual = context.get<Any>(condition.name)
+                if (passed) {
+                    "${condition.name} ${condition.operator.name.lowercase()} ${condition.expected}"
+                } else {
+                    "Variable ${condition.name}: expected ${condition.expected}, got $actual"
+                }
+            }
+            is Condition.Negated -> {
+                val innerMessage = generateAssertionMessage(response, condition.condition, !passed, context)
+                if (passed) "NOT: condition was false (assertion passed)" else "Negated assertion failed: $innerMessage"
+            }
+            is Condition.Compound -> {
+                if (passed) "Compound condition passed" else "Compound condition failed"
+            }
+        }
 
-        return runCatching { JsonPath.read<Any>(body, jsonPath) }
-            .fold(
-                onSuccess = { actual ->
-                    val passed = valuesEqual(actual, expected)
-                    val message =
-                        if (passed) {
-                            "$jsonPath equals $expected"
-                        } else {
-                            buildString {
-                                append("Assertion failed at $jsonPath\n")
-                                append("  Expected: $expected\n")
-                                append("  Actual:   $actual")
-                            }
-                        }
-                    AssertionResult(
-                        assertion = assertion,
-                        passed = passed,
-                        message = message,
-                        actual = actual,
-                    )
-                },
-                onFailure = { e ->
-                    AssertionResult(
-                        assertion = assertion,
-                        passed = false,
-                        message = "Failed to evaluate JSONPath '$jsonPath': ${e.message}",
-                        actual = null,
-                    )
-                },
-            )
-    }
+    /**
+     * Get the actual value from the response for a given condition type.
+     */
+    private fun getActualValueForCondition(
+        response: HttpResponse<String>,
+        condition: Condition,
+        context: ExecutionContext,
+    ): Any? =
+        when (condition) {
+            is Condition.Status -> response.statusCode()
+            is Condition.JsonPath -> {
+                val body = response.body() ?: ""
+                runCatching { JsonPath.read<Any>(body, condition.path) }.getOrNull()
+            }
+            is Condition.Header -> response.headers().allValues(condition.name).firstOrNull()
+            is Condition.BodyContains -> response.body()?.take(200)
+            is Condition.Variable -> context.get<Any>(condition.name)
+            is Condition.Negated -> getActualValueForCondition(response, condition.condition, context)
+            else -> null
+        }
 
     /**
      * Compare values handling type coercion (e.g., Int 1 == String "1", Double 1.0 == Int 1).
@@ -1115,125 +1190,4 @@ class ScenarioExecutor(
             is String -> value.toDoubleOrNull()
             else -> null
         }
-
-    private fun assertBodyMatches(
-        response: HttpResponse<String>,
-        assertion: Assertion,
-        context: ExecutionContext,
-    ): AssertionResult {
-        val body = response.body() ?: ""
-        val jsonPath = assertion.jsonPath ?: "$"
-        val rawPattern = assertion.pattern ?: ""
-        val pattern = context.interpolate(rawPattern)
-
-        return runCatching {
-            val actual = JsonPath.read<Any>(body, jsonPath)?.toString() ?: ""
-            val regex = Regex(pattern)
-            val passed = regex.containsMatchIn(actual)
-            Triple(actual, passed, if (passed) "$jsonPath matches pattern" else "Value at $jsonPath does not match pattern '$pattern'")
-        }.fold(
-            onSuccess = { (actual, passed, message) ->
-                AssertionResult(assertion = assertion, passed = passed, message = message, actual = actual)
-            },
-            onFailure = { e ->
-                AssertionResult(assertion = assertion, passed = false, message = "Failed to evaluate: ${e.message}", actual = null)
-            },
-        )
-    }
-
-    private fun assertBodyArraySize(
-        response: HttpResponse<String>,
-        assertion: Assertion,
-    ): AssertionResult {
-        val body = response.body() ?: ""
-        val jsonPath = assertion.jsonPath ?: "$"
-        val expected = assertion.expected as? Int ?: 0
-
-        return runCatching { JsonPath.read<List<*>>(body, jsonPath) }
-            .fold(
-                onSuccess = { array ->
-                    val actual = array.size
-                    val passed = actual == expected
-                    AssertionResult(
-                        assertion = assertion,
-                        passed = passed,
-                        message = if (passed) "Array size is $actual" else "Expected array size $expected but got $actual",
-                        actual = actual,
-                    )
-                },
-                onFailure = { e ->
-                    AssertionResult(
-                        assertion = assertion,
-                        passed = false,
-                        message = "Failed to evaluate array at '$jsonPath': ${e.message}",
-                        actual = null,
-                    )
-                },
-            )
-    }
-
-    private fun assertBodyArrayNotEmpty(
-        response: HttpResponse<String>,
-        assertion: Assertion,
-    ): AssertionResult {
-        val body = response.body() ?: ""
-        val jsonPath = assertion.jsonPath ?: "$"
-
-        return runCatching { JsonPath.read<List<*>>(body, jsonPath) }
-            .fold(
-                onSuccess = { array ->
-                    val passed = array.isNotEmpty()
-                    AssertionResult(
-                        assertion = assertion,
-                        passed = passed,
-                        message = if (passed) "Array is not empty (size: ${array.size})" else "Array at $jsonPath is empty",
-                        actual = array.size,
-                    )
-                },
-                onFailure = { e ->
-                    AssertionResult(
-                        assertion = assertion,
-                        passed = false,
-                        message = "Failed to evaluate array at '$jsonPath': ${e.message}",
-                        actual = null,
-                    )
-                },
-            )
-    }
-
-    private fun assertHeaderExists(
-        response: HttpResponse<String>,
-        assertion: Assertion,
-    ): AssertionResult {
-        val headerName = assertion.headerName ?: ""
-        val exists = response.headers().firstValue(headerName).isPresent
-
-        return AssertionResult(
-            assertion = assertion,
-            passed = exists,
-            message = if (exists) "Header '$headerName' exists" else "Header '$headerName' not found",
-            actual = exists,
-        )
-    }
-
-    private fun assertHeaderEquals(
-        response: HttpResponse<String>,
-        assertion: Assertion,
-        context: ExecutionContext,
-    ): AssertionResult {
-        val headerName = assertion.headerName ?: ""
-        val rawExpected = assertion.expected as? String ?: ""
-        val expected = context.interpolate(rawExpected)
-        val actual = response.headers().firstValue(headerName).orElse(null)
-        val passed = actual == expected
-
-        val passedMessage = "Header '$headerName' equals '$expected'"
-        val failedMessage = "Expected header '$headerName' to be '$expected' but got '$actual'"
-        return AssertionResult(
-            assertion = assertion,
-            passed = passed,
-            message = if (passed) passedMessage else failedMessage,
-            actual = actual,
-        )
-    }
 }

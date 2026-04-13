@@ -116,8 +116,10 @@ class FragmentStepScope internal constructor(
     fun statusCode(expected: Int) {
         assertions.add(
             org.berrycrush.model.Assertion(
-                type = org.berrycrush.model.AssertionType.STATUS_CODE,
-                expected = expected,
+                condition =
+                    org.berrycrush.model.Condition
+                        .Status(expected),
+                description = "status $expected",
             ),
         )
     }

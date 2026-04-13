@@ -286,8 +286,7 @@ class Lexer(
                 break
             }
 
-            val c = advance()
-            when (c) {
+            when (val c = advance()) {
                 '\n' -> {
                     sb.append(c)
                     line++

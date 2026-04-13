@@ -51,17 +51,29 @@ step_keyword      = "given " | "when " | "then " | "and " | "but " ;
 step_directive    = INDENT , INDENT , directive_type , [ directive_value ] , NEWLINE ;
 directive_type    = "call" | "assert" | "extract" | "include" | "body:" | conditional ;
 
-(* Conditional assertions *)
+(* Assertions *)
+assertion         = "assert" , [ "not" ] , condition ;
+
+(* Conditional branching - if/else if/else *)
 conditional       = if_branch , { else_if_branch } , [ else_branch ] ;
 if_branch         = "if" , condition , NEWLINE , { conditional_action } ;
 else_if_branch    = "else if" , condition , NEWLINE , { conditional_action } ;
 else_branch       = "else" , NEWLINE , { conditional_action } ;
 conditional_action = assertion | extraction | fail_action | conditional ;
-condition         = status_condition | jsonpath_condition | header_condition ;
-status_condition  = "status" , number ;
-jsonpath_condition = jsonpath , operator , value ;
-header_condition  = "header" , header_name , operator , value ;
 fail_action       = "fail" , quoted_string ;
+
+(* Conditions - unified for both 'if' and 'assert' *)
+condition         = status_condition | jsonpath_condition | header_condition 
+                  | body_contains | schema_condition | response_time
+                  | variable_condition ;
+status_condition  = "status" , ( number | status_range ) ;
+status_range      = digit , "xx" | number , "-" , number ;
+jsonpath_condition = jsonpath , [ "not" ] , operator , [ value ] ;
+header_condition  = "header" , header_name , [ "not" ] , operator , [ value ] ;
+body_contains     = "contains" , quoted_string ;
+schema_condition  = "schema" ;
+response_time     = "responseTime" , number ;
+variable_condition = variable_path , [ "not" ] , operator , [ value ] ;
 
 (* Examples for parameterized scenarios *)
 examples          = INDENT , "examples:" , NEWLINE , example_header , { example_row } ;
@@ -291,6 +303,9 @@ when I create a pet
 
 ### Assertions (`assert`)
 
+> **Note:** Assertions and `if` conditions share the same condition evaluation logic.
+> The same operators and syntax work identically in both contexts.
+
 #### Status Code
 ```
 assert status 200
@@ -305,6 +320,11 @@ assert not contains "unexpected text"   # Body does not contain substring
 assert schema                            # Validate against OpenAPI schema
 ```
 
+#### Response Time Assertions
+```
+assert responseTime 1000       # Response must complete within 1000ms
+```
+
 #### JSONPath Assertions
 ```
 assert $.name equals "Fluffy"
@@ -314,6 +334,13 @@ assert $.count greaterThan 0
 assert $.tags contains "urgent"
 assert $.status in ["available", "pending"]
 assert $.items hasSize 5
+```
+
+#### Header Assertions
+```
+assert header Content-Type equals "application/json"
+assert header X-Request-Id exists
+assert header Cache-Control contains "no-cache"
 ```
 
 #### The `not` Keyword (Negation)
@@ -371,6 +398,9 @@ when I get the pet
 
 Conditional assertions allow branching logic based on response status, JSON path values, or headers.
 
+> **Note:** `if` conditions and `assert` statements share the same condition evaluation logic.
+> This means the same condition types (status, jsonpath, header) work identically in both contexts.
+
 #### Basic Syntax
 
 ```
@@ -391,15 +421,24 @@ when I make a request
 
 #### Condition Types
 
+Both `if` conditions and `assert` statements share a unified condition syntax:
+
 | Type | Syntax | Example |
 |------|--------|---------|
-| Status code | `if status <code>` | `if status 201` |
-| JSON path | `if $.path <operator> <value>` | `if $.count greaterThan 0` |
-| Header | `if header <name> <operator> <value>` | `if header Content-Type equals "application/json"` |
+| Status code | `status <code>` | `status 201` |
+| Status range | `status <range>` | `status 2xx` |
+| JSON path | `$.path <op> <value>` | `$.count greaterThan 0` |
+| Header | `header <name> <op> <value>` | `header Content-Type equals "application/json"` |
+| Body contains | `contains <text>` | `contains "success"` |
+| Schema validation | `schema` | `schema` |
+| Response time | `responseTime <ms>` | `responseTime 1000` |
+| Variable | `<variable> <op> <value>` | `test.type equals "invalid"` |
+
+> **Note:** While all condition types are syntactically valid in both contexts, some are more commonly used in assertions (schema, responseTime) and some in conditionals (variable).
 
 #### JSON Path Operators
 
-Same operators as assertions: `equals`, `notEmpty`, `greaterThan`, `lessThan`, `contains`, etc.
+Same operators work in both `if` and `assert` contexts: `equals`, `exists`, `notEmpty`, `greaterThan`, `lessThan`, `contains`, `in`, `hasSize`, `matches`.
 
 ```
 if $.items greaterThan 0

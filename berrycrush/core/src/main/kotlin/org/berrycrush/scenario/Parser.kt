@@ -662,10 +662,8 @@ class Parser(
         val finalAutoTestConfig =
             if (autoTestConfig != null && autoTestExcludes != null) {
                 AutoTestConfig(autoTestConfig.types, autoTestExcludes, autoTestConfig.location)
-            } else if (autoTestConfig != null) {
-                autoTestConfig
             } else {
-                null
+                autoTestConfig
             }
 
         return CallNode(
@@ -954,115 +952,197 @@ class Parser(
             skipWhitespace()
         }
 
-        // Determine assertion type
-        val assertionKind: AssertionKind
-        var path: String? = null
-        var expected: ValueNode? = null
-        var headerName: String? = null
+        // Parse the condition
+        val condition = parseAssertCondition(loc, negate) ?: return null
 
-        val typeOrPath = current().value.lowercase()
-        val typeOrPathLoc = currentLocation()
-        advance()
+        return AssertNode(
+            condition = condition,
+            location = loc,
+        )
+    }
+
+    /**
+     * Context for condition parsing - affects parsing style for some conditions.
+     */
+    private enum class ConditionContext {
+        /** Parsing for assertion */
+        ASSERT,
+
+        /** Parsing for if/else condition */
+        CONDITIONAL,
+    }
+
+    /**
+     * Apply negation to a condition if needed.
+     */
+    private fun applyNegation(
+        condition: ConditionNode,
+        negate: Boolean,
+        loc: SourceLocation,
+    ): ConditionNode = if (negate) ConditionNode.NegatedCondition(condition, loc) else condition
+
+    /**
+     * Parse a condition. All condition types are available in both assert and if contexts.
+     * Returns null if the keyword doesn't match any condition type.
+     *
+     * Supported conditions: status, header, jsonpath, schema, contains, responseTime
+     */
+    private fun parseCondition(
+        keyword: String,
+        loc: SourceLocation,
+        context: ConditionContext,
+        negate: Boolean,
+    ): ConditionNode? =
+        when {
+            keyword == "status" || keyword == "statuscode" -> {
+                advance()
+                skipWhitespace()
+                parseStatusValue()?.let { expected ->
+                    applyNegation(ConditionNode.StatusCondition(expected, loc), negate, loc)
+                }
+            }
+            keyword == "schema" || keyword == "matchesschema" -> {
+                advance()
+                skipWhitespace()
+                applyNegation(ConditionNode.SchemaCondition(loc), negate, loc)
+            }
+            keyword == "header" -> {
+                advance()
+                skipWhitespace()
+                val headerName = parseHeaderName()
+                skipWhitespace()
+
+                // For assertions, use simpler header parsing (= or : for equals, otherwise exists)
+                // For conditionals, use full operator parsing
+                val cond =
+                    if (context == ConditionContext.ASSERT) {
+                        if (current().type == TokenType.EQUALS || current().type == TokenType.COLON) {
+                            advance()
+                            skipWhitespace()
+                            ConditionNode.HeaderCondition(headerName, ConditionOperator.EQUALS, parseValue(), loc)
+                        } else {
+                            ConditionNode.HeaderCondition(headerName, ConditionOperator.EXISTS, null, loc)
+                        }
+                    } else {
+                        val (op, expected) = parseConditionOperatorAndValue()
+                        ConditionNode.HeaderCondition(headerName, op, expected, loc)
+                    }
+                applyNegation(cond, negate, loc)
+            }
+            keyword == "contains" || keyword == "bodycontains" -> {
+                advance()
+                skipWhitespace()
+                parseValue()?.let { text ->
+                    applyNegation(ConditionNode.BodyContainsCondition(text, loc), negate, loc)
+                }
+            }
+            keyword == "responsetime" -> {
+                advance()
+                skipWhitespace()
+                parseValue()?.let { maxMs ->
+                    applyNegation(ConditionNode.ResponseTimeCondition(maxMs, loc), negate, loc)
+                }
+            }
+            keyword.startsWith("$") || current().type == TokenType.JSON_PATH -> {
+                parseJsonPathCondition(keyword, loc, context, negate)
+            }
+            else -> null
+        }
+
+    /**
+     * Parse a JSON path condition with operator validation for assertions.
+     */
+    private fun parseJsonPathCondition(
+        keyword: String,
+        loc: SourceLocation,
+        context: ConditionContext,
+        initialNegate: Boolean,
+    ): ConditionNode? {
+        val path =
+            if (current().type == TokenType.JSON_PATH) {
+                current().value.also { advance() }
+            } else {
+                keyword.also { advance() }
+            }
         skipWhitespace()
 
-        when {
-            typeOrPath == "status" || typeOrPath == "statuscode" -> {
-                assertionKind = AssertionKind.STATUS_CODE
-                expected = parseStatusValue()
-            }
-            typeOrPath == "schema" || typeOrPath == "matchesschema" -> {
-                assertionKind = AssertionKind.MATCHES_SCHEMA
-            }
-            typeOrPath == "header" -> {
+        // Check for "not" after the JSON path (e.g., "$.name not equals ...")
+        val negate =
+            if (current().value.lowercase() == "not") {
+                advance()
                 skipWhitespace()
-                // Parse header name (may contain hyphens, e.g., Content-Type, X-Request-Id)
-                headerName = parseHeaderName()
-                skipWhitespace()
+                true
+            } else {
+                initialNegate
+            }
 
-                if (current().type == TokenType.EQUALS || current().type == TokenType.COLON) {
-                    advance()
-                    skipWhitespace()
-                    assertionKind = AssertionKind.HEADER_EQUALS
-                    expected = parseValue()
-                } else {
-                    assertionKind = AssertionKind.HEADER_EXISTS
-                }
-            }
-            typeOrPath == "contains" || typeOrPath == "bodycontains" -> {
-                assertionKind = AssertionKind.BODY_CONTAINS
-                expected = parseValue()
-            }
-            typeOrPath.startsWith("$") -> {
-                path = typeOrPath
-                skipWhitespace()
+        // For assertions, validate operators
+        if (context == ConditionContext.ASSERT) {
+            val operatorText = current().value.lowercase()
+            val validOperators =
+                setOf(
+                    "equals",
+                    "=",
+                    "matches",
+                    "exists",
+                    "hassize",
+                    "size",
+                    "arraysize",
+                    "notempty",
+                    "contains",
+                    "greaterthan",
+                    ">",
+                    "lessthan",
+                    "<",
+                    "in",
+                )
 
-                // Check for "not" after the JSON path (e.g., "assert $.name not equals ...")
-                if (current().value.lowercase() == "not") {
-                    negate = true
-                    advance()
-                    skipWhitespace()
-                }
-
-                val actionKeyword = current().value.lowercase()
-                when {
-                    current().type == TokenType.EQUALS || actionKeyword == "equals" -> {
-                        advance()
-                        skipWhitespace()
-                        assertionKind = AssertionKind.BODY_EQUALS
-                        expected = parseValue()
-                    }
-                    actionKeyword == "matches" -> {
-                        advance()
-                        skipWhitespace()
-                        assertionKind = AssertionKind.BODY_MATCHES
-                        expected = parseValue()
-                    }
-                    actionKeyword == "size" || actionKeyword == "arraysize" -> {
-                        advance()
-                        skipWhitespace()
-                        assertionKind = AssertionKind.BODY_ARRAY_SIZE
-                        expected = parseValue()
-                    }
-                    actionKeyword == "notempty" -> {
-                        advance()
-                        assertionKind = AssertionKind.BODY_ARRAY_NOT_EMPTY
-                    }
-                    else -> {
-                        errors.add(
-                            ParseError(
-                                "Unknown assertion action '$actionKeyword' for JSON path. " +
-                                    "Expected: equals, matches, size, arraysize, or notempty",
-                                currentLocation(),
-                            ),
-                        )
-                        return null
-                    }
-                }
-            }
-            typeOrPath == "responsetime" -> {
-                assertionKind = AssertionKind.RESPONSE_TIME
-                expected = parseValue()
-            }
-            else -> {
+            if (!validOperators.contains(operatorText) &&
+                current().type != TokenType.EQUALS &&
+                current().type != TokenType.NEWLINE &&
+                current().type != TokenType.DEDENT
+            ) {
                 errors.add(
                     ParseError(
-                        "Unknown assertion type '$typeOrPath'. " +
-                            "Expected: status, header, contains, \$.<jsonpath>, schema, or responsetime",
-                        typeOrPathLoc,
+                        "Unknown assertion action '$operatorText' for JSON path. " +
+                            "Expected: equals, matches, exists, hasSize, size, arraySize, notEmpty, contains, greaterThan, lessThan, or in",
+                        currentLocation(),
                     ),
                 )
                 return null
             }
         }
 
-        return AssertNode(
-            assertionType = assertionKind,
-            path = path,
-            expected = expected,
-            headerName = headerName,
-            negate = negate,
-            location = loc,
+        val (op, expected) = parseConditionOperatorAndValue()
+        return applyNegation(ConditionNode.JsonPathCondition(path, op, expected, loc), negate, loc)
+    }
+
+    /**
+     * Parse a condition for an assertion.
+     * All condition types are available.
+     */
+    private fun parseAssertCondition(
+        loc: SourceLocation,
+        initialNegate: Boolean,
+    ): ConditionNode? {
+        val typeOrPath = current().value.lowercase()
+        val typeOrPathLoc = currentLocation()
+
+        // Use unified condition parsing
+        val result = parseCondition(typeOrPath, loc, ConditionContext.ASSERT, initialNegate)
+        if (result != null) {
+            return result
+        }
+
+        // No matching condition type found
+        errors.add(
+            ParseError(
+                "Unknown assertion type '$typeOrPath'. " +
+                    $$"Expected: status, header, contains, $.<jsonpath>, schema, or responsetime",
+                typeOrPathLoc,
+            ),
         )
+        return null
     }
 
     private fun parseIncludeAction(): IncludeNode? {
@@ -1497,6 +1577,8 @@ class Parser(
 
     /**
      * Parse a simple condition (not including logical operators).
+     *
+     * Supports: status, header, jsonpath (shared), plus variable conditions (conditional-only)
      */
     private fun parseSimpleCondition(): ConditionNode? {
         val loc = currentLocation()
@@ -1513,35 +1595,14 @@ class Parser(
 
         val keyword = current().value.lowercase()
 
+        // Use unified condition parsing (status, header, jsonpath, schema, contains, responseTime)
+        val result = parseCondition(keyword, loc, ConditionContext.CONDITIONAL, negate)
+        if (result != null) {
+            return result
+        }
+
+        // Handle variable conditions (only available in conditionals)
         return when {
-            keyword == "status" || keyword == "statuscode" -> {
-                advance()
-                skipWhitespace()
-                val expected = parseStatusValue() ?: return null
-                val cond = ConditionNode.StatusCondition(expected, loc)
-                if (negate) ConditionNode.NegatedCondition(cond, loc) else cond
-            }
-            keyword == "header" -> {
-                advance()
-                skipWhitespace()
-                val headerName = parseHeaderName()
-                skipWhitespace()
-                val (op, expected) = parseConditionOperatorAndValue()
-                val cond = ConditionNode.HeaderCondition(headerName, op, expected, loc)
-                if (negate) ConditionNode.NegatedCondition(cond, loc) else cond
-            }
-            keyword.startsWith("\$") || current().type == TokenType.JSON_PATH -> {
-                val path =
-                    if (current().type == TokenType.JSON_PATH) {
-                        current().value.also { advance() }
-                    } else {
-                        keyword.also { advance() }
-                    }
-                skipWhitespace()
-                val (op, expected) = parseConditionOperatorAndValue()
-                val cond = ConditionNode.JsonPathCondition(path, op, expected, loc)
-                if (negate) ConditionNode.NegatedCondition(cond, loc) else cond
-            }
             current().type == TokenType.IDENTIFIER || current().type == TokenType.VARIABLE -> {
                 // Variable condition (e.g., test.type equals "invalid")
                 val varName = buildVariablePath()
@@ -1551,7 +1612,7 @@ class Parser(
                 if (negate) ConditionNode.NegatedCondition(cond, loc) else cond
             }
             else -> {
-                errors.add(ParseError("Expected condition (status, header, jsonpath, or variable)", loc))
+                errors.add(ParseError("Expected condition (status, header, jsonpath, contains, schema, responseTime, or variable)", loc))
                 null
             }
         }
@@ -1626,6 +1687,20 @@ class Parser(
                     skipWhitespace()
                     ConditionOperator.LESS_THAN
                 }
+                "hassize", "size", "arraysize" -> {
+                    advance()
+                    skipWhitespace()
+                    ConditionOperator.HAS_SIZE
+                }
+                "notempty" -> {
+                    advance()
+                    return Pair(ConditionOperator.NOT_EMPTY, null)
+                }
+                "in" -> {
+                    advance()
+                    skipWhitespace()
+                    ConditionOperator.CONTAINS
+                }
                 else -> {
                     // Default to equals if no operator
                     ConditionOperator.EQUALS
@@ -1680,7 +1755,7 @@ class Parser(
      *
      * Syntax: `fail "error message"` or `fail "message with {{variable}}"`
      */
-    private fun parseFailAction(): FailNode? {
+    private fun parseFailAction(): FailNode {
         val loc = currentLocation()
         advance() // consume 'fail'
         skipWhitespace()

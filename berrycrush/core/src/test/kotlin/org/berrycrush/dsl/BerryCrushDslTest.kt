@@ -1,6 +1,8 @@
 package org.berrycrush.dsl
 
-import org.berrycrush.model.AssertionType
+import org.berrycrush.model.Assertion
+import org.berrycrush.model.Condition
+import org.berrycrush.model.ConditionOperator
 import org.berrycrush.model.StepType
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,6 +10,24 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BerryCrushDslTest {
+    // Helper functions for checking assertion types
+    private fun Assertion.isStatusAssertion(): Boolean =
+        condition is Condition.Status || (condition is Condition.Negated && condition.condition is Condition.Status)
+
+    private fun Assertion.isBodyContainsAssertion(): Boolean =
+        condition is Condition.BodyContains ||
+            (condition is Condition.Negated && condition.condition is Condition.BodyContains)
+
+    private fun Assertion.isJsonPathAssertion(): Boolean {
+        val c = if (condition is Condition.Negated) condition.condition else condition
+        return c is Condition.JsonPath
+    }
+
+    private fun Assertion.isHeaderExistsAssertion(): Boolean {
+        val c = if (condition is Condition.Negated) condition.condition else condition
+        return c is Condition.Header && c.operator == ConditionOperator.EXISTS
+    }
+
     @Test
     fun `should create suite with single spec`() {
         val specPath =
@@ -147,10 +167,10 @@ class BerryCrushDslTest {
         val thenStep = scenario.steps[0]
         assertEquals(4, thenStep.assertions.size)
 
-        assertTrue(thenStep.assertions.any { it.type == AssertionType.STATUS_CODE })
-        assertTrue(thenStep.assertions.any { it.type == AssertionType.BODY_CONTAINS })
-        assertTrue(thenStep.assertions.any { it.type == AssertionType.BODY_EQUALS })
-        assertTrue(thenStep.assertions.any { it.type == AssertionType.HEADER_EXISTS })
+        assertTrue(thenStep.assertions.any { it.isStatusAssertion() })
+        assertTrue(thenStep.assertions.any { it.isBodyContainsAssertion() })
+        assertTrue(thenStep.assertions.any { it.isJsonPathAssertion() })
+        assertTrue(thenStep.assertions.any { it.isHeaderExistsAssertion() })
     }
 
     @Test

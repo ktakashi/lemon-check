@@ -224,7 +224,7 @@ class ScenarioTestExecutor(
      * For non-outline scenarios, this is a no-op.
      */
     private fun initializeContext(
-        scenario: org.berrycrush.model.Scenario,
+        scenario: Scenario,
         context: ExecutionContext?,
     ) {
         context ?: return

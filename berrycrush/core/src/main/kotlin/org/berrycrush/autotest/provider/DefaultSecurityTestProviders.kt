@@ -93,7 +93,7 @@ class CommandInjectionProvider : SecurityTestProvider {
             SecurityPayload("Unix semicolon", "; ls -la"),
             SecurityPayload("Unix pipe", "| cat /etc/passwd"),
             SecurityPayload("Unix backtick", "`id`"),
-            SecurityPayload("Unix subshell", "\$(whoami)"),
+            SecurityPayload("Unix subshell", $$"$(whoami)"),
             SecurityPayload("Windows ampersand", "& dir"),
         )
 }

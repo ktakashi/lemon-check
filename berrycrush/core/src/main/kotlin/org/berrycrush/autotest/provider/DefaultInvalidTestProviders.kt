@@ -207,9 +207,8 @@ class TypeProvider : InvalidTestProvider {
     override fun generateInvalidValues(
         fieldName: String,
         schema: Schema<*>,
-    ): List<InvalidTestValue> {
-        val type = schema.type
-        return when (type) {
+    ): List<InvalidTestValue> =
+        when (val type = schema.type) {
             "integer", "number" ->
                 listOf(
                     InvalidTestValue(
@@ -226,7 +225,6 @@ class TypeProvider : InvalidTestProvider {
                 )
             else -> emptyList()
         }
-    }
 }
 
 /**
