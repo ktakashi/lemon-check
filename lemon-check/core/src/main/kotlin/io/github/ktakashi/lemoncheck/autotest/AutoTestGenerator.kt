@@ -6,7 +6,8 @@ import io.github.ktakashi.lemoncheck.scenario.AutoTestType
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.media.Schema
-import java.util.*
+import java.math.BigDecimal
+import java.util.UUID
 
 /**
  * Generates auto-test cases based on OpenAPI schema constraints and security patterns.
@@ -42,8 +43,7 @@ class AutoTestGenerator(
         /**
          * Create an AutoTestGenerator from a SpecRegistry using the default spec.
          */
-        fun fromRegistry(registry: SpecRegistry): AutoTestGenerator =
-            AutoTestGenerator(registry.getDefault().openApi)
+        fun fromRegistry(registry: SpecRegistry): AutoTestGenerator = AutoTestGenerator(registry.getDefault().openApi)
 
         /**
          * Create an AutoTestGenerator from a SpecRegistry for a specific spec.
@@ -142,9 +142,10 @@ class AutoTestGenerator(
         val content = requestBody.content ?: return null
 
         // Try JSON content types
-        val mediaType = content["application/json"]
-            ?: content.entries.firstOrNull()?.value
-            ?: return null
+        val mediaType =
+            content["application/json"]
+                ?: content.entries.firstOrNull()?.value
+                ?: return null
 
         var schema = mediaType.schema ?: return null
 
@@ -174,7 +175,7 @@ class AutoTestGenerator(
 
             // Generate constraint violation tests
             testCases.addAll(
-                generateConstraintViolations(fieldName, resolvedSchema, baseBody, requiredFields)
+                generateConstraintViolations(fieldName, resolvedSchema, baseBody, requiredFields),
             )
         }
 
@@ -188,8 +189,8 @@ class AutoTestGenerator(
                         invalidValue = null,
                         description = "Missing required field '$requiredField'",
                         body = baseBody.filterKeys { it != requiredField },
-                        tag = "invalid",
-                    )
+                        tag = "Invalid request - required",
+                    ),
                 )
             }
         }
@@ -222,47 +223,78 @@ class AutoTestGenerator(
                 schema.minLength?.let { minLen ->
                     if (minLen > 0) {
                         val invalidValue = "x".repeat((minLen - 1).coerceAtLeast(0))
-                        testCases.add(createInvalidTestCase(fieldName, invalidValue,
-                            "String shorter than minLength ($minLen)", baseBody))
+                        testCases.add(
+                            createInvalidTestCase(
+                                fieldName,
+                                invalidValue,
+                                "String shorter than minLength ($minLen)",
+                                baseBody,
+                            ),
+                        )
                     }
                 }
 
                 // maxLength violation
                 schema.maxLength?.let { maxLen ->
                     val invalidValue = "x".repeat(maxLen + 10)
-                    testCases.add(createInvalidTestCase(fieldName, invalidValue,
-                        "String longer than maxLength ($maxLen)", baseBody))
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName,
+                            invalidValue,
+                            "String longer than maxLength ($maxLen)",
+                            baseBody,
+                        ),
+                    )
                 }
 
                 // pattern violation
                 schema.pattern?.let { pattern ->
-                    testCases.add(createInvalidTestCase(fieldName, "!!!invalid_pattern!!!",
-                        "String not matching pattern ($pattern)", baseBody))
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName,
+                            "!!!invalid_pattern!!!",
+                            "String not matching pattern ($pattern)",
+                            baseBody,
+                        ),
+                    )
                 }
 
                 // format violations
                 schema.format?.let { format ->
-                    val invalidValue = when (format) {
-                        "email" -> "not-an-email"
-                        "uuid" -> "not-a-uuid"
-                        "uri", "url" -> "not-a-url"
-                        "date" -> "not-a-date"
-                        "date-time" -> "not-a-datetime"
-                        "ipv4" -> "not.an.ip"
-                        "ipv6" -> "not:an:ipv6"
-                        else -> null
-                    }
+                    val invalidValue =
+                        when (format) {
+                            "email" -> "not-an-email"
+                            "uuid" -> "not-a-uuid"
+                            "uri", "url" -> "not-a-url"
+                            "date" -> "not-a-date"
+                            "date-time" -> "not-a-datetime"
+                            "ipv4" -> "not.an.ip"
+                            "ipv6" -> "not:an:ipv6"
+                            else -> null
+                        }
                     invalidValue?.let {
-                        testCases.add(createInvalidTestCase(fieldName, it,
-                            "Invalid format ($format)", baseBody))
+                        testCases.add(
+                            createInvalidTestCase(
+                                fieldName,
+                                it,
+                                "Invalid format ($format)",
+                                baseBody,
+                            ),
+                        )
                     }
                 }
 
                 // enum violation
                 schema.enum?.let { enumValues ->
                     if (enumValues.isNotEmpty()) {
-                        testCases.add(createInvalidTestCase(fieldName, "INVALID_ENUM_VALUE_${UUID.randomUUID()}",
-                            "Value not in enum", baseBody))
+                        testCases.add(
+                            createInvalidTestCase(
+                                fieldName,
+                                "INVALID_ENUM_VALUE_${UUID.randomUUID()}",
+                                "Value not in enum",
+                                baseBody,
+                            ),
+                        )
                     }
                 }
             }
@@ -270,43 +302,79 @@ class AutoTestGenerator(
             "integer", "number" -> {
                 // minimum violation
                 schema.minimum?.let { min ->
-                    val invalidValue = min.subtract(java.math.BigDecimal.ONE)
-                    testCases.add(createInvalidTestCase(fieldName, invalidValue,
-                        "Value below minimum ($min)", baseBody))
+                    val invalidValue = min.subtract(BigDecimal.ONE)
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName,
+                            invalidValue,
+                            "Value below minimum ($min)",
+                            baseBody,
+                        ),
+                    )
                 }
 
                 // maximum violation
                 schema.maximum?.let { max ->
-                    val invalidValue = max.add(java.math.BigDecimal.ONE)
-                    testCases.add(createInvalidTestCase(fieldName, invalidValue,
-                        "Value above maximum ($max)", baseBody))
+                    val invalidValue = max.add(BigDecimal.ONE)
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName,
+                            invalidValue,
+                            "Value above maximum ($max)",
+                            baseBody,
+                        ),
+                    )
                 }
 
                 // Type mismatch - string instead of number
-                testCases.add(createInvalidTestCase(fieldName, "not-a-number",
-                    "Invalid type (string instead of $type)", baseBody))
+                testCases.add(
+                    createInvalidTestCase(
+                        fieldName,
+                        "not-a-number",
+                        "Invalid type (string instead of $type)",
+                        baseBody,
+                    ),
+                )
             }
 
             "boolean" -> {
                 // Invalid boolean value
-                testCases.add(createInvalidTestCase(fieldName, "not-a-boolean",
-                    "Invalid boolean value", baseBody))
+                testCases.add(
+                    createInvalidTestCase(
+                        fieldName,
+                        "not-a-boolean",
+                        "Invalid boolean value",
+                        baseBody,
+                    ),
+                )
             }
 
             "array" -> {
                 // minItems violation
                 schema.minItems?.let { minItems ->
                     if (minItems > 0) {
-                        testCases.add(createInvalidTestCase(fieldName, emptyList<Any>(),
-                            "Array with fewer items than minItems ($minItems)", baseBody))
+                        testCases.add(
+                            createInvalidTestCase(
+                                fieldName,
+                                emptyList<Any>(),
+                                "Array with fewer items than minItems ($minItems)",
+                                baseBody,
+                            ),
+                        )
                     }
                 }
 
                 // maxItems violation
                 schema.maxItems?.let { maxItems ->
                     val tooManyItems = (0..maxItems + 5).map { "item$it" }
-                    testCases.add(createInvalidTestCase(fieldName, tooManyItems,
-                        "Array with more items than maxItems ($maxItems)", baseBody))
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName,
+                            tooManyItems,
+                            "Array with more items than maxItems ($maxItems)",
+                            baseBody,
+                        ),
+                    )
                 }
             }
         }
@@ -322,7 +390,9 @@ class AutoTestGenerator(
         location: ParameterLocation = ParameterLocation.BODY,
         basePathParams: Map<String, Any?> = emptyMap(),
         baseHeaders: Map<String, String> = emptyMap(),
+        invalidType: String = deriveInvalidType(description),
     ): AutoTestCase {
+        val tag = "Invalid request - $invalidType"
         return when (location) {
             ParameterLocation.BODY -> {
                 val modifiedBody = baseBody.toMutableMap()
@@ -338,7 +408,7 @@ class AutoTestGenerator(
                     description = description,
                     location = ParameterLocation.BODY,
                     body = modifiedBody,
-                    tag = "invalid",
+                    tag = tag,
                 )
             }
             ParameterLocation.PATH -> {
@@ -352,7 +422,7 @@ class AutoTestGenerator(
                     location = ParameterLocation.PATH,
                     body = baseBody,
                     pathParams = modifiedPathParams,
-                    tag = "invalid",
+                    tag = tag,
                 )
             }
             ParameterLocation.HEADER -> {
@@ -366,7 +436,7 @@ class AutoTestGenerator(
                     location = ParameterLocation.HEADER,
                     body = baseBody,
                     headers = modifiedHeaders,
-                    tag = "invalid",
+                    tag = tag,
                 )
             }
             ParameterLocation.QUERY -> {
@@ -377,9 +447,32 @@ class AutoTestGenerator(
                     description = description,
                     location = ParameterLocation.QUERY,
                     body = baseBody,
-                    tag = "invalid",
+                    tag = tag,
                 )
             }
+        }
+    }
+
+    /**
+     * Derive the invalid type from the description for tagging purposes.
+     */
+    private fun deriveInvalidType(description: String): String {
+        val lowerDesc = description.lowercase()
+        return when {
+            lowerDesc.contains("minlength") || lowerDesc.contains("shorter than") -> "minLength"
+            lowerDesc.contains("maxlength") || lowerDesc.contains("longer than") -> "maxLength"
+            lowerDesc.contains("pattern") -> "pattern"
+            lowerDesc.contains("format") -> "format"
+            lowerDesc.contains("enum") -> "enum"
+            lowerDesc.contains("minimum") || lowerDesc.contains("below minimum") -> "minimum"
+            lowerDesc.contains("maximum") || lowerDesc.contains("above maximum") -> "maximum"
+            lowerDesc.contains("type") || lowerDesc.contains("not-a-") -> "type"
+            lowerDesc.contains("required") || lowerDesc.contains("missing") -> "required"
+            lowerDesc.contains("minitems") || lowerDesc.contains("fewer items") -> "minItems"
+            lowerDesc.contains("maxitems") || lowerDesc.contains("more items") -> "maxItems"
+            lowerDesc.contains("boolean") -> "type"
+            lowerDesc.contains("empty") -> "empty"
+            else -> "constraint"
         }
     }
 
@@ -395,12 +488,12 @@ class AutoTestGenerator(
         val properties = schema.properties ?: return testCases
 
         // Find string fields to test
-        val stringFields = properties
-            .filter { (_, fieldSchema) ->
-                val resolved = resolveSchema(fieldSchema as Schema<*>)
-                resolved.type == "string" || resolved.type == null
-            }
-            .keys
+        val stringFields =
+            properties
+                .filter { (_, fieldSchema) ->
+                    val resolved = resolveSchema(fieldSchema as Schema<*>)
+                    resolved.type == "string" || resolved.type == null
+                }.keys
 
         stringFields.forEach { fieldName ->
             SecurityTestPatterns.getAllPatterns().forEach { pattern ->
@@ -414,7 +507,7 @@ class AutoTestGenerator(
                         description = "${pattern.category}: ${pattern.name}",
                         body = modifiedBody,
                         tag = "security",
-                    )
+                    ),
                 )
             }
         }
@@ -440,34 +533,40 @@ class AutoTestGenerator(
             when (type) {
                 "integer", "number" -> {
                     // Invalid type - string instead of number
-                    testCases.add(createInvalidTestCase(
-                        fieldName = param.name,
-                        invalidValue = "not-a-number",
-                        description = "Invalid type (string instead of $type)",
-                        baseBody = baseBody,
-                        location = ParameterLocation.PATH,
-                        basePathParams = basePathParams,
-                    ))
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName = param.name,
+                            invalidValue = "not-a-number",
+                            description = "Invalid type (string instead of $type)",
+                            baseBody = baseBody,
+                            location = ParameterLocation.PATH,
+                            basePathParams = basePathParams,
+                        ),
+                    )
                     // Negative value
-                    testCases.add(createInvalidTestCase(
-                        fieldName = param.name,
-                        invalidValue = -1,
-                        description = "Negative value",
-                        baseBody = baseBody,
-                        location = ParameterLocation.PATH,
-                        basePathParams = basePathParams,
-                    ))
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName = param.name,
+                            invalidValue = -1,
+                            description = "Negative value",
+                            baseBody = baseBody,
+                            location = ParameterLocation.PATH,
+                            basePathParams = basePathParams,
+                        ),
+                    )
                 }
                 "string" -> {
                     // Empty string
-                    testCases.add(createInvalidTestCase(
-                        fieldName = param.name,
-                        invalidValue = "",
-                        description = "Empty string",
-                        baseBody = baseBody,
-                        location = ParameterLocation.PATH,
-                        basePathParams = basePathParams,
-                    ))
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName = param.name,
+                            invalidValue = "",
+                            description = "Empty string",
+                            baseBody = baseBody,
+                            location = ParameterLocation.PATH,
+                            basePathParams = basePathParams,
+                        ),
+                    )
                 }
             }
         }
@@ -497,7 +596,7 @@ class AutoTestGenerator(
                         body = baseBody,
                         pathParams = basePathParams.toMutableMap().apply { this[param.name] = pattern.payload },
                         tag = "security",
-                    )
+                    ),
                 )
             }
         }
@@ -521,32 +620,37 @@ class AutoTestGenerator(
             val type = resolvedSchema.type ?: "string"
 
             // Empty header value
-            testCases.add(createInvalidTestCase(
-                fieldName = param.name,
-                invalidValue = "",
-                description = "Empty header value",
-                baseBody = baseBody,
-                location = ParameterLocation.HEADER,
-                baseHeaders = baseHeaders,
-            ))
+            testCases.add(
+                createInvalidTestCase(
+                    fieldName = param.name,
+                    invalidValue = "",
+                    description = "Empty header value",
+                    baseBody = baseBody,
+                    location = ParameterLocation.HEADER,
+                    baseHeaders = baseHeaders,
+                ),
+            )
 
             // Invalid format if format is specified
             resolvedSchema.format?.let { format ->
-                val invalidValue = when (format) {
-                    "uuid" -> "not-a-uuid"
-                    "date" -> "not-a-date"
-                    "date-time" -> "not-a-datetime"
-                    else -> null
-                }
+                val invalidValue =
+                    when (format) {
+                        "uuid" -> "not-a-uuid"
+                        "date" -> "not-a-date"
+                        "date-time" -> "not-a-datetime"
+                        else -> null
+                    }
                 invalidValue?.let {
-                    testCases.add(createInvalidTestCase(
-                        fieldName = param.name,
-                        invalidValue = it,
-                        description = "Invalid format ($format)",
-                        baseBody = baseBody,
-                        location = ParameterLocation.HEADER,
-                        baseHeaders = baseHeaders,
-                    ))
+                    testCases.add(
+                        createInvalidTestCase(
+                            fieldName = param.name,
+                            invalidValue = it,
+                            description = "Invalid format ($format)",
+                            baseBody = baseBody,
+                            location = ParameterLocation.HEADER,
+                            baseHeaders = baseHeaders,
+                        ),
+                    )
                 }
             }
         }
@@ -577,7 +681,7 @@ class AutoTestGenerator(
                         body = baseBody,
                         headers = baseHeaders.toMutableMap().apply { this[param.name] = pattern.payload },
                         tag = "security",
-                    )
+                    ),
                 )
             }
         }
@@ -630,46 +734,52 @@ object SecurityTestPatterns {
         val payload: String,
     )
 
-    private val sqlInjectionPatterns = listOf(
-        SecurityPattern("SQL Injection", "Single quote", "' OR '1'='1"),
-        SecurityPattern("SQL Injection", "Union select", "' UNION SELECT * FROM users--"),
-        SecurityPattern("SQL Injection", "Comment bypass", "admin'--"),
-        SecurityPattern("SQL Injection", "Boolean-based", "1' AND '1'='1"),
-        SecurityPattern("SQL Injection", "Stacked queries", "'; DROP TABLE users;--"),
-    )
+    private val sqlInjectionPatterns =
+        listOf(
+            SecurityPattern("SQL Injection", "Single quote", "' OR '1'='1"),
+            SecurityPattern("SQL Injection", "Union select", "' UNION SELECT * FROM users--"),
+            SecurityPattern("SQL Injection", "Comment bypass", "admin'--"),
+            SecurityPattern("SQL Injection", "Boolean-based", "1' AND '1'='1"),
+            SecurityPattern("SQL Injection", "Stacked queries", "'; DROP TABLE users;--"),
+        )
 
-    private val xssPatterns = listOf(
-        SecurityPattern("XSS", "Script tag", "<script>alert('XSS')</script>"),
-        SecurityPattern("XSS", "Event handler", "<img src=x onerror=alert('XSS')>"),
-        SecurityPattern("XSS", "SVG onload", "<svg onload=alert('XSS')>"),
-        SecurityPattern("XSS", "JavaScript URL", "javascript:alert('XSS')"),
-        SecurityPattern("XSS", "HTML injection", "<h1>Injected</h1>"),
-    )
+    private val xssPatterns =
+        listOf(
+            SecurityPattern("XSS", "Script tag", "<script>alert('XSS')</script>"),
+            SecurityPattern("XSS", "Event handler", "<img src=x onerror=alert('XSS')>"),
+            SecurityPattern("XSS", "SVG onload", "<svg onload=alert('XSS')>"),
+            SecurityPattern("XSS", "JavaScript URL", "javascript:alert('XSS')"),
+            SecurityPattern("XSS", "HTML injection", "<h1>Injected</h1>"),
+        )
 
-    private val pathTraversalPatterns = listOf(
-        SecurityPattern("Path Traversal", "Unix relative", "../../../etc/passwd"),
-        SecurityPattern("Path Traversal", "Windows relative", "..\\..\\..\\windows\\system32\\config\\sam"),
-        SecurityPattern("Path Traversal", "URL encoded", "..%2F..%2F..%2Fetc%2Fpasswd"),
-        SecurityPattern("Path Traversal", "Double encoded", "..%252F..%252F..%252Fetc%252Fpasswd"),
-    )
+    private val pathTraversalPatterns =
+        listOf(
+            SecurityPattern("Path Traversal", "Unix relative", "../../../etc/passwd"),
+            SecurityPattern("Path Traversal", "Windows relative", "..\\..\\..\\windows\\system32\\config\\sam"),
+            SecurityPattern("Path Traversal", "URL encoded", "..%2F..%2F..%2Fetc%2Fpasswd"),
+            SecurityPattern("Path Traversal", "Double encoded", "..%252F..%252F..%252Fetc%252Fpasswd"),
+        )
 
-    private val commandInjectionPatterns = listOf(
-        SecurityPattern("Command Injection", "Unix semicolon", "; ls -la"),
-        SecurityPattern("Command Injection", "Unix pipe", "| cat /etc/passwd"),
-        SecurityPattern("Command Injection", "Unix backtick", "`id`"),
-        SecurityPattern("Command Injection", "Unix subshell", "$(whoami)"),
-        SecurityPattern("Command Injection", "Windows ampersand", "& dir"),
-    )
+    private val commandInjectionPatterns =
+        listOf(
+            SecurityPattern("Command Injection", "Unix semicolon", "; ls -la"),
+            SecurityPattern("Command Injection", "Unix pipe", "| cat /etc/passwd"),
+            SecurityPattern("Command Injection", "Unix backtick", "`id`"),
+            SecurityPattern("Command Injection", "Unix subshell", "$(whoami)"),
+            SecurityPattern("Command Injection", "Windows ampersand", "& dir"),
+        )
 
-    private val ldapInjectionPatterns = listOf(
-        SecurityPattern("LDAP Injection", "Wildcard", "*"),
-        SecurityPattern("LDAP Injection", "Filter bypass", "admin)(&)"),
-    )
+    private val ldapInjectionPatterns =
+        listOf(
+            SecurityPattern("LDAP Injection", "Wildcard", "*"),
+            SecurityPattern("LDAP Injection", "Filter bypass", "admin)(&)"),
+        )
 
-    private val xmlInjectionPatterns = listOf(
-        SecurityPattern("XXE", "External entity", "<!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>"),
-        SecurityPattern("XML Injection", "CDATA", "<![CDATA[<script>alert('XSS')</script>]]>"),
-    )
+    private val xmlInjectionPatterns =
+        listOf(
+            SecurityPattern("XXE", "External entity", "<!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>"),
+            SecurityPattern("XML Injection", "CDATA", "<![CDATA[<script>alert('XSS')</script>]]>"),
+        )
 
     fun getAllPatterns(): List<SecurityPattern> =
         sqlInjectionPatterns +
@@ -683,8 +793,7 @@ object SecurityTestPatterns {
      * Get patterns suitable for path parameter testing.
      * Path traversal and some injection patterns are most relevant here.
      */
-    fun getPathTraversalPatterns(): List<SecurityPattern> =
-        pathTraversalPatterns + commandInjectionPatterns.take(3)
+    fun getPathTraversalPatterns(): List<SecurityPattern> = pathTraversalPatterns + commandInjectionPatterns.take(3)
 
     /**
      * Get patterns suitable for header parameter testing.

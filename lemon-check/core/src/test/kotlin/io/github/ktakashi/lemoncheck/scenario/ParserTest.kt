@@ -1436,4 +1436,69 @@ class ParserTest {
         val conditional = conditionals[0]
         assertTrue(conditional.ifBranch.condition is ConditionNode.CompoundCondition)
     }
+
+    // Auto-test excludes tests
+
+    @Test
+    fun `should parse auto-test with excludes`() {
+        val source =
+            """
+            scenario: Auto-test with excludes
+              when I make a request
+                call ^createPet
+                  auto: [invalid security]
+                  excludes: [SQLInjection maxLength]
+                  body:
+                    name: "Test"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callNode = step.actions.first() as CallNode
+        assertNotNull(callNode.autoTestConfig)
+        assertEquals(setOf(AutoTestType.INVALID, AutoTestType.SECURITY), callNode.autoTestConfig!!.types)
+        assertEquals(setOf("SQLInjection", "maxLength"), callNode.autoTestConfig!!.excludes)
+    }
+
+    @Test
+    fun `should parse auto-test excludes with comma separation`() {
+        val source =
+            """
+            scenario: Auto-test with comma excludes
+              when I test
+                call ^createPet
+                  auto: [security]
+                  excludes: [XSS, PathTraversal, CommandInjection]
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callNode = step.actions.first() as CallNode
+        assertNotNull(callNode.autoTestConfig)
+        assertEquals(setOf("XSS", "PathTraversal", "CommandInjection"), callNode.autoTestConfig!!.excludes)
+    }
+
+    @Test
+    fun `should parse auto-test without excludes`() {
+        val source =
+            """
+            scenario: Auto-test without excludes
+              when I test
+                call ^createPet
+                  auto: [invalid]
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val step = result.ast!!.scenarios[0].steps[0]
+        val callNode = step.actions.first() as CallNode
+        assertNotNull(callNode.autoTestConfig)
+        assertEquals(setOf(AutoTestType.INVALID), callNode.autoTestConfig!!.types)
+        assertEquals(emptySet<String>(), callNode.autoTestConfig!!.excludes)
+    }
 }

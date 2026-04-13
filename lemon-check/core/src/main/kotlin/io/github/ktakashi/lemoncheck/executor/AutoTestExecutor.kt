@@ -76,24 +76,29 @@ class AutoTestExecutor(
         val baseBody = extractBaseBody(step, context)
 
         // Extract base path params from step
-        val basePathParams = step.pathParams.mapValues { (_, v) ->
-            when (v) {
-                is String -> context.interpolate(v)
-                else -> v
+        val basePathParams =
+            step.pathParams.mapValues { (_, v) ->
+                when (v) {
+                    is String -> context.interpolate(v)
+                    else -> v
+                }
             }
-        }
 
         // Extract base headers from step
         val baseHeaders = step.headers.mapValues { (_, v) -> context.interpolate(v) }
 
         // Generate test cases
-        val testCases = generator.generateTestCases(
-            operationId = operationId,
-            testTypes = autoTestConfig.types,
-            baseBody = baseBody,
-            basePathParams = basePathParams,
-            baseHeaders = baseHeaders,
-        )
+        val allTestCases =
+            generator.generateTestCases(
+                operationId = operationId,
+                testTypes = autoTestConfig.types,
+                baseBody = baseBody,
+                basePathParams = basePathParams,
+                baseHeaders = baseHeaders,
+            )
+
+        // Filter out excluded tests
+        val testCases = filterExcludedTests(allTestCases, autoTestConfig.excludes)
 
         if (testCases.isEmpty()) {
             // No test cases generated - just pass
@@ -174,10 +179,11 @@ class AutoTestExecutor(
         for ((key, value) in props) {
             when (value) {
                 is BodyProperty.Simple -> {
-                    val resolved = when (val v = value.value) {
-                        is String -> context.interpolate(v)
-                        else -> v
-                    }
+                    val resolved =
+                        when (val v = value.value) {
+                            is String -> context.interpolate(v)
+                            else -> v
+                        }
                     result[key] = resolved
                 }
                 is BodyProperty.Nested -> {
@@ -215,11 +221,12 @@ class AutoTestExecutor(
 
         return try {
             // Determine body, path params, and headers for this test case
-            val testBody = if (testCase.body.isNotEmpty()) {
-                objectMapper.writeValueAsString(testCase.body)
-            } else {
-                step.body
-            }
+            val testBody =
+                if (testCase.body.isNotEmpty()) {
+                    objectMapper.writeValueAsString(testCase.body)
+                } else {
+                    step.body
+                }
 
             // Merge test case path params with step's path params
             val testPathParams = step.pathParams.toMutableMap()
@@ -232,12 +239,13 @@ class AutoTestExecutor(
             // Execute the HTTP request
             val (spec, resolvedOp) = specRegistry.resolve(step.operationId!!, step.specName)
             val baseUrl = configuration.baseUrl ?: spec.baseUrl
-            val url = httpBuilder.buildUrl(
-                baseUrl = baseUrl,
-                path = resolvedOp.path,
-                pathParams = paramResolver(testPathParams, context),
-                queryParams = paramResolver(step.queryParams, context),
-            )
+            val url =
+                httpBuilder.buildUrl(
+                    baseUrl = baseUrl,
+                    path = resolvedOp.path,
+                    pathParams = paramResolver(testPathParams, context),
+                    queryParams = paramResolver(step.queryParams, context),
+                )
 
             val headers = configuration.defaultHeaders + spec.defaultHeaders + testHeaders
 
@@ -245,12 +253,13 @@ class AutoTestExecutor(
             requestLogger(resolvedOp.method.name, url, headers, testBody)
 
             val requestStartTime = System.currentTimeMillis()
-            val response = httpBuilder.execute(
-                method = resolvedOp.method,
-                url = url,
-                headers = headers,
-                body = testBody,
-            )
+            val response =
+                httpBuilder.execute(
+                    method = resolvedOp.method,
+                    url = url,
+                    headers = headers,
+                    body = testBody,
+                )
 
             // Log response if enabled
             responseLogger(resolvedOp.method.name, url, response, requestStartTime)
@@ -274,8 +283,9 @@ class AutoTestExecutor(
             // For security tests, an exception (e.g., invalid URL) means the attack was blocked
             // at the infrastructure level, which is a good thing
             val isSecurityTest = testCase.type == AutoTestType.SECURITY
-            val isUrlError = e.message?.contains("Illegal character") == true ||
-                e.message?.contains("Invalid URL") == true
+            val isUrlError =
+                e.message?.contains("Illegal character") == true ||
+                    e.message?.contains("Invalid URL") == true
 
             AutoTestResult(
                 testCase = testCase,
@@ -298,12 +308,85 @@ class AutoTestExecutor(
     ) {
         if (configuration.logRequests) {
             val status = if (result.passed) "PASS" else "FAIL"
-            val message = buildString {
-                append("  [AUTO-TEST] [$status] ")
-                append("${testCase.type}: ${testCase.description} ")
-                append("(field=${testCase.fieldName}, status=${result.statusCode ?: "N/A"})")
-            }
+            val message =
+                buildString {
+                    append("  [AUTO-TEST] [$status] ")
+                    append("[${testCase.tag}] ")
+                    append("${testCase.description} ")
+                    append("(field=${testCase.fieldName}, status=${result.statusCode ?: "N/A"})")
+                }
             println(message)
         }
+    }
+
+    /**
+     * Filter out test cases that match any of the exclude patterns.
+     *
+     * Excludes can match:
+     * - Security test categories (e.g., "SQLInjection", "XSS", "PathTraversal")
+     * - Invalid test types (e.g., "minLength", "maxLength", "required", "pattern", "enum", "type")
+     * - Test description keywords (case-insensitive partial match)
+     *
+     * @param testCases The generated test cases
+     * @param excludes Set of exclude patterns
+     * @return Filtered list of test cases
+     */
+    private fun filterExcludedTests(
+        testCases: List<AutoTestCase>,
+        excludes: Set<String>,
+    ): List<AutoTestCase> {
+        if (excludes.isEmpty()) {
+            return testCases
+        }
+
+        // Normalize exclude patterns for case-insensitive matching
+        val normalizedExcludes = excludes.map { it.lowercase().replace(" ", "") }
+
+        return testCases.filter { testCase ->
+            val description = testCase.description.lowercase().replace(" ", "")
+            val tag = testCase.tag.lowercase().replace(" ", "")
+
+            // Check if any exclude pattern matches
+            !normalizedExcludes.any { exclude ->
+                description.contains(exclude) ||
+                    tag.contains(exclude) ||
+                    // Also match common category name formats
+                    matchesCategoryPattern(description, exclude)
+            }
+        }
+    }
+
+    /**
+     * Check if a description matches a category pattern.
+     *
+     * Supports various naming conventions:
+     * - "SQLInjection" matches "sql injection", "SQL Injection", "SQL_Injection"
+     * - "maxLength" matches "maxlength", "max_length", "max length", "Maximum length"
+     */
+    private fun matchesCategoryPattern(
+        description: String,
+        pattern: String,
+    ): Boolean {
+        // Map common pattern aliases
+        val patternAliases =
+            mapOf(
+                "sqlinjection" to listOf("sql", "injection", "union", "select", "drop"),
+                "xss" to listOf("script", "alert", "onerror", "javascript"),
+                "pathtraversal" to listOf("path", "traversal", "../", "..\\"),
+                "commandinjection" to listOf("command", "injection", "exec", "system"),
+                "ldapinjection" to listOf("ldap", "filter"),
+                "xxe" to listOf("xxe", "entity", "doctype"),
+                "xmlinjection" to listOf("xml", "cdata"),
+                "headerinjection" to listOf("header", "crlf", "injection"),
+                "minlength" to listOf("minimum", "minlength", "too short", "below minimum"),
+                "maxlength" to listOf("maximum", "maxlength", "too long", "exceeds maximum"),
+                "required" to listOf("required", "missing"),
+                "pattern" to listOf("pattern", "format", "invalid format"),
+                "enum" to listOf("enum", "invalid value", "not in allowed"),
+                "type" to listOf("type", "invalid type", "wrong type"),
+            )
+
+        val aliases = patternAliases[pattern] ?: return false
+        return aliases.any { alias -> description.contains(alias) }
     }
 }

@@ -587,7 +587,10 @@ class ScenarioLoader {
      * Transform AST AutoTestConfig to model AutoTestConfig.
      */
     private fun transformAutoTestConfig(config: AutoTestConfig): io.github.ktakashi.lemoncheck.model.AutoTestConfig =
-        io.github.ktakashi.lemoncheck.model.AutoTestConfig(config.types)
+        io.github.ktakashi.lemoncheck.model.AutoTestConfig(
+            types = config.types,
+            excludes = config.excludes,
+        )
 }
 
 /**

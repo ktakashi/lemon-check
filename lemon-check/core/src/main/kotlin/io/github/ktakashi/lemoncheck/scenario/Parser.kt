@@ -604,6 +604,7 @@ class Parser(
         var bodyProperties: Map<String, BodyPropertyValue>? = null
         var bodyFile: String? = null
         var autoTestConfig: AutoTestConfig? = null
+        var autoTestExcludes: Set<String>? = null
 
         // Parse optional parameters block
         skipNewlines()
@@ -638,6 +639,7 @@ class Parser(
                             }
                             paramName == "bodyFile" -> bodyFile = parseBodyFilePath()
                             paramName == "auto" -> autoTestConfig = parseAutoTestConfig()
+                            paramName == "excludes" -> autoTestExcludes = parseAutoTestExcludes()
                             else -> {
                                 val value = parseValue()
                                 if (value != null) {
@@ -656,6 +658,16 @@ class Parser(
             }
         }
 
+        // Merge auto test config with excludes
+        val finalAutoTestConfig =
+            if (autoTestConfig != null && autoTestExcludes != null) {
+                AutoTestConfig(autoTestConfig.types, autoTestExcludes, autoTestConfig.location)
+            } else if (autoTestConfig != null) {
+                autoTestConfig
+            } else {
+                null
+            }
+
         return CallNode(
             operationId = operationId,
             specName = specName,
@@ -664,7 +676,7 @@ class Parser(
             body = body,
             bodyProperties = bodyProperties,
             bodyFile = bodyFile,
-            autoTestConfig = autoTestConfig,
+            autoTestConfig = finalAutoTestConfig,
             location = loc,
         )
     }
@@ -820,7 +832,7 @@ class Parser(
                 }
                 advance()
             }
-            return if (types.isNotEmpty()) AutoTestConfig(types, loc) else null
+            return if (types.isNotEmpty()) AutoTestConfig(types, emptySet(), loc) else null
         }
 
         advance() // consume [
@@ -845,7 +857,47 @@ class Parser(
             advance() // consume ]
         }
 
-        return if (types.isNotEmpty()) AutoTestConfig(types, loc) else null
+        return if (types.isNotEmpty()) AutoTestConfig(types, emptySet(), loc) else null
+    }
+
+    /**
+     * Parse auto test excludes configuration.
+     * Syntax: excludes: [SQLInjection maxLength] or excludes: [XSS, PathTraversal]
+     *
+     * Supports both space-separated and comma-separated values.
+     */
+    private fun parseAutoTestExcludes(): Set<String> {
+        val excludes = mutableSetOf<String>()
+
+        // Expect [ to start the list
+        if (current().type != TokenType.OPEN_BRACKET) {
+            // Try to parse as bare identifier
+            if (current().type == TokenType.IDENTIFIER || current().type == TokenType.OPERATION_ID) {
+                excludes.add(current().value)
+                advance()
+            }
+            return excludes
+        }
+
+        advance() // consume [
+
+        // Parse exclude names
+        while (!isAtEnd() && current().type != TokenType.CLOSE_BRACKET) {
+            when (current().type) {
+                TokenType.IDENTIFIER, TokenType.OPERATION_ID -> {
+                    excludes.add(current().value)
+                    advance()
+                }
+                TokenType.COMMA -> advance()
+                else -> advance()
+            }
+        }
+
+        if (current().type == TokenType.CLOSE_BRACKET) {
+            advance() // consume ]
+        }
+
+        return excludes
     }
 
     private fun parseExtractAction(): ExtractNode? {
@@ -1450,13 +1502,14 @@ class Parser(
         val loc = currentLocation()
 
         // Check for 'not' prefix for negation
-        val negate = if (current().value.lowercase() == "not") {
-            advance()
-            skipWhitespace()
-            true
-        } else {
-            false
-        }
+        val negate =
+            if (current().value.lowercase() == "not") {
+                advance()
+                skipWhitespace()
+                true
+            } else {
+                false
+            }
 
         val keyword = current().value.lowercase()
 
@@ -1478,11 +1531,12 @@ class Parser(
                 if (negate) ConditionNode.NegatedCondition(cond, loc) else cond
             }
             keyword.startsWith("\$") || current().type == TokenType.JSON_PATH -> {
-                val path = if (current().type == TokenType.JSON_PATH) {
-                    current().value.also { advance() }
-                } else {
-                    keyword.also { advance() }
-                }
+                val path =
+                    if (current().type == TokenType.JSON_PATH) {
+                        current().value.also { advance() }
+                    } else {
+                        keyword.also { advance() }
+                    }
                 skipWhitespace()
                 val (op, expected) = parseConditionOperatorAndValue()
                 val cond = ConditionNode.JsonPathCondition(path, op, expected, loc)
@@ -1541,41 +1595,42 @@ class Parser(
     private fun parseConditionOperatorAndValue(): Pair<ConditionOperator, ValueNode?> {
         val opText = current().value.lowercase()
 
-        val op = when (opText) {
-            "equals", "=" -> {
-                advance()
-                skipWhitespace()
-                ConditionOperator.EQUALS
+        val op =
+            when (opText) {
+                "equals", "=" -> {
+                    advance()
+                    skipWhitespace()
+                    ConditionOperator.EQUALS
+                }
+                "contains" -> {
+                    advance()
+                    skipWhitespace()
+                    ConditionOperator.CONTAINS
+                }
+                "matches" -> {
+                    advance()
+                    skipWhitespace()
+                    ConditionOperator.MATCHES
+                }
+                "exists" -> {
+                    advance()
+                    return Pair(ConditionOperator.EXISTS, null)
+                }
+                "greaterthan", ">" -> {
+                    advance()
+                    skipWhitespace()
+                    ConditionOperator.GREATER_THAN
+                }
+                "lessthan", "<" -> {
+                    advance()
+                    skipWhitespace()
+                    ConditionOperator.LESS_THAN
+                }
+                else -> {
+                    // Default to equals if no operator
+                    ConditionOperator.EQUALS
+                }
             }
-            "contains" -> {
-                advance()
-                skipWhitespace()
-                ConditionOperator.CONTAINS
-            }
-            "matches" -> {
-                advance()
-                skipWhitespace()
-                ConditionOperator.MATCHES
-            }
-            "exists" -> {
-                advance()
-                return Pair(ConditionOperator.EXISTS, null)
-            }
-            "greaterthan", ">" -> {
-                advance()
-                skipWhitespace()
-                ConditionOperator.GREATER_THAN
-            }
-            "lessthan", "<" -> {
-                advance()
-                skipWhitespace()
-                ConditionOperator.LESS_THAN
-            }
-            else -> {
-                // Default to equals if no operator
-                ConditionOperator.EQUALS
-            }
-        }
 
         val expected = parseValue()
         return Pair(op, expected)
@@ -1598,7 +1653,16 @@ class Parser(
                     TokenType.INCLUDE -> parseIncludeAction()?.let { actions.add(it) }
                     TokenType.FAIL -> parseFailAction()?.let { actions.add(it) }
                     TokenType.NEWLINE -> advance()
-                    TokenType.DEDENT, TokenType.ELSE, TokenType.IF, TokenType.GIVEN, TokenType.WHEN, TokenType.THEN, TokenType.AND, TokenType.BUT, TokenType.EOF -> break
+                    TokenType.DEDENT,
+                    TokenType.ELSE,
+                    TokenType.IF,
+                    TokenType.GIVEN,
+                    TokenType.WHEN,
+                    TokenType.THEN,
+                    TokenType.AND,
+                    TokenType.BUT,
+                    TokenType.EOF,
+                    -> break
                     else -> advance()
                 }
             }
@@ -1622,22 +1686,23 @@ class Parser(
         skipWhitespace()
 
         // Get the message
-        val message = when (current().type) {
-            TokenType.STRING -> {
-                val msg = current().value
-                advance()
-                msg
-            }
-            else -> {
-                // Collect tokens until newline as message
-                val parts = mutableListOf<String>()
-                while (!isAtEnd() && current().type != TokenType.NEWLINE && current().type != TokenType.DEDENT) {
-                    parts.add(current().value)
+        val message =
+            when (current().type) {
+                TokenType.STRING -> {
+                    val msg = current().value
                     advance()
+                    msg
                 }
-                parts.joinToString(" ")
+                else -> {
+                    // Collect tokens until newline as message
+                    val parts = mutableListOf<String>()
+                    while (!isAtEnd() && current().type != TokenType.NEWLINE && current().type != TokenType.DEDENT) {
+                        parts.add(current().value)
+                        advance()
+                    }
+                    parts.joinToString(" ")
+                }
             }
-        }
 
         return FailNode(message, loc)
     }

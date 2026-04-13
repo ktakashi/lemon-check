@@ -157,9 +157,13 @@ data class CallNode(
 
 /**
  * Configuration for auto-generating tests.
+ *
+ * @property types The types of tests to generate (invalid, security)
+ * @property excludes Test categories to exclude (e.g., "SQLInjection", "maxLength")
  */
 data class AutoTestConfig(
     val types: Set<AutoTestType>,
+    val excludes: Set<String> = emptySet(),
     val location: SourceLocation,
 )
 
@@ -169,6 +173,7 @@ data class AutoTestConfig(
 enum class AutoTestType {
     /** Invalid request tests - violate schema constraints */
     INVALID,
+
     /** Security tests - injection and attack patterns */
     SECURITY,
 }

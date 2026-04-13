@@ -2,7 +2,6 @@ package io.github.ktakashi.lemoncheck.junit.engine
 
 import io.github.ktakashi.lemoncheck.autotest.AutoTestCase
 import io.github.ktakashi.lemoncheck.autotest.ParameterLocation
-import io.github.ktakashi.lemoncheck.scenario.AutoTestType
 import org.junit.platform.engine.TestDescriptor
 import org.junit.platform.engine.TestSource
 import org.junit.platform.engine.UniqueId
@@ -24,14 +23,10 @@ class AutoTestDescriptor(
     companion object {
         /**
          * Create a display name for an auto-test case.
-         * Format: [Invalid request] {location} {fieldName} with value {value}
-         *         [Security {type}] {location} {fieldName} with value {value}
+         * Format: [{tag}] {location} {fieldName} with value {value}
          */
         fun createDisplayName(testCase: AutoTestCase): String {
-            val typeLabel = when (testCase.type) {
-                AutoTestType.INVALID -> "[Invalid request]"
-                AutoTestType.SECURITY -> "[Security ${extractSecurityType(testCase.description)}]"
-            }
+            val typeLabel = "[${testCase.tag}]"
             val location = when (testCase.location) {
                 ParameterLocation.BODY -> "request body"
                 ParameterLocation.PATH -> "path variable"
@@ -41,11 +36,6 @@ class AutoTestDescriptor(
             val valueStr = testCase.invalidValue?.toString()?.take(30) ?: "null"
             val valueSuffix = if (valueStr.length >= 30) "..." else ""
             return "$typeLabel $location ${testCase.fieldName} with value $valueStr$valueSuffix"
-        }
-
-        private fun extractSecurityType(description: String): String {
-            // Extract type from description like "SQL Injection: Single quote"
-            return description.substringBefore(":").trim()
         }
     }
 }

@@ -81,5 +81,40 @@ scenario: Auto-generated path parameter tests for getPetById
       # May get 404 for invalid IDs which is fine
       assert status 2xx
 
+@auto-test @security @excludes-demo
+scenario: Auto-generated security tests with exclusions
+  # This scenario demonstrates excluding specific test categories
+  when I create a pet excluding SQL injection tests
+    call ^createPet
+      auto: [security]
+      excludes: [SQLInjection LDAPInjection]
+      body:
+        name: "ExcludeDemoPet"
+        status: "available"
+
+  then only non-SQL tests run
+    if status 4xx
+      assert status 4xx
+    else
+      assert status 2xx
+
+@auto-test @invalid @excludes-demo
+scenario: Auto-generated invalid tests with exclusions
+  # This scenario demonstrates excluding specific invalid test types
+  when I create a pet excluding minLength and required tests
+    call ^createPet
+      auto: [invalid]
+      excludes: [minLength required]
+      body:
+        name: "ExcludeDemoPet"
+        status: "available"
+
+  then only non-excluded invalid tests run
+    # Tests for maxLength, pattern, enum, type will still run
+    if status 4xx
+      assert status 4xx
+    else
+      assert status 2xx
+
 
 
