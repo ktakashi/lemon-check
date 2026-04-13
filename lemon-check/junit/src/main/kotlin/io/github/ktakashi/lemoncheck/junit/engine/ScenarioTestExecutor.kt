@@ -3,6 +3,7 @@ package io.github.ktakashi.lemoncheck.junit.engine
 import io.github.ktakashi.lemoncheck.autotest.AutoTestCase
 import io.github.ktakashi.lemoncheck.context.ExecutionContext
 import io.github.ktakashi.lemoncheck.dsl.LemonCheckSuite
+import io.github.ktakashi.lemoncheck.executor.ExecutionListener
 import io.github.ktakashi.lemoncheck.executor.ScenarioExecutor
 import io.github.ktakashi.lemoncheck.junit.DefaultBindings
 import io.github.ktakashi.lemoncheck.junit.LemonCheckBindings
@@ -12,7 +13,10 @@ import io.github.ktakashi.lemoncheck.junit.spi.BindingsProvider
 import io.github.ktakashi.lemoncheck.model.AutoTestResult
 import io.github.ktakashi.lemoncheck.model.FragmentRegistry
 import io.github.ktakashi.lemoncheck.model.ResultStatus
+import io.github.ktakashi.lemoncheck.model.Scenario
 import io.github.ktakashi.lemoncheck.model.ScenarioResult
+import io.github.ktakashi.lemoncheck.model.Step
+import io.github.ktakashi.lemoncheck.model.StepResult
 import io.github.ktakashi.lemoncheck.plugin.PluginRegistry
 import io.github.ktakashi.lemoncheck.runner.ScenarioRunner
 import io.github.ktakashi.lemoncheck.scenario.ScenarioLoader
@@ -174,7 +178,9 @@ class ScenarioTestExecutor(
             return false
         }
 
-        listener.executionStarted(scenarioDescriptor)
+        // Create execution listener adapter for real-time event reporting
+        // This handles scenario start/end as well as auto-test events
+        val executionListener = JUnitExecutionListenerAdapter(scenarioDescriptor, listener)
 
         return runCatching {
             val sourceFile = File(fileContext.scenarioPath)
@@ -192,10 +198,21 @@ class ScenarioTestExecutor(
             // Add example row values to context if this is an outline scenario
             initializeContext(scenarioDescriptor.scenario, executionContext)
 
-            fileContext.executor.execute(scenarioDescriptor.scenario, executionContext, sourceFile)
+            // Execute with execution listener for real-time event reporting
+            // All JUnit events (scenario start/end, auto-test start/end) are handled by the listener
+            fileContext.executor.execute(
+                scenarioDescriptor.scenario,
+                executionContext,
+                sourceFile,
+                executionListener,
+            )
         }.fold(
-            onSuccess = { result -> handleScenarioResult(scenarioDescriptor, result, listener) },
+            onSuccess = { executionListener.hasFailure() },
             onFailure = { e ->
+                // Ensure scenario is started before reporting failure
+                if (!executionListener.scenarioStarted) {
+                    listener.executionStarted(scenarioDescriptor)
+                }
                 listener.executionFinished(scenarioDescriptor, TestExecutionResult.failed(e))
                 true
             },
@@ -226,110 +243,6 @@ class ScenarioTestExecutor(
             context[key] = resolvedValue
         }
     }
-
-    private fun handleScenarioResult(
-        scenarioDescriptor: IndividualScenarioDescriptor,
-        result: ScenarioResult,
-        listener: EngineExecutionListener,
-    ): Boolean {
-        // Check if any step has auto-test results
-        val autoTestResults = result.stepResults.flatMap { it.autoTestResults }
-
-        if (autoTestResults.isNotEmpty()) {
-            return handleAutoTestResults(scenarioDescriptor, result, autoTestResults, listener)
-        }
-
-        // Standard result handling for non-auto-test scenarios
-        return when (result.status) {
-            ResultStatus.PASSED -> {
-                listener.executionFinished(scenarioDescriptor, TestExecutionResult.successful())
-                false
-            }
-            ResultStatus.SKIPPED -> {
-                listener.executionFinished(scenarioDescriptor, TestExecutionResult.aborted(null))
-                false
-            }
-            else -> {
-                val message = buildFailedStepsMessage(scenarioDescriptor.scenario.name, result)
-                listener.executionFinished(
-                    scenarioDescriptor,
-                    TestExecutionResult.failed(AssertionError(message)),
-                )
-                true
-            }
-        }
-    }
-
-    /**
-     * Handle scenario results that contain auto-test results.
-     * Each auto-test is reported as a separate dynamic test directly under the scenario.
-     */
-    private fun handleAutoTestResults(
-        scenarioDescriptor: IndividualScenarioDescriptor,
-        result: ScenarioResult,
-        autoTestResults: List<AutoTestResult>,
-        listener: EngineExecutionListener,
-    ): Boolean {
-        // Phase 1: Register all dynamic tests first
-        val autoTestDescriptors =
-            autoTestResults.mapIndexed { index, autoResult ->
-                val testCase = autoResult.testCase
-                val displayName = AutoTestDescriptor.createDisplayName(testCase)
-                val testId = scenarioDescriptor.uniqueId.append("auto-test", "${index + 1}")
-
-                val autoTestDescriptor =
-                    AutoTestDescriptor(
-                        uniqueId = testId,
-                        displayName = displayName,
-                        testCase = testCase,
-                        stepDescription = getStepDescription(result, testCase),
-                    )
-
-                // Add to scenario and register
-                scenarioDescriptor.addChild(autoTestDescriptor)
-                listener.dynamicTestRegistered(autoTestDescriptor)
-
-                autoTestDescriptor to autoResult
-            }
-
-        // Phase 2: Execute all registered tests
-        var hasFailure = false
-        for ((autoTestDescriptor, autoResult) in autoTestDescriptors) {
-            listener.executionStarted(autoTestDescriptor)
-            if (autoResult.passed) {
-                listener.executionFinished(autoTestDescriptor, TestExecutionResult.successful())
-            } else {
-                hasFailure = true
-                val errorMessage = buildAutoTestFailureMessage(autoResult)
-                listener.executionFinished(
-                    autoTestDescriptor,
-                    TestExecutionResult.failed(AssertionError(errorMessage)),
-                )
-            }
-        }
-
-        // Report the scenario container result
-        val scenarioResult =
-            if (hasFailure) {
-                TestExecutionResult.failed(
-                    AssertionError("${autoTestResults.count { !it.passed }}/${autoTestResults.size} auto-tests failed"),
-                )
-            } else {
-                TestExecutionResult.successful()
-            }
-        listener.executionFinished(scenarioDescriptor, scenarioResult)
-
-        return hasFailure
-    }
-
-    private fun getStepDescription(
-        result: ScenarioResult,
-        testCase: AutoTestCase,
-    ): String =
-        result.stepResults
-            .firstOrNull { it.autoTestResults.any { r -> r.testCase == testCase } }
-            ?.step
-            ?.description ?: "auto-test"
 
     private fun buildAutoTestFailureMessage(autoResult: AutoTestResult): String =
         buildString {
@@ -513,6 +426,133 @@ class ScenarioTestExecutor(
             }
 
         return registry
+    }
+
+    /**
+     * Adapter that bridges [ExecutionListener] to JUnit's [EngineExecutionListener].
+     *
+     * This adapter centralizes all JUnit event reporting by implementing the
+     * [ExecutionListener] interface and firing corresponding JUnit events:
+     * - [onScenarioStarting] → `executionStarted(scenarioDescriptor)`
+     * - [onScenarioCompleted] → `executionFinished(scenarioDescriptor, result)`
+     * - [onAutoTestStarting] → `dynamicTestRegistered`, `executionStarted`
+     * - [onAutoTestCompleted] → `executionFinished`
+     *
+     * This allows IDEs like IntelliJ to show test output in real-time.
+     */
+    private inner class JUnitExecutionListenerAdapter(
+        private val scenarioDescriptor: IndividualScenarioDescriptor,
+        private val listener: EngineExecutionListener,
+    ) : ExecutionListener {
+        private var testIndex = 0
+        private val descriptors = mutableMapOf<AutoTestCase, AutoTestDescriptor>()
+        private var autoTestFailureCount = 0
+        private var lastScenarioResult: ScenarioResult? = null
+
+        /**
+         * Returns true if the scenario execution started.
+         */
+        var scenarioStarted = false
+            private set
+
+        /**
+         * Returns true if there were any failures (auto-test or scenario).
+         */
+        fun hasFailure(): Boolean = autoTestFailureCount > 0 || lastScenarioResult?.status != ResultStatus.PASSED
+
+        override fun onScenarioStarting(scenario: Scenario) {
+            scenarioStarted = true
+            listener.executionStarted(scenarioDescriptor)
+        }
+
+        override fun onScenarioCompleted(
+            scenario: Scenario,
+            result: ScenarioResult,
+        ) {
+            lastScenarioResult = result
+
+            // Determine the appropriate result to report
+            val autoTestResults = result.stepResults.flatMap { it.autoTestResults }
+
+            val testResult =
+                when {
+                    // Auto-test failures
+                    autoTestFailureCount > 0 -> {
+                        TestExecutionResult.failed(
+                            AssertionError("$autoTestFailureCount/${autoTestResults.size} auto-tests failed"),
+                        )
+                    }
+                    // Scenario passed
+                    result.status == ResultStatus.PASSED -> {
+                        TestExecutionResult.successful()
+                    }
+                    // Scenario skipped
+                    result.status == ResultStatus.SKIPPED -> {
+                        TestExecutionResult.aborted(null)
+                    }
+                    // Scenario failed
+                    else -> {
+                        val message = buildFailedStepsMessage(scenario.name, result)
+                        TestExecutionResult.failed(AssertionError(message))
+                    }
+                }
+
+            listener.executionFinished(scenarioDescriptor, testResult)
+        }
+
+        override fun onStepStarting(step: Step) {
+            // Step-level reporting not currently used in JUnit
+            // Future: Could create step descriptors for fine-grained progress
+        }
+
+        override fun onStepCompleted(
+            step: Step,
+            result: StepResult,
+        ) {
+            // Step-level reporting not currently used in JUnit
+        }
+
+        override fun onAutoTestStarting(testCase: AutoTestCase) {
+            val displayName = AutoTestDescriptor.createDisplayName(testCase)
+            val testId = scenarioDescriptor.uniqueId.append("auto-test", "${++testIndex}")
+
+            val descriptor =
+                AutoTestDescriptor(
+                    uniqueId = testId,
+                    displayName = displayName,
+                    testCase = testCase,
+                    stepDescription = testCase.description,
+                )
+
+            // Register the dynamic test with JUnit
+            scenarioDescriptor.addChild(descriptor)
+            listener.dynamicTestRegistered(descriptor)
+
+            // Start execution immediately for real-time output
+            listener.executionStarted(descriptor)
+
+            descriptors[testCase] = descriptor
+        }
+
+        override fun onAutoTestCompleted(
+            testCase: AutoTestCase,
+            result: AutoTestResult,
+        ) {
+            val descriptor =
+                descriptors[testCase]
+                    ?: throw IllegalStateException("onAutoTestCompleted called without matching onAutoTestStarting")
+
+            if (result.passed) {
+                listener.executionFinished(descriptor, TestExecutionResult.successful())
+            } else {
+                autoTestFailureCount++
+                val errorMessage = buildAutoTestFailureMessage(result)
+                listener.executionFinished(
+                    descriptor,
+                    TestExecutionResult.failed(AssertionError(errorMessage)),
+                )
+            }
+        }
     }
 
     companion object {

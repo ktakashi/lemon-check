@@ -56,12 +56,14 @@ class AutoTestExecutor(
      * @param step The step with auto-test configuration
      * @param context The execution context for variable interpolation
      * @param stepStartTime When the step started (for duration calculation)
+     * @param listener Listener for execution events
      * @return StepResult containing all auto-test results
      */
     fun executeAutoTests(
         step: Step,
         context: ExecutionContext,
         stepStartTime: Instant,
+        listener: ExecutionListener = ExecutionListener.NOOP,
     ): StepResult {
         val autoTestConfig = step.autoTestConfig!!
         val operationId = step.operationId!!
@@ -114,8 +116,14 @@ class AutoTestExecutor(
         val allResults = mutableListOf<AutoTestResult>()
 
         for (testCase in testCases) {
+            // Notify listener that test is starting
+            listener.onAutoTestStarting(testCase)
+
             val testResult = executeAutoTestCase(step, testCase, context)
             allResults.add(testResult)
+
+            // Notify listener that test finished
+            listener.onAutoTestCompleted(testCase, testResult)
 
             // Log the test case execution
             logAutoTestCase(testCase, testResult)

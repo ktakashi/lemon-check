@@ -51,6 +51,10 @@ class ScenarioExecutor(
 ) {
     private val httpBuilder = HttpRequestBuilder(configuration)
 
+    // Current execution listener for the executing scenario
+    // Thread-local to support concurrent execution
+    private val currentExecutionListener = ThreadLocal<ExecutionListener>()
+
     // Lazy-initialized auto-test executor - created on first use to avoid circular dependencies
     private val autoTestExecutor: AutoTestExecutor by lazy {
         AutoTestExecutor(
@@ -75,41 +79,59 @@ class ScenarioExecutor(
      * @param sharedContext Optional shared context for cross-scenario variable sharing.
      *                      If provided, variables from previous scenarios are available.
      * @param sourceFile Optional source file for the scenario (used in reports for grouping).
+     * @param executionListener Optional listener for execution events (scenario, step, auto-test).
+     *                          Used by frameworks (like JUnit) to receive real-time notifications.
      */
     fun execute(
         scenario: Scenario,
         sharedContext: ExecutionContext? = null,
         sourceFile: java.io.File? = null,
+        executionListener: ExecutionListener? = null,
     ): ScenarioResult {
-        val startTime = Instant.now()
-        val context = sharedContext?.createChild() ?: ExecutionContext()
-        val scenarioContext = ScenarioContextAdapter(scenario, context, startTime, sourceFile)
+        // Set the listener for this execution (thread-local for concurrent safety)
+        val listener = executionListener ?: ExecutionListener.NOOP
+        currentExecutionListener.set(listener)
 
-        pluginRegistry?.dispatchScenarioStart(scenarioContext)
+        try {
+            // Notify listener that scenario is starting
+            listener.onScenarioStarting(scenario)
 
-        val stepResults = executeAllSteps(scenario, context, scenarioContext)
-        val overallStatus = determineOverallStatus(stepResults)
-        val duration = Duration.between(startTime, Instant.now())
+            val startTime = Instant.now()
+            val context = sharedContext?.createChild() ?: ExecutionContext()
+            val scenarioContext = ScenarioContextAdapter(scenario, context, startTime, sourceFile)
 
-        val scenarioResult =
-            ScenarioResult(
-                scenario = scenario,
-                status = overallStatus,
-                stepResults = stepResults,
-                startTime = startTime,
-                duration = duration,
-            )
+            pluginRegistry?.dispatchScenarioStart(scenarioContext)
 
-        pluginRegistry?.dispatchScenarioEnd(scenarioContext, ScenarioResultAdapter(scenarioResult))
+            val stepResults = executeAllSteps(scenario, context, scenarioContext)
+            val overallStatus = determineOverallStatus(stepResults)
+            val duration = Duration.between(startTime, Instant.now())
 
-        // Copy extracted variables back to shared context for cross-scenario sharing
-        if (sharedContext != null && scenarioResult.status == ResultStatus.PASSED) {
-            context.allVariables().forEach { (name, value) ->
-                value?.let { sharedContext[name] = it }
+            val scenarioResult =
+                ScenarioResult(
+                    scenario = scenario,
+                    status = overallStatus,
+                    stepResults = stepResults,
+                    startTime = startTime,
+                    duration = duration,
+                )
+
+            pluginRegistry?.dispatchScenarioEnd(scenarioContext, ScenarioResultAdapter(scenarioResult))
+
+            // Copy extracted variables back to shared context for cross-scenario sharing
+            if (sharedContext != null && scenarioResult.status == ResultStatus.PASSED) {
+                context.allVariables().forEach { (name, value) ->
+                    value?.let { sharedContext[name] = it }
+                }
             }
-        }
 
-        return scenarioResult
+            // Notify listener that scenario completed
+            listener.onScenarioCompleted(scenario, scenarioResult)
+
+            return scenarioResult
+        } finally {
+            // Clean up thread-local
+            currentExecutionListener.remove()
+        }
     }
 
     /**
@@ -212,8 +234,14 @@ class ScenarioExecutor(
         scenarioContext: ScenarioContextAdapter,
         stepIndex: Int,
     ): StepResult {
+        // Get current execution listener
+        val listener = currentExecutionListener.get() ?: ExecutionListener.NOOP
+
         // Create step context
         val stepContext = StepContextAdapter(step, stepIndex, scenarioContext)
+
+        // Notify listener that step is starting
+        listener.onStepStarting(step)
 
         // Dispatch plugin: onStepStart
         pluginRegistry?.dispatchStepStart(stepContext)
@@ -223,6 +251,9 @@ class ScenarioExecutor(
 
         // Dispatch plugin: onStepEnd
         pluginRegistry?.dispatchStepEnd(stepContext, StepResultAdapter(result))
+
+        // Notify listener that step completed
+        listener.onStepCompleted(step, result)
 
         return result
     }
@@ -300,7 +331,8 @@ class ScenarioExecutor(
         runCatching {
             // Check if this step has auto-test configuration
             if (step.autoTestConfig != null) {
-                autoTestExecutor.executeAutoTests(step, context, stepStartTime)
+                val listener = currentExecutionListener.get() ?: ExecutionListener.NOOP
+                autoTestExecutor.executeAutoTests(step, context, stepStartTime, listener)
             } else {
                 executeHttpRequest(step, context, stepStartTime)
             }

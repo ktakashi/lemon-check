@@ -1162,9 +1162,8 @@ class ParserTest {
 
         val condition = conditionals[0].ifBranch.condition
         assertTrue(condition is ConditionNode.JsonPathCondition)
-        val jsonPathCondition = condition
-        assertEquals($$"$.status", jsonPathCondition.path)
-        assertEquals(ConditionOperator.EQUALS, jsonPathCondition.operator)
+        assertEquals("$.status", condition.path)
+        assertEquals(ConditionOperator.EQUALS, condition.operator)
     }
 
     @Test
@@ -1334,7 +1333,7 @@ class ParserTest {
 
         val conditional = conditionals[0]
         assertTrue(conditional.ifBranch.condition is ConditionNode.VariableCondition)
-        val varCondition = conditional.ifBranch.condition as ConditionNode.VariableCondition
+        val varCondition = conditional.ifBranch.condition
         assertEquals("test.type", varCondition.variableName)
         assertEquals(ConditionOperator.EQUALS, varCondition.operator)
     }
@@ -1359,7 +1358,7 @@ class ParserTest {
 
         val conditional = conditionals[0]
         assertTrue(conditional.ifBranch.condition is ConditionNode.CompoundCondition)
-        val compound = conditional.ifBranch.condition as ConditionNode.CompoundCondition
+        val compound = conditional.ifBranch.condition
         assertEquals(LogicalOperator.AND, compound.operator)
         assertTrue(compound.left is ConditionNode.StatusCondition)
         assertTrue(compound.right is ConditionNode.VariableCondition)
@@ -1385,7 +1384,7 @@ class ParserTest {
 
         val conditional = conditionals[0]
         assertTrue(conditional.ifBranch.condition is ConditionNode.CompoundCondition)
-        val compound = conditional.ifBranch.condition as ConditionNode.CompoundCondition
+        val compound = conditional.ifBranch.condition
         assertEquals(LogicalOperator.OR, compound.operator)
         assertTrue(compound.left is ConditionNode.StatusCondition)
         assertTrue(compound.right is ConditionNode.StatusCondition)
@@ -1411,7 +1410,7 @@ class ParserTest {
 
         val conditional = conditionals[0]
         assertTrue(conditional.ifBranch.condition is ConditionNode.NegatedCondition)
-        val negated = conditional.ifBranch.condition as ConditionNode.NegatedCondition
+        val negated = conditional.ifBranch.condition
         assertTrue(negated.condition is ConditionNode.VariableCondition)
     }
 
@@ -1458,8 +1457,8 @@ class ParserTest {
         val step = result.ast!!.scenarios[0].steps[0]
         val callNode = step.actions.first() as CallNode
         assertNotNull(callNode.autoTestConfig)
-        assertEquals(setOf(AutoTestType.INVALID, AutoTestType.SECURITY), callNode.autoTestConfig!!.types)
-        assertEquals(setOf("SQLInjection", "maxLength"), callNode.autoTestConfig!!.excludes)
+        assertEquals(setOf(AutoTestType.INVALID, AutoTestType.SECURITY), callNode.autoTestConfig.types)
+        assertEquals(setOf("SQLInjection", "maxLength"), callNode.autoTestConfig.excludes)
     }
 
     @Test
@@ -1479,7 +1478,7 @@ class ParserTest {
         val step = result.ast!!.scenarios[0].steps[0]
         val callNode = step.actions.first() as CallNode
         assertNotNull(callNode.autoTestConfig)
-        assertEquals(setOf("XSS", "PathTraversal", "CommandInjection"), callNode.autoTestConfig!!.excludes)
+        assertEquals(setOf("XSS", "PathTraversal", "CommandInjection"), callNode.autoTestConfig.excludes)
     }
 
     @Test
@@ -1498,7 +1497,7 @@ class ParserTest {
         val step = result.ast!!.scenarios[0].steps[0]
         val callNode = step.actions.first() as CallNode
         assertNotNull(callNode.autoTestConfig)
-        assertEquals(setOf(AutoTestType.INVALID), callNode.autoTestConfig!!.types)
-        assertEquals(emptySet<String>(), callNode.autoTestConfig!!.excludes)
+        assertEquals(setOf(AutoTestType.INVALID), callNode.autoTestConfig.types)
+        assertEquals(emptySet(), callNode.autoTestConfig.excludes)
     }
 }
