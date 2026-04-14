@@ -38,7 +38,6 @@ class JsonReportPlugin(
 
     private fun toJsonStructure(report: TestReport): Map<String, Any?> =
         mapOf(
-            $$"$schema" to "https://json-schema.org/draft/2020-12/schema",
             "timestamp" to report.timestamp.toString(),
             "duration" to report.duration.toMillis(),
             "summary" to
