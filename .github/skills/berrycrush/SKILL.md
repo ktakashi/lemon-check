@@ -98,10 +98,28 @@ call ^createPet
 ```
 
 ### Call with External Body File
+
+Load request body from external files (supports variable interpolation):
 ```
 call ^createPet
   bodyFile: "classpath:templates/pet.json"
 ```
+
+**Supported path formats:**
+- `classpath:path/to/file.json` - Load from classpath (recommended)
+- `file:./relative/path.json` - Load from file system
+- `/absolute/path.json` - Load from absolute path
+
+**Example template file (`templates/pet.json`):**
+```json
+{
+  "name": "{{petName}}",
+  "category": "{{category}}",
+  "status": "available"
+}
+```
+
+> Note: If both `body` and `bodyFile` are specified, inline `body` takes precedence.
 
 ### Multi-Spec Call
 ```
@@ -310,6 +328,8 @@ outline: Test multiple pets
 
 ## Parameters Block
 
+### File-Level Parameters
+
 Place at top of file for configuration:
 ```
 parameters:
@@ -320,6 +340,40 @@ parameters:
   logResponses: true
   header.Authorization: "Bearer test-token"
 ```
+
+### Feature-Level Parameters
+
+Configure only scenarios within a specific feature (overrides file-level):
+```
+feature: Pet CRUD Operations
+  parameters:
+    shareVariablesAcrossScenarios: true
+  
+  scenario: Create pet
+    when: I create a pet
+      call ^createPet
+        body: {"name": "SharedPet"}
+      extract $.id => petId
+  
+  scenario: Use shared variable
+    # Can access {{petId}} from previous scenario within this feature
+    when: I get the pet
+      call ^getPetById
+        petId: {{petId}}
+    then: I see the pet
+      assert status 200
+```
+
+### Supported Parameters
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `baseUrl` | String | Override API base URL |
+| `timeout` | Number | Request timeout in seconds |
+| `shareVariablesAcrossScenarios` | Boolean | Share extracted variables |
+| `logRequests` | Boolean | Enable HTTP request logging |
+| `logResponses` | Boolean | Enable HTTP response logging |
+| `strictSchemaValidation` | Boolean | Fail on schema validation warnings |
+| `header.<name>` | String | Add/override default header |
 
 ## Auto-Generated Tests
 
@@ -410,3 +464,180 @@ scenario: Pet CRUD operations
   then it is removed
     assert status 204
 ```
+
+## Custom Steps
+
+Custom steps allow you to extend BerryCrush with reusable, domain-specific steps implemented in Kotlin or Java.
+
+### Defining Custom Steps
+
+Use the `@Step` annotation:
+```kotlin
+import org.berrycrush.step.Step
+import org.berrycrush.step.StepContext
+
+class PetstoreSteps {
+    @Step("create a test pet named {string}")
+    fun createTestPet(name: String, context: StepContext) {
+        // Perform actions
+        context.setVariable("petName", name)
+    }
+
+    @Step("I have {int} pets with status {word}")
+    fun setupPets(count: Int, status: String, context: StepContext) {
+        // Create multiple pets
+    }
+}
+```
+
+### Pattern Placeholders
+
+| Placeholder | Matches | Example |
+|-------------|---------|---------|
+| `{string}` | Quoted string | `"hello"` |
+| `{int}` | Integer | `42` |
+| `{float}` | Decimal | `3.14` |
+| `{word}` | Single word | `available` |
+| `{any}` | Any text (greedy) | `hello world` |
+
+### StepContext API
+
+The `StepContext` provides access to the execution context:
+
+| Method | Description |
+|--------|-------------|
+| `variable(name)` | Get a variable by name |
+| `setVariable(name, value)` | Set a scenario-scoped variable |
+| `setSharedVariable(name, value)` | Set a suite-scoped (shared) variable |
+| `allVariables()` | Get all current variables |
+| `lastResponse` | The last HTTP response (or null) |
+| `configuration` | The current execution configuration |
+
+### Using Custom Steps
+
+```
+scenario: Create and verify pet
+  given: create a test pet named "Fluffy"
+  then: the pet should have status "available"
+```
+
+### Configuration
+
+Register step classes in `@BerryCrushConfiguration`:
+```java
+@BerryCrushConfiguration(
+    openApiSpec = "petstore.yaml",
+    stepClasses = {PetstoreSteps.class}
+)
+public class PetstoreScenarioTest {}
+```
+
+Or via package scanning:
+```java
+@BerryCrushConfiguration(
+    openApiSpec = "petstore.yaml",
+    stepPackages = {"com.example.steps"}
+)
+public class PetstoreScenarioTest {}
+```
+
+## Custom Assertions
+
+Custom assertions extend the `assert` directive with domain-specific validation logic.
+
+### Defining Custom Assertions
+
+Use the `@Assertion` annotation:
+```kotlin
+import org.berrycrush.assertion.Assertion
+import org.berrycrush.assertion.AssertionContext
+import org.berrycrush.assertion.AssertionResult
+
+class PetstoreAssertions {
+    @Assertion("pet name is {string}")
+    fun assertPetName(expectedName: String, context: AssertionContext): AssertionResult {
+        val actualName: String? = context.response.jsonPath.read("$.name")
+        return if (actualName == expectedName) {
+            AssertionResult.success()
+        } else {
+            AssertionResult.failure("Expected name '$expectedName' but got '$actualName'")
+        }
+    }
+
+    @Assertion("pet is available")
+    fun assertPetAvailable(context: AssertionContext): AssertionResult {
+        val status: String? = context.response.jsonPath.read("$.status")
+        return if (status == "available") {
+            AssertionResult.success()
+        } else {
+            AssertionResult.failure("Pet status is '$status', expected 'available'")
+        }
+    }
+}
+```
+
+### Using Custom Assertions
+
+```
+scenario: Verify pet response
+  when: I get the pet
+    call ^getPetById
+      petId: 123
+  then: the pet exists
+    assert status 200
+    assert pet name is "Fluffy"
+    assert pet is available
+```
+
+### Configuration
+
+Register assertion classes in `@BerryCrushConfiguration`:
+```java
+@BerryCrushConfiguration(
+    openApiSpec = "petstore.yaml",
+    assertionClasses = {PetstoreAssertions.class}
+)
+public class PetstoreScenarioTest {}
+```
+
+## Variable Scopes
+
+Variables can be set with different scopes:
+
+### Scenario-Scoped Variables (Default)
+
+Variables set with `setVariable()` are isolated to the current scenario:
+```kotlin
+context.setVariable("tempId", generateId())  // Only visible in current scenario
+```
+
+### Suite-Scoped Variables (Shared)
+
+Variables set with `setSharedVariable()` are shared across scenarios when sharing is enabled:
+```kotlin
+context.setSharedVariable("authToken", getAuthToken())  // Shared when enabled
+```
+
+> If `shareVariablesAcrossScenarios` is disabled, `setSharedVariable()` behaves like `setVariable()`.
+
+### Variable Lookup Priority
+
+1. Scenario-scoped variables (checked first)
+2. Shared variables (checked second)
+
+## Escaping Variable Syntax
+
+To use literal `{{` or `${` in strings without interpolation, escape with backslash:
+
+```
+# Assert literal text "{{petName}}" appears in body
+assert not contains "\\{{petName}}"
+
+# In request bodies
+body: {"template": "Hello \\{{name}}"}
+```
+
+Escape sequences:
+- `\\{{` → literal `{{`
+- `\\$` → literal `$`
+
