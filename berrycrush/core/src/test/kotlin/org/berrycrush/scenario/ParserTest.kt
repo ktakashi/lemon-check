@@ -41,6 +41,17 @@ class ParserTest {
     private fun AssertNode.isResponseTimeAssertion(): Boolean = unwrapCondition() is ConditionNode.ResponseTimeCondition
 
     /**
+     * Check if an assertion's condition is a CustomAssertionCondition.
+     */
+    private fun AssertNode.isCustomAssertion(): Boolean = unwrapCondition() is ConditionNode.CustomAssertionCondition
+
+    /**
+     * Get the pattern from a CustomAssertionCondition assertion.
+     */
+    private fun AssertNode.getCustomPattern(): String? =
+        (unwrapCondition() as? ConditionNode.CustomAssertionCondition)?.pattern
+
+    /**
      * Check if an assertion is negated (wrapped in NegatedCondition).
      */
     private fun AssertNode.isNegated(): Boolean = condition is ConditionNode.NegatedCondition
@@ -937,18 +948,26 @@ class ParserTest {
     // =========================================================================
 
     @Test
-    fun `should fail on unknown assertion type`() {
+    fun `should parse unknown assertion type as custom assertion`() {
         val source =
             """
-            scenario: Unknown assertion type
+            scenario: Custom assertion pattern
               then: check something
                 assert foo "bar"
             """.trimIndent()
 
         val result = Parser.parse(source)
 
-        assertTrue(!result.isSuccess || result.errors.isNotEmpty(), "Parse should fail for unknown assertion type")
-        assertTrue(result.errors.any { it.message.contains("Unknown assertion type") })
+        // Unknown assertion types are now treated as custom assertion patterns
+        assertTrue(result.isSuccess, "Parse should succeed for custom assertion pattern: ${result.errors}")
+        assertEquals(1, result.ast!!.scenarios.size)
+        
+        // Verify the assertion is captured as custom assertion
+        val assertions = extractAssertions(result.ast.scenarios[0])
+        assertEquals(1, assertions.size)
+        assertTrue(assertions[0].isCustomAssertion(), "Should be a custom assertion")
+        // Pattern preserves quotes for string tokens so custom assertion matchers can extract parameters
+        assertEquals("foo \"bar\"", assertions[0].getCustomPattern())
     }
 
     @Test
@@ -2005,5 +2024,167 @@ class ParserTest {
         val step = result.ast!!.scenarios[0].steps[0]
         val conditional = step.actions[1] as ConditionalNode
         assertTrue(conditional.ifBranch.condition is ConditionNode.ResponseTimeCondition)
+    }
+
+    // =========================================================================
+    // Custom Assertion Tests
+    // Tests for custom assertion patterns (domain-specific assertions)
+    // =========================================================================
+
+    @Test
+    fun `should parse custom assertion with multi-word pattern`() {
+        val source =
+            """
+            scenario: Custom multi-word assertion
+              then: check custom rule
+                assert the user is authenticated
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertEquals(1, assertions.size)
+        assertTrue(assertions[0].isCustomAssertion(), "Should be a custom assertion")
+        assertEquals("the user is authenticated", assertions[0].getCustomPattern())
+    }
+
+    @Test
+    fun `should parse custom assertion with variable placeholder`() {
+        val source =
+            """
+            scenario: Custom assertion with variable
+              then: check ownership
+                assert {{userId}} owns the resource
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertTrue(assertions[0].isCustomAssertion(), "Should be a custom assertion")
+        // Variable tokens capture just the name without {{}}
+        assertEquals("userId owns the resource", assertions[0].getCustomPattern())
+    }
+
+    @Test
+    fun `should parse custom assertion with numeric values`() {
+        val source =
+            """
+            scenario: Custom numeric assertion
+              then: check count
+                assert item count equals 5
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertTrue(assertions[0].isCustomAssertion(), "Should be a custom assertion")
+        assertEquals("item count equals 5", assertions[0].getCustomPattern())
+    }
+
+    @Test
+    fun `should parse multiple custom assertions in same step`() {
+        val source =
+            """
+            scenario: Multiple custom assertions
+              then: verify all rules
+                assert the user is active
+                assert permissions include admin
+                assert quota is not exceeded
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertEquals(3, assertions.size)
+
+        assertTrue(assertions[0].isCustomAssertion())
+        assertEquals("the user is active", assertions[0].getCustomPattern())
+
+        assertTrue(assertions[1].isCustomAssertion())
+        assertEquals("permissions include admin", assertions[1].getCustomPattern())
+
+        assertTrue(assertions[2].isCustomAssertion())
+        assertEquals("quota is not exceeded", assertions[2].getCustomPattern())
+    }
+
+    @Test
+    fun `should parse custom assertion mixed with standard assertions`() {
+        val source =
+            """
+            scenario: Mixed assertions
+              then: check everything
+                assert status 200
+                assert the user is authenticated
+                assert $.name equals "Test"
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertEquals(3, assertions.size)
+
+        assertTrue(assertions[0].isStatusAssertion(), "First should be status assertion")
+        assertTrue(assertions[1].isCustomAssertion(), "Second should be custom assertion")
+        assertEquals("the user is authenticated", assertions[1].getCustomPattern())
+        assertTrue(assertions[2].isJsonPathAssertion(), "Third should be JSON path assertion")
+    }
+
+    @Test
+    fun `should parse custom assertion in custom step without call`() {
+        val source =
+            """
+            scenario: Custom step with custom assertion
+              then I verify the business rule
+                assert the order is valid
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertEquals(1, assertions.size)
+        assertTrue(assertions[0].isCustomAssertion())
+        assertEquals("the order is valid", assertions[0].getCustomPattern())
+    }
+
+    @Test
+    fun `should parse custom assertion starting with known keyword but different context`() {
+        val source =
+            """
+            scenario: Assertion resembling builtin but custom
+              then: check custom
+                assert response is cached locally
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertEquals(1, assertions.size)
+        assertTrue(assertions[0].isCustomAssertion())
+        assertEquals("response is cached locally", assertions[0].getCustomPattern())
+    }
+
+    @Test
+    fun `should normalize whitespace in custom assertion patterns`() {
+        val source =
+            """
+            scenario: Normalize spacing
+              then: check
+                assert total   equals   100
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        val assertions = extractAssertions(result.ast!!.scenarios[0])
+        assertTrue(assertions[0].isCustomAssertion())
+        // Tokens are joined with single spaces - whitespace is normalized
+        assertEquals("total equals 100", assertions[0].getCustomPattern())
     }
 }

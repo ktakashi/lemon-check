@@ -1,10 +1,18 @@
 package org.berrycrush.junit
 
+import org.berrycrush.assertion.AnnotationAssertionScanner
+import org.berrycrush.assertion.AssertionRegistry
+import org.berrycrush.assertion.DefaultAssertionRegistry
 import org.berrycrush.config.BerryCrushConfiguration
 import org.berrycrush.dsl.BerryCrushSuite
 import org.berrycrush.exception.ConfigurationException
 import org.berrycrush.executor.BerryCrushScenarioExecutor
+import org.berrycrush.junit.BerryCrushConfiguration as BerryCrushConfigAnnotation
 import org.berrycrush.model.Scenario
+import org.berrycrush.step.AnnotationStepScanner
+import org.berrycrush.step.DefaultStepRegistry
+import org.berrycrush.step.PackageStepScanner
+import org.berrycrush.step.StepRegistry
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionContext
@@ -93,6 +101,8 @@ class BerryCrushExtension :
         private val NAMESPACE = ExtensionContext.Namespace.create(BerryCrushExtension::class.java)
         private const val SUITE_KEY = "berryCrushSuite"
         private const val EXECUTOR_KEY = "scenarioExecutor"
+        private const val STEP_REGISTRY_KEY = "stepRegistry"
+        private const val ASSERTION_REGISTRY_KEY = "assertionRegistry"
         private const val CLASSPATH_PREFIX = "classpath:"
     }
 
@@ -215,10 +225,133 @@ class BerryCrushExtension :
         var executor = context.getStore(NAMESPACE).get(EXECUTOR_KEY, BerryCrushScenarioExecutor::class.java)
         if (executor == null) {
             val suite = getSuite(context)
-            executor = BerryCrushScenarioExecutor(suite.specRegistry, suite.configuration)
+            val stepRegistry = getOrCreateStepRegistry(context)
+            val assertionRegistry = getOrCreateAssertionRegistry(context)
+            executor = BerryCrushScenarioExecutor(
+                specRegistry = suite.specRegistry,
+                configuration = suite.configuration,
+                stepRegistry = stepRegistry,
+                assertionRegistry = assertionRegistry,
+            )
             context.getStore(NAMESPACE).put(EXECUTOR_KEY, executor)
         }
         return executor
+    }
+
+    /**
+     * Get or create the step registry by scanning step classes from configuration.
+     */
+    private fun getOrCreateStepRegistry(context: ExtensionContext): StepRegistry? {
+        // Check if already created
+        var registry = context.getStore(NAMESPACE).get(STEP_REGISTRY_KEY, StepRegistry::class.java)
+        if (registry != null) {
+            return registry
+        }
+
+        // Get the test class to read configuration annotation
+        val testClass = findRootTestClass(context)
+        val configAnnotation = testClass?.getAnnotation(
+            BerryCrushConfigAnnotation::class.java
+        )
+
+        if (configAnnotation == null) {
+            return null
+        }
+
+        val stepClasses = configAnnotation.stepClasses
+        val stepPackages = configAnnotation.stepPackages
+
+        if (stepClasses.isEmpty() && stepPackages.isEmpty()) {
+            return null
+        }
+
+        // Create registry and scan classes
+        registry = DefaultStepRegistry()
+        val scanner = AnnotationStepScanner()
+
+        // Scan step classes
+        for (klass in stepClasses) {
+            val definitions = scanner.scan(klass.java)
+            registry.registerAll(definitions)
+        }
+
+        // Scan step packages
+        if (stepPackages.isNotEmpty()) {
+            val packageScanner = PackageStepScanner()
+            for (packageName in stepPackages) {
+                val definitions = packageScanner.scan(packageName)
+                registry.registerAll(definitions)
+            }
+        }
+
+        context.getStore(NAMESPACE).put(STEP_REGISTRY_KEY, registry)
+        return registry
+    }
+
+    /**
+     * Get or create the assertion registry for custom assertions.
+     *
+     * Scans for `@Assertion` annotated methods in classes specified by
+     * `assertionClasses` and `assertionPackages` in `@BerryCrushConfiguration`.
+     *
+     * @param context The JUnit extension context
+     * @return The assertion registry, or null if no assertion classes configured
+     */
+    private fun getOrCreateAssertionRegistry(context: ExtensionContext): AssertionRegistry? {
+        // Check if already exists
+        var registry = context.getStore(NAMESPACE).get(ASSERTION_REGISTRY_KEY, AssertionRegistry::class.java)
+        if (registry != null) {
+            return registry
+        }
+
+        // Get the test class to read configuration annotation
+        val testClass = findRootTestClass(context)
+        val configAnnotation = testClass?.getAnnotation(
+            BerryCrushConfigAnnotation::class.java
+        )
+
+        if (configAnnotation == null) {
+            return null
+        }
+
+        val assertionClasses = configAnnotation.assertionClasses
+        val assertionPackages = configAnnotation.assertionPackages
+
+        if (assertionClasses.isEmpty() && assertionPackages.isEmpty()) {
+            return null
+        }
+
+        // Create registry and scan classes
+        registry = DefaultAssertionRegistry()
+        val scanner = AnnotationAssertionScanner()
+
+        // Scan assertion classes
+        for (klass in assertionClasses) {
+            val definitions = scanner.scan(klass.java)
+            registry.registerAll(definitions)
+        }
+
+        // Scan assertion packages
+        if (assertionPackages.isNotEmpty()) {
+            // TODO: Implement PackageAssertionScanner if needed
+            // For now, only class-based registration is supported
+        }
+
+        context.getStore(NAMESPACE).put(ASSERTION_REGISTRY_KEY, registry)
+        return registry
+    }
+
+    /**
+     * Find the root test class (handles nested classes).
+     */
+    private fun findRootTestClass(context: ExtensionContext): Class<*>? {
+        var current: ExtensionContext? = context
+        var rootClass: Class<*>? = null
+        while (current != null) {
+            current.testClass.ifPresent { rootClass = it }
+            current = current.parent.orElse(null)
+        }
+        return rootClass
     }
 
     /**

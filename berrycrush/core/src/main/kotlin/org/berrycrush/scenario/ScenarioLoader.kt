@@ -437,6 +437,7 @@ class ScenarioLoader {
             is Condition.Compound -> "(${describeCondition(
                 condition.left,
             )}) ${condition.operator.name} (${describeCondition(condition.right)})"
+            is Condition.CustomAssertion -> condition.pattern
         }
 
     private fun transformExampleRow(node: ExampleRowNode): ExampleRow {
@@ -537,6 +538,8 @@ class ScenarioLoader {
                 Condition.Schema
             is ConditionNode.ResponseTimeCondition ->
                 Condition.ResponseTime(maxMs = extractValue(node.maxMs))
+            is ConditionNode.CustomAssertionCondition ->
+                Condition.CustomAssertion(pattern = node.pattern)
         }
 
     /**

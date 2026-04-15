@@ -343,6 +343,18 @@ sealed class ConditionNode {
         val maxMs: ValueNode,
         override val location: SourceLocation,
     ) : ConditionNode()
+
+    /**
+     * Custom assertion condition (matched against AssertionRegistry).
+     * Example: `assert the order should have status "completed"`
+     *
+     * This condition type is used when the assertion text doesn't match
+     * any built-in condition types (status, header, jsonpath, etc.).
+     */
+    data class CustomAssertionCondition(
+        val pattern: String,
+        override val location: SourceLocation,
+    ) : ConditionNode()
 }
 
 /**

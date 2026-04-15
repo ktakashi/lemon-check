@@ -152,6 +152,15 @@ sealed class Condition {
     data class ResponseTime(
         val maxMs: Any,
     ) : Condition()
+
+    /**
+     * Custom assertion condition (matched against AssertionRegistry).
+     *
+     * @property pattern The custom assertion pattern to match
+     */
+    data class CustomAssertion(
+        val pattern: String,
+    ) : Condition()
 }
 
 /**

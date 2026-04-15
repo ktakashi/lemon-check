@@ -66,6 +66,7 @@ class StepResultAdapter(
             is Condition.Negated -> getExpectedFromCondition(condition.condition)
             is Condition.Compound -> null
             is Condition.Schema -> "schema"
+            is Condition.CustomAssertion -> condition.pattern
         }
 
     /**
@@ -82,5 +83,6 @@ class StepResultAdapter(
             is Condition.Variable -> "VARIABLE"
             is Condition.Negated -> "NOT_${getConditionTypeName(condition.condition)}"
             is Condition.Compound -> "COMPOUND"
+            is Condition.CustomAssertion -> "CUSTOM"
         }
 }
