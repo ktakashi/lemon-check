@@ -53,7 +53,7 @@ import org.berrycrush.samples.petstore.assertions.PetstoreAssertions;
 @BerryCrushConfiguration(
     bindings = PetstoreBindings.class, 
     openApiSpec = "petstore.yaml",
-    plugins = {"report:text", "report:json:berrycrush/report.json", "sample:logging"},
+    plugins = {"report:text", "report:console:high-contrast", "report:json:berrycrush/report.json", "sample:logging"},
     stepClasses = {PetCustomSteps.class},
     assertionClasses = {PetstoreAssertions.class}
 )

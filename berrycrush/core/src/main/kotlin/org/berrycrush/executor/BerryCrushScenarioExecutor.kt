@@ -383,12 +383,14 @@ class BerryCrushScenarioExecutor(
 
             // Check if the method returned a StepResult
             if (result is StepResult) {
-                result
+                // Ensure custom step flag is set
+                result.copy(isCustomStep = true)
             } else {
                 StepResult(
                     step = step,
                     status = ResultStatus.PASSED,
                     duration = Duration.between(stepStartTime, Instant.now()),
+                    isCustomStep = true,
                 )
             }
         }.getOrElse { e ->
@@ -409,6 +411,7 @@ class BerryCrushScenarioExecutor(
                 status = status,
                 duration = Duration.between(stepStartTime, Instant.now()),
                 error = actualException as? Exception ?: RuntimeException(actualException),
+                isCustomStep = true,
             )
         }
 
@@ -503,6 +506,47 @@ class BerryCrushScenarioExecutor(
     }
 
     /**
+     * Check if a step contains any custom assertions.
+     */
+    private fun hasCustomAssertion(step: Step): Boolean {
+        // Check direct assertions
+        if (step.assertions.any { it.condition is Condition.CustomAssertion }) {
+            return true
+        }
+        // Check conditional assertions
+        return step.conditionals.any { conditional ->
+            hasCustomAssertionInConditional(conditional)
+        }
+    }
+
+    /**
+     * Check if a conditional contains any custom assertions.
+     */
+    private fun hasCustomAssertionInConditional(conditional: ConditionalAssertion): Boolean {
+        // Check if branch
+        if (conditional.ifBranch.actions.assertions.any { it.condition is Condition.CustomAssertion }) {
+            return true
+        }
+        // Check else if branches
+        if (conditional.elseIfBranches.any { branch ->
+            branch.actions.assertions.any { it.condition is Condition.CustomAssertion }
+        }) {
+            return true
+        }
+        // Check else actions
+        if (conditional.elseActions?.assertions?.any { it.condition is Condition.CustomAssertion } == true) {
+            return true
+        }
+        // Check nested conditionals
+        val hasNestedCustom = conditional.ifBranch.actions.nestedConditionals.any { hasCustomAssertionInConditional(it) } ||
+            conditional.elseIfBranches.any { branch ->
+                branch.actions.nestedConditionals.any { hasCustomAssertionInConditional(it) }
+            } ||
+            (conditional.elseActions?.nestedConditionals?.any { hasCustomAssertionInConditional(it) } == true)
+        return hasNestedCustom
+    }
+
+    /**
      * Build a StepResult from an HTTP response.
      */
     private fun buildResultFromResponse(
@@ -511,6 +555,8 @@ class BerryCrushScenarioExecutor(
         stepStartTime: Instant,
         context: ExecutionContext,
     ): StepResult {
+        val isCustom = hasCustomAssertion(step)
+
         // Check for unconditional fail
         if (step.failMessage != null) {
             return StepResult(
@@ -521,6 +567,7 @@ class BerryCrushScenarioExecutor(
                 responseHeaders = response.headers().map(),
                 duration = Duration.between(stepStartTime, Instant.now()),
                 error = AssertionError(step.failMessage),
+                isCustomStep = isCustom,
             )
         }
 
@@ -543,6 +590,7 @@ class BerryCrushScenarioExecutor(
                 extractedValues = extractedValues + conditionalResults.extractedValues,
                 assertionResults = assertionResults,
                 error = AssertionError(conditionalResults.failMessage),
+                isCustomStep = isCustom,
             )
         }
 
@@ -557,6 +605,7 @@ class BerryCrushScenarioExecutor(
             duration = Duration.between(stepStartTime, Instant.now()),
             extractedValues = extractedValues + conditionalResults.extractedValues,
             assertionResults = assertionResults,
+            isCustomStep = isCustom,
         )
     }
 

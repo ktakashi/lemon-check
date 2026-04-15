@@ -132,13 +132,13 @@ object PluginNameResolver {
         // Try matching by ID first
         val byId = discoveredPlugins.find { it.id == baseId }
         if (byId != null) {
-            return newPluginInstanceWithPath(byId, path)
+            return newPluginInstanceWithParam(byId, path)
         }
 
         // Then try matching by name
         val byName = discoveredPlugins.find { it.name == baseId }
         if (byName != null) {
-            return newPluginInstanceWithPath(byName, path)
+            return newPluginInstanceWithParam(byName, path)
         }
 
         throwUnknownPluginException(baseId)
@@ -148,20 +148,21 @@ object PluginNameResolver {
     private fun newPluginInstance(plugin: BerryCrushPlugin) = plugin::class.java.getDeclaredConstructor().newInstance()
 
     /**
-     * Creates a new instance of a plugin with Path parameter.
+     * Creates a new instance of a plugin with a parameter (Path or String).
      *
-     * Looks for a constructor where the first parameter is Path.
-     * Kotlin classes with default parameters generate constructors with
-     * additional synthetic parameters, so we find a constructor that
-     * starts with Path and provide defaults for remaining parameters.
+     * Tries constructors in this order:
+     * 1. Constructor with Path as first parameter
+     * 2. Constructor with String as first parameter (for options like "stderr,high-contrast")
+     * 3. No-arg constructor (falls back)
      */
-    private fun newPluginInstanceWithPath(
+    private fun newPluginInstanceWithParam(
         plugin: BerryCrushPlugin,
         path: Path,
     ): BerryCrushPlugin {
         val pluginClass = plugin::class.java
+        val paramString = path.toString()
 
-        // Find constructor where first parameter is Path
+        // Try constructor where first parameter is Path
         val pathConstructor =
             pluginClass.declaredConstructors.find { constructor ->
                 constructor.parameterTypes.isNotEmpty() &&
@@ -183,6 +184,17 @@ object PluginNameResolver {
                     }.toTypedArray()
 
             return pathConstructor.newInstance(*args) as BerryCrushPlugin
+        }
+
+        // Try constructor where first parameter is String (for options)
+        val stringConstructor =
+            pluginClass.declaredConstructors.find { constructor ->
+                constructor.parameterTypes.size == 1 &&
+                    constructor.parameterTypes[0] == String::class.java
+            }
+
+        if (stringConstructor != null) {
+            return stringConstructor.newInstance(paramString) as BerryCrushPlugin
         }
 
         // Fall back to no-arg constructor

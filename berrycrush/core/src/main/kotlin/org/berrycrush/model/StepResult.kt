@@ -16,6 +16,7 @@ import java.time.Duration
  * @property error Exception if an error occurred
  * @property message Optional message providing additional context
  * @property autoTestResults Results from auto-generated tests (if autoTestConfig was used)
+ * @property isCustomStep True if this step was executed via a custom @Step or @Assertion annotation
  */
 data class StepResult(
     val step: Step,
@@ -29,6 +30,7 @@ data class StepResult(
     val error: Throwable? = null,
     val message: String? = null,
     val autoTestResults: List<AutoTestResult> = emptyList(),
+    val isCustomStep: Boolean = false,
 )
 
 /**

@@ -52,6 +52,9 @@ class StepResultAdapter(
     override val error: Throwable?
         get() = modelResult.error
 
+    override val isCustomStep: Boolean
+        get() = modelResult.isCustomStep
+
     /**
      * Extract expected value from a Condition for error reporting.
      */

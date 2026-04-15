@@ -1,6 +1,7 @@
 package org.berrycrush.plugin
 
 import org.berrycrush.exception.ConfigurationException
+import org.berrycrush.report.ConsoleReportPlugin
 import org.berrycrush.report.JsonReportPlugin
 import org.berrycrush.report.JunitReportPlugin
 import org.berrycrush.report.TextReportPlugin
@@ -65,6 +66,39 @@ class PluginNameResolverTest {
 
         assertIs<JunitReportPlugin>(plugin)
         assertEquals("report:junit", plugin.id)
+    }
+
+    @Test
+    fun `resolves console report plugin by id`() {
+        val plugin = PluginNameResolver.resolve("report:console")
+
+        assertIs<ConsoleReportPlugin>(plugin)
+        assertEquals("report:console", plugin.id)
+    }
+
+    @Test
+    fun `resolves console report plugin with stderr option`() {
+        val plugin = PluginNameResolver.resolve("report:console:stderr")
+
+        assertIs<ConsoleReportPlugin>(plugin)
+        // We can't easily verify stderr was set, but the plugin should be created
+        assertEquals("report:console", plugin.id)
+    }
+
+    @Test
+    fun `resolves console report plugin with high-contrast option`() {
+        val plugin = PluginNameResolver.resolve("report:console:high-contrast")
+
+        assertIs<ConsoleReportPlugin>(plugin)
+        assertEquals("report:console", plugin.id)
+    }
+
+    @Test
+    fun `resolves console report plugin with multiple options`() {
+        val plugin = PluginNameResolver.resolve("report:console:stderr,high-contrast")
+
+        assertIs<ConsoleReportPlugin>(plugin)
+        assertEquals("report:console", plugin.id)
     }
 
     @Test

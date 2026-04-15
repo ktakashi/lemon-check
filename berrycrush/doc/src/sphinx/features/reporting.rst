@@ -43,6 +43,88 @@ Configuration:
         pluginClasses = [TextReportPlugin::class]
     )
 
+Console Report (Colored)
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+ANSI-colored console output for terminal display. Provides visual highlighting
+with green for passed, red for failed, gray for skipped, and bold cyan for
+custom steps/assertions.
+
+.. code-block:: text
+
+    ═══════════════════════════════════════════════════════════════════════════════
+    BerryCrush Test Report
+    ═══════════════════════════════════════════════════════════════════════════════
+    Execution Date: 2026-04-09T10:30:00Z
+    Duration: 1.234s
+
+    scenario: List all pets ✓    (green checkmark)
+      I request all pets ................................. 200 OK
+      verify custom assertion ............................ pass    (bold cyan + green)
+
+    scenario: Invalid request ✗  (red X)
+      assert status 200 ................................. FAIL    (red)
+
+Features:
+
+- **Color-coded results**: Green for passed, red for failed, gray for skipped
+- **Custom step highlighting**: Bold/bright cyan for custom steps and assertions
+- **Configurable colors**: Customize via ``ColorScheme``
+- **Multiple schemes**: DEFAULT, HIGH_CONTRAST, MONOCHROME, NONE
+
+Configuration:
+
+.. code-block:: kotlin
+
+    @BerryCrushConfiguration(
+        pluginClasses = [ConsoleReportPlugin::class]
+    )
+
+With options (output stream, color scheme):
+
+.. code-block:: kotlin
+
+    @BerryCrushConfiguration(
+        // stderr with high contrast colors
+        plugins = ["report:console:stderr,high-contrast"]
+    )
+
+Supported options (comma-separated):
+
+- ``stderr`` - Output to stderr instead of stdout
+- ``stdout`` - Output to stdout (default)
+- ``high-contrast`` - Bold colors for accessibility
+- ``monochrome`` or ``mono`` - Styles only (bold, dim), no colors
+- ``no-color`` or ``none`` - Plain text, no styling
+
+Examples:
+
+.. code-block:: kotlin
+
+    plugins = ["report:console"]                    // stdout, default colors
+    plugins = ["report:console:stderr"]             // stderr, default colors
+    plugins = ["report:console:high-contrast"]      // stdout, high contrast
+    plugins = ["report:console:stderr,monochrome"]  // stderr, styles only
+
+With custom colors:
+
+.. code-block:: kotlin
+
+    // In bindings
+    override fun getPlugins() = listOf(
+        ConsoleReportPlugin(
+            output = System.err,            // Write to stderr
+            colorScheme = ColorScheme.HIGH_CONTRAST
+        )
+    )
+
+Available color schemes:
+
+- ``ColorScheme.DEFAULT`` - Standard terminal colors
+- ``ColorScheme.HIGH_CONTRAST`` - Bold colors for accessibility
+- ``ColorScheme.MONOCHROME`` - Styles only (bold, dim), no colors
+- ``ColorScheme.NONE`` - No styling (plain text)
+
 JSON Report
 ^^^^^^^^^^^
 
@@ -159,8 +241,8 @@ Via Annotation
 
     @BerryCrushConfiguration(
         pluginClasses = [
-            TextReportPlugin::class,   // Console output
-            JunitReportPlugin::class   // CI/CD integration
+            ConsoleReportPlugin::class, // Colored console output
+            JunitReportPlugin::class    // CI/CD integration
         ],
         plugins = [
             "report:json:reports/test-results.json"

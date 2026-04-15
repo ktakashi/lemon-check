@@ -15,6 +15,7 @@ import java.time.Duration
  * @property httpStatusCode HTTP status code from the response (null if not an HTTP step)
  * @property responseBody Response body content (null if not an HTTP step or no body)
  * @property responseHeaders Response headers (empty if not an HTTP step)
+ * @property isCustomStep True if this step was executed via a custom @Step or @Assertion annotation
  */
 interface StepResult {
     val status: ResultStatus
@@ -25,4 +26,5 @@ interface StepResult {
     val httpStatusCode: Int?
     val responseBody: String?
     val responseHeaders: Map<String, List<String>>
+    val isCustomStep: Boolean
 }

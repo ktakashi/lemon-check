@@ -79,6 +79,7 @@ abstract class ReportPlugin(
                                     null
                                 },
                             failure = stepResult.failure,
+                            isCustomStep = stepResult.isCustomStep,
                         )
                     },
                 tags = context.tags,
