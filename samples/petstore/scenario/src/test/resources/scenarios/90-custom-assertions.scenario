@@ -1,0 +1,34 @@
+# API Assertion Features
+# This scenario file demonstrates BerryCrush's assertion capabilities
+# with various built-in assertion types.
+
+scenario: Status code assertions
+  when I list pets
+    call ^listPets
+  then the response is as expected
+    assert status 2xx
+
+scenario: JSON path assertions
+  when I get a specific pet
+    call ^getPetById
+      petId: 1
+  then the pet details are correct
+    assert status 200
+    assert $.id equals 1
+    assert $.name notEmpty
+
+scenario: Header assertions
+  when I list all pets
+    call ^listPets
+  then the response headers are correct
+    assert status 2xx
+    assert header Content-Type
+
+scenario: Body contains assertions
+  when I create a new pet
+    call ^createPet
+      body: {"name": "AssertionTestPet", "status": "available"}
+  then the response body is correct
+    assert status 2xx
+    assert contains "AssertionTestPet"
+    assert $.status equals "available"

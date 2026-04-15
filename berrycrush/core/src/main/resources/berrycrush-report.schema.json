@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://berrycrush.org/schemas/report.schema.json",
+  "title": "BerryCrush Test Report",
+  "description": "JSON schema for BerryCrush test execution reports",
+  "type": "object",
+  "required": ["timestamp", "duration", "summary", "scenarios"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the test run started"
+    },
+    "duration": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total test execution time in milliseconds"
+    },
+    "summary": {
+      "$ref": "#/$defs/TestSummary"
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ScenarioReportEntry"
+      },
+      "description": "All scenario execution results"
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Test environment metadata (e.g., Java version, OS)"
+    }
+  },
+  "$defs": {
+    "TestSummary": {
+      "type": "object",
+      "description": "Aggregate test execution statistics",
+      "required": ["total", "passed", "failed", "skipped", "errors"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of scenarios executed"
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios that passed"
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios that failed"
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios that were skipped"
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios that encountered errors"
+        }
+      }
+    },
+    "ScenarioReportEntry": {
+      "type": "object",
+      "description": "Report entry for a single scenario with full execution details",
+      "required": ["name", "status", "duration", "steps"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Scenario name from scenario file"
+        },
+        "status": {
+          "$ref": "#/$defs/ResultStatus"
+        },
+        "duration": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total scenario execution time in milliseconds"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Scenario tags for filtering and organization"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StepReportEntry"
+          },
+          "description": "Execution details for all steps in the scenario"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional scenario metadata"
+        },
+        "sourceFile": {
+          "type": ["string", "null"],
+          "description": "Name of the source scenario file"
+        }
+      }
+    },
+    "StepReportEntry": {
+      "type": "object",
+      "description": "Report entry for a single step with request/response/assertion details",
+      "required": ["description", "status", "duration"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Step description text"
+        },
+        "status": {
+          "$ref": "#/$defs/ResultStatus"
+        },
+        "duration": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Step execution time in milliseconds"
+        },
+        "failure": {
+          "oneOf": [
+            { "$ref": "#/$defs/AssertionFailure" },
+            { "type": "null" }
+          ],
+          "description": "Detailed failure information if status is FAILED"
+        },
+        "request": {
+          "oneOf": [
+            { "$ref": "#/$defs/HttpRequest" },
+            { "type": "null" }
+          ],
+          "description": "HTTP request details (null for non-HTTP steps)"
+        },
+        "response": {
+          "oneOf": [
+            { "$ref": "#/$defs/HttpResponse" },
+            { "type": "null" }
+          ],
+          "description": "HTTP response details (null until response received)"
+        }
+      }
+    },
+    "AssertionFailure": {
+      "type": "object",
+      "description": "Detailed failure information for debugging test failures",
+      "required": ["message", "assertionType"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Human-readable failure message explaining what failed"
+        },
+        "expected": {
+          "type": ["string", "null"],
+          "description": "Expected value for comparison assertions"
+        },
+        "actual": {
+          "type": ["string", "null"],
+          "description": "Actual value that was received"
+        },
+        "diff": {
+          "type": ["string", "null"],
+          "description": "Computed difference between expected and actual"
+        },
+        "assertionType": {
+          "type": "string",
+          "description": "Type of assertion that failed (e.g., STATUS_CODE, JSON_PATH_EQUALS)"
+        }
+      }
+    },
+    "HttpRequest": {
+      "type": "object",
+      "description": "Snapshot of HTTP request details",
+      "required": ["method", "url", "headers", "timestamp"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+          "description": "HTTP method"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Complete URL target of the request"
+        },
+        "headers": {
+          "$ref": "#/$defs/HttpHeaders"
+        },
+        "body": {
+          "type": ["string", "null"],
+          "description": "Request body content"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the request was sent"
+        }
+      }
+    },
+    "HttpResponse": {
+      "type": "object",
+      "description": "Snapshot of HTTP response details",
+      "required": ["statusCode", "statusMessage", "headers", "duration", "timestamp"],
+      "properties": {
+        "statusCode": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599,
+          "description": "HTTP status code (200, 404, 500, etc.)"
+        },
+        "statusMessage": {
+          "type": "string",
+          "description": "HTTP status message (OK, Not Found, etc.)"
+        },
+        "headers": {
+          "$ref": "#/$defs/HttpHeaders"
+        },
+        "body": {
+          "type": ["string", "null"],
+          "description": "Response body content"
+        },
+        "duration": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Time elapsed to receive the response in milliseconds"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the response was received"
+        }
+      }
+    },
+    "HttpHeaders": {
+      "type": "object",
+      "description": "HTTP headers as name to list of values",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "ResultStatus": {
+      "type": "string",
+      "enum": ["PASSED", "FAILED", "SKIPPED", "ERROR"],
+      "description": "Result status for steps and scenarios"
+    }
+  }
+}

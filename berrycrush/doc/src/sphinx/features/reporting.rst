@@ -16,11 +16,24 @@ Human-readable console output, ideal for development and debugging.
 
 .. code-block:: text
 
-    === Scenario: List all pets ===
-      ✓ Given the API is available: PASSED
-      ✓ When I request GET /api/pets: PASSED
-      ✓ Then the response status should be 200: PASSED
-      Result: PASSED (123ms)
+    ═══════════════════════════════════════════════════════════════════════════════
+    BerryCrush Test Report
+    ═══════════════════════════════════════════════════════════════════════════════
+    Execution Date: 2026-04-09T10:30:00Z
+    Duration: 1,234s
+
+    scenario: List all pets ✓
+      I request all pets ................................. 200 OK
+      I verify the response .............................. 200 OK
+
+    scenario: Create a new pet ✓
+      I create a pet ................................ 201 Created
+      the pet is created ............................ 201 Created
+
+    ═══════════════════════════════════════════════════════════════════════════════
+    Summary: 2/2 scenarios passed (100.0%)
+      2 passed, 0 failed, 0 skipped, 0 errors
+    ═══════════════════════════════════════════════════════════════════════════════
 
 Configuration:
 
@@ -35,23 +48,45 @@ JSON Report
 
 Machine-parseable JSON format, suitable for custom integrations.
 
+A JSON Schema (2020-12) is available at ``berrycrush-report.schema.json`` in the
+berrycrush-core resources for validation.
+
 .. code-block:: json
 
     {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "report": {
-        "name": "BerryCrush Test Report",
-        "timestamp": "2026-04-09T10:30:00Z",
-        "duration": 1234,
-        "summary": {
-          "total": 5,
-          "passed": 4,
-          "failed": 1,
-          "skipped": 0,
-          "errors": 0
-        },
-        "scenarios": [...]
-      }
+      "timestamp": "2026-04-09T10:30:00Z",
+      "duration": 1234,
+      "summary": {
+        "total": 5,
+        "passed": 4,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0
+      },
+      "scenarios": [
+        {
+          "name": "List all pets",
+          "status": "PASSED",
+          "duration": 123,
+          "tags": ["api", "pets"],
+          "steps": [
+            {
+              "description": "I request all pets",
+              "status": "PASSED",
+              "duration": 45,
+              "response": {
+                "statusCode": 200,
+                "statusMessage": "OK",
+                "headers": { "content-type": ["application/json"] },
+                "body": "{...}",
+                "duration": 45,
+                "timestamp": "2026-04-09T10:30:00.123Z"
+              }
+            }
+          ]
+        }
+      ],
+      "environment": {}
     }
 
 Configuration:

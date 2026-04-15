@@ -1,5 +1,8 @@
 package org.berrycrush.junit.engine
 
+import org.berrycrush.assertion.AnnotationAssertionScanner
+import org.berrycrush.assertion.AssertionRegistry
+import org.berrycrush.assertion.DefaultAssertionRegistry
 import org.berrycrush.autotest.AutoTestCase
 import org.berrycrush.context.ExecutionContext
 import org.berrycrush.dsl.BerryCrushSuite
@@ -20,6 +23,9 @@ import org.berrycrush.model.StepResult
 import org.berrycrush.plugin.PluginRegistry
 import org.berrycrush.runner.ScenarioRunner
 import org.berrycrush.scenario.ScenarioLoader
+import org.berrycrush.step.AnnotationStepScanner
+import org.berrycrush.step.DefaultStepRegistry
+import org.berrycrush.step.StepRegistry
 import org.junit.platform.engine.EngineExecutionListener
 import org.junit.platform.engine.TestExecutionResult
 import java.io.File
@@ -274,6 +280,8 @@ class ScenarioTestExecutor(
 
         val pluginRegistry = createPluginRegistry(classDescriptor)
         val fragmentRegistry = loadFragments(classDescriptor)
+        val stepRegistry = createStepRegistry(classDescriptor)
+        val assertionRegistry = createAssertionRegistry(classDescriptor)
         val runner = ScenarioRunner(suite.specRegistry, suite.configuration, pluginRegistry, fragmentRegistry)
 
         return TestExecutionContext(
@@ -281,6 +289,8 @@ class ScenarioTestExecutor(
             bindings = bindings,
             pluginRegistry = pluginRegistry,
             fragmentRegistry = fragmentRegistry,
+            stepRegistry = stepRegistry,
+            assertionRegistry = assertionRegistry,
             runner = runner,
         )
     }
@@ -318,6 +328,8 @@ class ScenarioTestExecutor(
                 fileConfig,
                 context.pluginRegistry,
                 context.fragmentRegistry,
+                context.stepRegistry,
+                context.assertionRegistry,
             )
 
         val sharedContext =
@@ -426,6 +438,66 @@ class ScenarioTestExecutor(
             }
 
         return registry
+    }
+
+    /**
+     * Creates a StepRegistry with step definitions from @BerryCrushConfiguration.stepClasses.
+     * Returns null if no step classes are configured.
+     */
+    private fun createStepRegistry(classDescriptor: ClassTestDescriptor): StepRegistry? {
+        val config =
+            classDescriptor.testClass.getAnnotation(BerryCrushConfiguration::class.java)
+                ?: return null
+
+        val stepClasses = config.stepClasses
+        if (stepClasses.isEmpty()) return null
+
+        val registry = DefaultStepRegistry()
+        val scanner = AnnotationStepScanner()
+
+        stepClasses.forEach { klass ->
+            runCatching {
+                scanner.scan(klass.java).forEach { definition ->
+                    registry.register(definition)
+                }
+            }.onFailure { e ->
+                System.err.println(
+                    "Warning: Failed to scan step class ${klass.qualifiedName}: ${e.message}"
+                )
+            }
+        }
+
+        return if (registry.allDefinitions().isEmpty()) null else registry
+    }
+
+    /**
+     * Creates an AssertionRegistry with assertion definitions from @BerryCrushConfiguration.assertionClasses.
+     * Returns null if no assertion classes are configured.
+     */
+    private fun createAssertionRegistry(classDescriptor: ClassTestDescriptor): AssertionRegistry? {
+        val config =
+            classDescriptor.testClass.getAnnotation(BerryCrushConfiguration::class.java)
+                ?: return null
+
+        val assertionClasses = config.assertionClasses
+        if (assertionClasses.isEmpty()) return null
+
+        val registry = DefaultAssertionRegistry()
+        val scanner = AnnotationAssertionScanner()
+
+        assertionClasses.forEach { klass ->
+            runCatching {
+                scanner.scan(klass.java).forEach { definition ->
+                    registry.register(definition)
+                }
+            }.onFailure { e ->
+                System.err.println(
+                    "Warning: Failed to scan assertion class ${klass.qualifiedName}: ${e.message}"
+                )
+            }
+        }
+
+        return if (registry.allDefinitions().isEmpty()) null else registry
     }
 
     /**
@@ -595,6 +667,8 @@ private data class TestExecutionContext(
     val bindings: BerryCrushBindings,
     val pluginRegistry: PluginRegistry,
     val fragmentRegistry: FragmentRegistry,
+    val stepRegistry: StepRegistry?,
+    val assertionRegistry: AssertionRegistry?,
     val runner: ScenarioRunner,
 )
 

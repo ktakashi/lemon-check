@@ -61,11 +61,23 @@ abstract class ReportPlugin(
                 steps =
                     result.stepResults.map { stepResult ->
                         StepReportEntry(
-                            description = "Step ${result.stepResults.indexOf(stepResult) + 1}",
+                            description = stepResult.stepDescription,
                             status = mapStatus(stepResult.status),
                             duration = stepResult.duration,
                             request = null, // HTTP snapshots can be added later
-                            response = null,
+                            response =
+                                if (stepResult.httpStatusCode != null) {
+                                    org.berrycrush.plugin.HttpResponse(
+                                        statusCode = stepResult.httpStatusCode!!,
+                                        statusMessage = httpStatusMessage(stepResult.httpStatusCode!!),
+                                        headers = stepResult.responseHeaders,
+                                        body = stepResult.responseBody,
+                                        duration = stepResult.duration,
+                                        timestamp = Instant.now(),
+                                    )
+                                } else {
+                                    null
+                                },
                             failure = stepResult.failure,
                         )
                     },
@@ -75,6 +87,27 @@ abstract class ReportPlugin(
             )
         scenarioReports.add(entry)
     }
+
+    /**
+     * Get HTTP status message for common status codes.
+     */
+    private fun httpStatusMessage(statusCode: Int): String =
+        when (statusCode) {
+            200 -> "OK"
+            201 -> "Created"
+            204 -> "No Content"
+            400 -> "Bad Request"
+            401 -> "Unauthorized"
+            403 -> "Forbidden"
+            404 -> "Not Found"
+            405 -> "Method Not Allowed"
+            409 -> "Conflict"
+            422 -> "Unprocessable Entity"
+            500 -> "Internal Server Error"
+            502 -> "Bad Gateway"
+            503 -> "Service Unavailable"
+            else -> ""
+        }
 
     /**
      * Called at the end of test execution to generate the report.

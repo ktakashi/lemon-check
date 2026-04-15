@@ -32,6 +32,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform {
-        includeEngines("berrycrush")
+        includeEngines("berrycrush", "junit-jupiter")
     }
 }

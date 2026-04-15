@@ -5,13 +5,23 @@ import java.nio.file.Path
 import java.time.format.DateTimeFormatter
 
 /**
- * Report plugin that generates human-readable text output.
+ * Report plugin that generates human-readable text output in scenario format.
  *
  * The text report includes:
  * - Summary header with execution date, duration, and totals
- * - Per-scenario details with status symbols
- * - Step-by-step results with failure details
- * - Final summary with failed scenario list
+ * - Per-scenario details styled like scenario files
+ * - Step-by-step results with status indicators and dotted leaders
+ * - Failure details with expected/actual values
+ *
+ * Example output:
+ * ```
+ * scenario: Get pet by ID
+ *   when I request a specific pet
+ *     call ^getPetById .................. 200 OK
+ *   then I get the pet details
+ *     assert status 200 ................. pass
+ *     assert $.name equals "Max" ........ pass
+ * ```
  */
 class TextReportPlugin(
     outputPath: Path = Path.of("berrycrush/report.txt"),
@@ -20,7 +30,8 @@ class TextReportPlugin(
     override val name: String = "Text Report Plugin"
 
     companion object {
-        private const val SEPARATOR = "================================================================================"
+        private const val SEPARATOR = "═══════════════════════════════════════════════════════════════════════════════"
+        private const val LINE_WIDTH = 60
         private val TIMESTAMP_FORMAT = DateTimeFormatter.ISO_INSTANT
     }
 
@@ -28,58 +39,15 @@ class TextReportPlugin(
         buildString {
             // Header
             appendLine(SEPARATOR)
-            appendLine("Lemon Check Test Report")
+            appendLine("BerryCrush Test Report")
             appendLine(SEPARATOR)
             appendLine("Execution Date: ${TIMESTAMP_FORMAT.format(report.timestamp)}")
             appendLine("Duration: ${formatDuration(report.duration.toMillis())}s")
-            appendLine(
-                "Scenarios: ${report.summary.total} total, " +
-                    "${report.summary.passed} passed, " +
-                    "${report.summary.failed} failed, " +
-                    "${report.summary.skipped} skipped",
-            )
             appendLine()
 
             // Scenarios
             for (scenario in report.scenarios) {
-                val statusLabel = formatStatus(scenario.status)
-                val durationStr = formatDuration(scenario.duration.toMillis())
-                appendLine("[$statusLabel] ${scenario.name} (${durationStr}s)")
-
-                for (step in scenario.steps) {
-                    val symbol = statusSymbol(step.status)
-                    appendLine("  $symbol ${step.description}")
-
-                    // Show failure details
-                    step.failure?.let { failure ->
-                        appendLine("    Step: ${failure.stepDescription}")
-                        appendLine("    Expected: ${failure.expected}")
-                        appendLine("    Actual: ${failure.actual}")
-
-                        failure.diff?.let { diff ->
-                            appendLine("    Diff:")
-                            diff.lines().forEach { line ->
-                                appendLine("      $line")
-                            }
-                        }
-
-                        failure.requestSnapshot?.let { request ->
-                            appendLine("    Request:")
-                            appendLine("      ${request.method} ${request.url}")
-                            request.body?.let { body ->
-                                appendLine("      Body: ${truncate(body, 200)}")
-                            }
-                        }
-
-                        failure.responseSnapshot?.let { response ->
-                            appendLine("    Response:")
-                            appendLine("      ${response.statusCode} ${response.statusMessage}")
-                            response.body?.let { body ->
-                                appendLine("      Body: ${truncate(body, 200)}")
-                            }
-                        }
-                    }
-                }
+                appendScenario(scenario)
                 appendLine()
             }
 
@@ -91,10 +59,18 @@ class TextReportPlugin(
                 } else {
                     0.0
                 }
-            appendLine("Summary: ${report.summary.passed}/${report.summary.total} scenarios passed (${String.format("%.1f", percentage)}%)")
+            appendLine(
+                "Summary: ${report.summary.passed}/${report.summary.total} scenarios passed " +
+                    "(${String.format("%.1f", percentage)}%)",
+            )
+            appendLine(
+                "  ${report.summary.passed} passed, ${report.summary.failed} failed, " +
+                    "${report.summary.skipped} skipped, ${report.summary.errors} errors",
+            )
 
             val failedScenarios = report.scenarios.filter { it.status == ResultStatus.FAILED }
             if (failedScenarios.isNotEmpty()) {
+                appendLine()
                 appendLine("Failed Scenarios:")
                 for (scenario in failedScenarios) {
                     appendLine("  - ${scenario.name}")
@@ -103,31 +79,61 @@ class TextReportPlugin(
             appendLine(SEPARATOR)
         }
 
-    private fun formatStatus(status: ResultStatus): String =
-        when (status) {
-            ResultStatus.PASSED -> "PASS"
-            ResultStatus.FAILED -> "FAIL"
-            ResultStatus.SKIPPED -> "SKIP"
-            ResultStatus.ERROR -> "ERR "
-        }
+    private fun StringBuilder.appendScenario(scenario: ScenarioReportEntry) {
+        val statusIcon = statusIcon(scenario.status)
+        appendLine("scenario: ${scenario.name} $statusIcon")
 
-    private fun statusSymbol(status: ResultStatus): String =
+        for (step in scenario.steps) {
+            appendStep(step)
+        }
+    }
+
+    private fun StringBuilder.appendStep(step: StepReportEntry) {
+        val description = step.description
+        val status = step.status
+        val response = step.response
+        val failure = step.failure
+
+        // Determine what to show on the right side
+        val rightSide =
+            when {
+                // If there's a response, show status code and message
+                response != null -> "${response.statusCode} ${response.statusMessage}"
+                // If it's an assertion step (description starts with "assert" or "then")
+                failure != null -> statusLabel(status)
+                // For other steps, show status
+                else -> statusLabel(status)
+            }
+
+        // Calculate dot padding
+        val leftPart = "  $description "
+        val dotsNeeded = (LINE_WIDTH - leftPart.length - rightSide.length).coerceAtLeast(2)
+        val dots = ".".repeat(dotsNeeded)
+
+        appendLine("$leftPart$dots $rightSide")
+
+        // Show failure details if present
+        if (failure != null && status == ResultStatus.FAILED) {
+            appendLine("    expected: ${failure.expected}")
+            appendLine("    actual: ${failure.actual}")
+        }
+    }
+
+    private fun statusIcon(status: ResultStatus): String =
         when (status) {
             ResultStatus.PASSED -> "✓"
             ResultStatus.FAILED -> "✗"
-            ResultStatus.SKIPPED -> "⊘"
+            ResultStatus.SKIPPED -> "○"
             ResultStatus.ERROR -> "⚠"
         }
 
-    private fun formatDuration(millis: Long): String = String.format("%.3f", millis / 1000.0)
-
-    private fun truncate(
-        text: String,
-        maxLength: Int,
-    ): String =
-        if (text.length <= maxLength) {
-            text
-        } else {
-            "${text.take(maxLength)}..."
+    private fun statusLabel(status: ResultStatus): String =
+        when (status) {
+            ResultStatus.PASSED -> "pass"
+            ResultStatus.FAILED -> "FAIL"
+            ResultStatus.SKIPPED -> "skip"
+            ResultStatus.ERROR -> "ERROR"
         }
+
+    private fun formatDuration(millis: Long): String = String.format("%.3f", millis / 1000.0)
 }

@@ -534,7 +534,14 @@ class Parser(
         val parts = mutableListOf<String>()
 
         while (!isAtEnd() && current().type != TokenType.NEWLINE && current().type != TokenType.EOF) {
-            parts.add(current().value)
+            // Preserve quotes for STRING tokens so custom step matchers can extract parameters
+            val tokenValue =
+                if (current().type == TokenType.STRING) {
+                    "\"${current().value}\""
+                } else {
+                    current().value
+                }
+            parts.add(tokenValue)
             advance()
         }
 
@@ -1120,29 +1127,56 @@ class Parser(
     /**
      * Parse a condition for an assertion.
      * All condition types are available.
+     * If no built-in condition matches, treats the text as a custom assertion pattern.
      */
     private fun parseAssertCondition(
         loc: SourceLocation,
         initialNegate: Boolean,
     ): ConditionNode? {
         val typeOrPath = current().value.lowercase()
-        val typeOrPathLoc = currentLocation()
 
-        // Use unified condition parsing
+        // Use unified condition parsing for built-in conditions
         val result = parseCondition(typeOrPath, loc, ConditionContext.ASSERT, initialNegate)
         if (result != null) {
             return result
         }
 
-        // No matching condition type found
-        errors.add(
-            ParseError(
-                "Unknown assertion type '$typeOrPath'. " +
-                    $$"Expected: status, header, contains, $.<jsonpath>, schema, or responsetime",
-                typeOrPathLoc,
-            ),
-        )
-        return null
+        // No built-in condition matched - treat as custom assertion pattern
+        // Collect all tokens until end of line as the pattern
+        val patternBuilder = StringBuilder()
+        while (!isAtEnd() && current().type != TokenType.NEWLINE && current().type != TokenType.EOF) {
+            if (patternBuilder.isNotEmpty()) {
+                patternBuilder.append(" ")
+            }
+            // Preserve quotes for STRING tokens so custom assertion matchers can extract parameters
+            val tokenValue =
+                if (current().type == TokenType.STRING) {
+                    "\"${current().value}\""
+                } else {
+                    current().value
+                }
+            patternBuilder.append(tokenValue)
+            advance()
+        }
+
+        val pattern = patternBuilder.toString().trim()
+        if (pattern.isEmpty()) {
+            errors.add(
+                ParseError(
+                    "Empty assertion pattern",
+                    loc,
+                ),
+            )
+            return null
+        }
+
+        // Create custom assertion condition
+        val condition = ConditionNode.CustomAssertionCondition(pattern, loc)
+        return if (initialNegate) {
+            ConditionNode.NegatedCondition(condition, loc)
+        } else {
+            condition
+        }
     }
 
     private fun parseIncludeAction(): IncludeNode? {

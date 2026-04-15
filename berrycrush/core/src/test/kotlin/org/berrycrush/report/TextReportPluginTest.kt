@@ -44,11 +44,11 @@ class TextReportPluginTest {
 
         val content = plugin.formatReport(report)
 
-        assertTrue(content.contains("Lemon Check Test Report"))
-        assertTrue(content.contains("Test Scenario"))
-        assertTrue(content.contains("[PASS]"))
-        assertTrue(content.contains("✓"))
-        assertTrue(content.contains("1 total, 1 passed, 0 failed"))
+        assertTrue(content.contains("BerryCrush Test Report"))
+        assertTrue(content.contains("scenario: Test Scenario"))
+        assertTrue(content.contains("✓")) // Scenario status icon
+        assertTrue(content.contains("pass")) // Step status
+        assertTrue(content.contains("1/1 scenarios passed"))
     }
 
     @Test
@@ -84,12 +84,48 @@ class TextReportPluginTest {
 
         val content = plugin.formatReport(report)
 
-        assertTrue(content.contains("[FAIL]"))
-        assertTrue(content.contains("✗"))
-        assertTrue(content.contains("Expected: 201"))
-        assertTrue(content.contains("Actual: 400"))
+        assertTrue(content.contains("✗")) // Failed scenario icon
+        assertTrue(content.contains("FAIL")) // Failed step status
+        assertTrue(content.contains("expected: 201"))
+        assertTrue(content.contains("actual: 400"))
         assertTrue(content.contains("Failed Scenarios:"))
         assertTrue(content.contains("- Failing Scenario"))
+    }
+
+    @Test
+    fun `report shows HTTP response status`() {
+        val outputPath = tempDir.resolve("report.txt")
+        val plugin = TextReportPlugin(outputPath)
+
+        val report =
+            createTestReport(
+                ScenarioReportEntry(
+                    name = "API Call Scenario",
+                    status = ResultStatus.PASSED,
+                    duration = Duration.ofMillis(200),
+                    steps =
+                        listOf(
+                            StepReportEntry(
+                                description = "call ^getPetById",
+                                status = ResultStatus.PASSED,
+                                duration = Duration.ofMillis(150),
+                                response =
+                                    org.berrycrush.plugin.HttpResponse(
+                                        statusCode = 200,
+                                        statusMessage = "OK",
+                                        headers = emptyMap(),
+                                        body = """{"id": 1, "name": "Max"}""",
+                                        duration = Duration.ofMillis(100),
+                                        timestamp = Instant.now(),
+                                    ),
+                            ),
+                        ),
+                ),
+            )
+
+        val content = plugin.formatReport(report)
+
+        assertTrue(content.contains("200 OK")) // HTTP response status
     }
 
     private fun createTestReport(vararg scenarios: ScenarioReportEntry): TestReport {

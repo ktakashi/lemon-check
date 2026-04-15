@@ -9,6 +9,8 @@ import org.junit.platform.suite.api.IncludeEngines;
 import org.junit.platform.suite.api.Suite;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import org.berrycrush.samples.petstore.assertions.PetstoreAssertions;
+
 /**
  * Integration test for petstore API using BerryCrush scenarios with Spring Boot.
  * 
@@ -52,7 +54,8 @@ import org.springframework.boot.test.context.SpringBootTest;
     bindings = PetstoreBindings.class, 
     openApiSpec = "petstore.yaml",
     plugins = {"report:text", "report:json:berrycrush/report.json", "sample:logging"},
-    stepClasses = {PetCustomSteps.class}
+    stepClasses = {PetCustomSteps.class},
+    assertionClasses = {PetstoreAssertions.class}
 )
 @BerryCrushSpec(paths = {"petstore.yaml"})
 @BerryCrushTags(exclude = {"ignore"})

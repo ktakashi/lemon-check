@@ -19,6 +19,18 @@ class StepResultAdapter(
     override val duration: Duration
         get() = modelResult.duration
 
+    override val stepDescription: String
+        get() = modelResult.step.description
+
+    override val httpStatusCode: Int?
+        get() = modelResult.statusCode
+
+    override val responseBody: String?
+        get() = modelResult.responseBody
+
+    override val responseHeaders: Map<String, List<String>>
+        get() = modelResult.responseHeaders
+
     override val failure: AssertionFailure?
         get() =
             modelResult.assertionResults
@@ -54,6 +66,7 @@ class StepResultAdapter(
             is Condition.Negated -> getExpectedFromCondition(condition.condition)
             is Condition.Compound -> null
             is Condition.Schema -> "schema"
+            is Condition.CustomAssertion -> condition.pattern
         }
 
     /**
@@ -70,5 +83,6 @@ class StepResultAdapter(
             is Condition.Variable -> "VARIABLE"
             is Condition.Negated -> "NOT_${getConditionTypeName(condition.condition)}"
             is Condition.Compound -> "COMPOUND"
+            is Condition.CustomAssertion -> "CUSTOM"
         }
 }

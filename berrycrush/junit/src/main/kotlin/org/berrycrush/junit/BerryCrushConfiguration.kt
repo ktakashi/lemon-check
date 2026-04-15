@@ -25,6 +25,10 @@ import kotlin.reflect.KClass
  *                       Each class must have a public no-arg constructor.
  * @property stepPackages Array of package names to scan for step definition classes.
  *                        All classes in these packages with @Step methods will be registered.
+ * @property assertionClasses Array of assertion definition classes to scan for @Assertion methods.
+ *                            Each class must have a public no-arg constructor.
+ * @property assertionPackages Array of package names to scan for assertion definition classes.
+ *                             All classes in these packages with @Assertion methods will be registered.
  */
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.RUNTIME)
@@ -37,4 +41,6 @@ annotation class BerryCrushConfiguration(
     val pluginClasses: Array<KClass<out BerryCrushPlugin>> = [],
     val stepClasses: Array<KClass<*>> = [],
     val stepPackages: Array<String> = [],
+    val assertionClasses: Array<KClass<*>> = [],
+    val assertionPackages: Array<String> = [],
 )

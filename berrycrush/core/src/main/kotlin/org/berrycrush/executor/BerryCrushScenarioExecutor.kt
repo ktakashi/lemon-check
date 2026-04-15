@@ -28,6 +28,10 @@ import org.berrycrush.plugin.adapter.ScenarioContextAdapter
 import org.berrycrush.plugin.adapter.ScenarioResultAdapter
 import org.berrycrush.plugin.adapter.StepContextAdapter
 import org.berrycrush.plugin.adapter.StepResultAdapter
+import org.berrycrush.step.StepContext
+import org.berrycrush.step.StepContextImpl
+import org.berrycrush.step.StepMatch
+import org.berrycrush.step.StepRegistry
 import org.berrycrush.util.FileLoader
 import tools.jackson.databind.ObjectMapper
 import java.net.http.HttpResponse
@@ -44,12 +48,16 @@ private val schemaValidator = SchemaValidator(objectMapper)
  * @property configuration Execution configuration
  * @property pluginRegistry Optional plugin registry for lifecycle hooks
  * @property fragmentRegistry Optional registry for reusable fragments
+ * @property stepRegistry Optional registry for custom step definitions
+ * @property assertionRegistry Optional registry for custom assertion definitions
  */
 class BerryCrushScenarioExecutor(
     private val specRegistry: SpecRegistry,
     private val configuration: BerryCrushConfiguration,
     private val pluginRegistry: PluginRegistry? = null,
     private val fragmentRegistry: FragmentRegistry? = null,
+    private val stepRegistry: StepRegistry? = null,
+    private val assertionRegistry: org.berrycrush.assertion.AssertionRegistry? = null,
 ) {
     private val httpBuilder = HttpRequestBuilder(configuration)
 
@@ -289,21 +297,36 @@ class BerryCrushScenarioExecutor(
     ): StepResult {
         val stepStartTime = Instant.now()
 
-        // If no operation to call, check if there are assertions or extractions to run against the last response
+        // If no operation to call, check for custom step or assertions
         return step.operationId?.let {
             executeOperationStep(step, context, stepStartTime)
         } ?: executeNonOperationStep(step, context, stepStartTime)
     }
 
     /**
-     * Execute a step that has no operationId (assertions/extractions against last response or no-op).
+     * Execute a step that has no operationId.
+     *
+     * Checks in order:
+     * 1. Custom step definition match
+     * 2. Assertions/extractions against last response
+     * 3. No-op (just pass)
      */
     private fun executeNonOperationStep(
         step: Step,
         context: ExecutionContext,
         stepStartTime: Instant,
-    ): StepResult =
-        if (step.assertions.isEmpty() && step.extractions.isEmpty()) {
+    ): StepResult {
+        // First, check if this is a custom step
+        stepRegistry?.let { registry ->
+            val resolvedDescription = resolveVariables(step.description, context)
+            val match = registry.findMatch(resolvedDescription)
+            if (match != null) {
+                return executeCustomStep(step, match, context, stepStartTime)
+            }
+        }
+
+        // Not a custom step - check for assertions/extractions
+        return if (step.assertions.isEmpty() && step.extractions.isEmpty()) {
             // No operation and no assertions - just pass
             StepResult(
                 step = step,
@@ -321,6 +344,84 @@ class BerryCrushScenarioExecutor(
                 error = IllegalStateException("No previous response to run assertions/extractions against"),
             )
         }
+    }
+
+    /**
+     * Execute a custom step definition.
+     */
+    private fun executeCustomStep(
+        step: Step,
+        match: StepMatch,
+        context: ExecutionContext,
+        stepStartTime: Instant,
+    ): StepResult =
+        runCatching {
+            val stepContext = StepContextImpl(
+                executionContext = context,
+                configuration = configuration,
+                sharedVariables = null, // TODO: Add shared variables support
+                sharingEnabled = false,
+            )
+
+            // Invoke the custom step method with extracted parameters and context
+            val method = match.definition.method
+            val parameters = match.parameters.toTypedArray()
+
+            // Check if method accepts StepContext as last parameter
+            val methodParams = method.parameters
+            val args = if (methodParams.isNotEmpty() &&
+                methodParams.last().type.isAssignableFrom(StepContext::class.java)
+            ) {
+                // Append StepContext to parameters
+                arrayOf(*parameters, stepContext)
+            } else {
+                parameters
+            }
+
+            // Invoke the method
+            val result = method.invoke(match.definition.instance, *args)
+
+            // Check if the method returned a StepResult
+            if (result is StepResult) {
+                result
+            } else {
+                StepResult(
+                    step = step,
+                    status = ResultStatus.PASSED,
+                    duration = Duration.between(stepStartTime, Instant.now()),
+                )
+            }
+        }.getOrElse { e ->
+            // Unwrap InvocationTargetException to get the actual exception
+            val actualException = when (e) {
+                is java.lang.reflect.InvocationTargetException -> e.cause ?: e
+                else -> e
+            }
+
+            // Determine status based on exception type
+            val status = when (actualException) {
+                is AssertionError -> ResultStatus.FAILED
+                else -> ResultStatus.ERROR
+            }
+
+            StepResult(
+                step = step,
+                status = status,
+                duration = Duration.between(stepStartTime, Instant.now()),
+                error = actualException as? Exception ?: RuntimeException(actualException),
+            )
+        }
+
+    /**
+     * Resolve variables in a string.
+     */
+    private fun resolveVariables(text: String, context: ExecutionContext): String {
+        val regex = """\{\{(\w+)}}""".toRegex()
+        return regex.replace(text) { matchResult ->
+            val varName = matchResult.groupValues[1]
+            context.get<Any>(varName)?.toString() ?: matchResult.value
+        }
+    }
 
     /**
      * Execute a step with an operationId (HTTP request).
@@ -812,7 +913,60 @@ class BerryCrushScenarioExecutor(
             is Condition.BodyContains -> evaluateBodyContainsCondition(response, condition, context)
             is Condition.Schema -> evaluateSchemaCondition(response, context)
             is Condition.ResponseTime -> evaluateResponseTimeCondition(response, condition, context)
+            is Condition.CustomAssertion -> evaluateCustomAssertionCondition(response, condition, context)
         }
+
+    /**
+     * Evaluate a custom assertion by invoking the matching assertion from the registry.
+     */
+    private fun evaluateCustomAssertionCondition(
+        response: HttpResponse<String>,
+        condition: Condition.CustomAssertion,
+        context: ExecutionContext,
+    ): Boolean {
+        val registry = assertionRegistry ?: return false
+
+        val match = registry.findMatch(condition.pattern) ?: return false
+
+        val assertionContext = org.berrycrush.assertion.AssertionContextImpl(
+            executionContext = context,
+            configuration = configuration,
+            sharedVariables = null,
+            sharingEnabled = false,
+        )
+
+        return runCatching {
+            val method = match.definition.method
+            val parameters = match.parameters.toTypedArray()
+
+            // Check if method accepts AssertionContext as last parameter
+            val methodParams = method.parameters
+            val args = if (methodParams.isNotEmpty() &&
+                methodParams.last().type.isAssignableFrom(org.berrycrush.assertion.AssertionContext::class.java)
+            ) {
+                arrayOf(*parameters, assertionContext)
+            } else {
+                parameters
+            }
+
+            val result = method.invoke(match.definition.instance, *args)
+
+            when (result) {
+                is org.berrycrush.assertion.AssertionResult -> result.passed
+                is Boolean -> result
+                else -> true // Assume passed if no AssertionResult returned
+            }
+        }.getOrElse { e ->
+            // Unwrap InvocationTargetException
+            val actualException = when (e) {
+                is java.lang.reflect.InvocationTargetException -> e.cause ?: e
+                else -> e
+            }
+
+            // AssertionError means the assertion failed
+            actualException !is AssertionError
+        }
+    }
 
     /**
      * Evaluate a body contains condition.
@@ -1139,6 +1293,9 @@ class BerryCrushScenarioExecutor(
             }
             is Condition.Compound -> {
                 if (passed) "Compound condition passed" else "Compound condition failed"
+            }
+            is Condition.CustomAssertion -> {
+                if (passed) "Custom assertion passed: ${condition.pattern}" else "Custom assertion failed: ${condition.pattern}"
             }
         }
 
