@@ -1,0 +1,169 @@
+# =============================================================================
+# Parameters and Variable Handling
+# =============================================================================
+# This scenario file demonstrates:
+# - extract keyword for value extraction
+# - {{param}} variable interpolation
+# - parameters: block for file-level configuration
+# - shareVariablesAcrossScenarios for cross-scenario variable sharing
+# - Escaping variable syntax with \{{
+
+# -----------------------------------------------------------------------------
+# Parameter configuration block
+# -----------------------------------------------------------------------------
+
+parameters:
+  shareVariablesAcrossScenarios: true
+  timeout: 30
+  logRequests: false
+  logResponses: false
+
+# -----------------------------------------------------------------------------
+# Extract keyword - basic extraction
+# -----------------------------------------------------------------------------
+
+scenario: Extract keyword - basic variable extraction
+  when: I create a pet
+    call ^createPet
+      body: {"name": "ExtractTestPet", "status": "available"}
+  then: I extract the ID
+    assert status 2xx
+    # Extract value using JSON path
+    extract $.id => petId
+    extract $.name => petName
+  # Use extracted values in subsequent call
+  and: I can use the extracted ID
+    call ^getPetById
+      petId: {{petId}}
+    assert status 200
+    assert $.name equals "{{petName}}"
+
+# -----------------------------------------------------------------------------
+# Variable interpolation in various contexts
+# -----------------------------------------------------------------------------
+
+scenario: Variable interpolation - different contexts
+  given: I have test data
+    call ^createPet
+      body: {"name": "InterpolationPet", "status": "available"}
+    extract $.id => myPetId
+    extract $.name => myPetName
+  when: I use variables in path parameters
+    call ^getPetById
+      petId: {{myPetId}}
+  then: the variable is properly interpolated
+    assert status 200
+    # Variable in assertion
+    assert $.name equals "{{myPetName}}"
+    # Variable used with JSON path
+    assert contains "{{myPetName}}"
+
+# -----------------------------------------------------------------------------
+# Cross-scenario variable sharing
+# -----------------------------------------------------------------------------
+
+# First scenario creates data and extracts ID
+scenario: Cross-scenario sharing - create and extract
+  when: I create a pet for sharing
+    call ^createPet
+      body: {"name": "SharedVarPet", "status": "available"}
+  then: I extract the ID for next scenario
+    assert status 2xx
+    # This variable will be available in subsequent scenarios
+    extract $.id => sharedPetId
+
+# Second scenario uses variable from first scenario
+scenario: Cross-scenario sharing - use shared variable
+  when: I retrieve pet using shared variable
+    call ^getPetById
+      # Using variable from previous scenario
+      petId: {{sharedPetId}}
+  then: the shared variable works
+    assert status 200
+    assert $.name equals "SharedVarPet"
+
+# Third scenario deletes using shared variable
+scenario: Cross-scenario sharing - cleanup with shared variable
+  when: I delete using shared variable
+    call ^deletePet
+      petId: {{sharedPetId}}
+  then: the pet is deleted
+    assert status 204
+
+# -----------------------------------------------------------------------------
+# Variables in headers
+# -----------------------------------------------------------------------------
+
+scenario: Variables in headers
+  given: I have an auth token
+    # Simulating token extraction (using static value for demo)
+    call ^createPet
+      body: {"name": "HeaderVarPet", "status": "available"}
+    extract $.id => headerTestId
+  when: I call API with header containing variable
+    call ^getPetById
+      petId: {{headerTestId}}
+      # Using variable in custom header
+      header_X-Request-Id: "request-{{headerTestId}}"
+  then: the call succeeds
+    assert status 200
+
+# -----------------------------------------------------------------------------
+# Escaping variable syntax
+# -----------------------------------------------------------------------------
+
+scenario: Escaping variable syntax - literal curly braces
+  when: I create a pet with template-like content
+    call ^createPet
+      # Using \{{ to produce literal {{ in the output
+      body: {"name": "TemplateDemo", "status": "available", "description": "Contains literal \\{{placeholder}}"}
+  then: the literal text is preserved
+    assert status 2xx
+    # Asserting the literal text (not variable interpolation)
+    # Escaped \{{ in assertion
+    assert not contains "\\{{petName}}"
+
+# -----------------------------------------------------------------------------
+# Nested variable extraction
+# -----------------------------------------------------------------------------
+
+scenario: Nested JSON path extraction
+  when: I create a pet with nested data
+    call ^createPet
+      body:
+        """
+        {
+          "name": "NestedPet",
+          "status": "available",
+          "category": "cat",
+          "tags": ["cute", "fluffy"]
+        }
+        """
+  then: I can extract nested values
+    assert status 2xx
+    extract $.id => nestedId
+    extract $.category => category
+  and: use nested values
+    call ^getPetById
+      petId: {{nestedId}}
+    assert $.category equals "{{category}}"
+
+# -----------------------------------------------------------------------------
+# Multiple extractions in one step
+# -----------------------------------------------------------------------------
+
+scenario: Multiple extractions in single step
+  when: I create a pet
+    call ^createPet
+      body: {"name": "MultiExtractPet", "status": "pending"}
+  then: I extract multiple values
+    assert status 2xx
+    # Multiple extract statements in one step
+    extract $.id => id1
+    extract $.name => name1
+    extract $.status => status1
+  and: all values are available
+    call ^getPetById
+      petId: {{id1}}
+    assert $.name equals "{{name1}}"
+    assert $.status equals "{{status1}}"

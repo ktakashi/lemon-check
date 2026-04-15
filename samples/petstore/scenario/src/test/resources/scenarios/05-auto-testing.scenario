@@ -1,0 +1,205 @@
+# =============================================================================
+# Auto Testing
+# =============================================================================
+# This scenario file demonstrates:
+# - auto: [invalid security] directive for auto-generated tests
+# - excludes: to filter test types
+# - Context variables: test.type, test.field, test.description, test.value
+# - Custom test providers (InvalidTestProvider, SecurityTestProvider)
+
+# -----------------------------------------------------------------------------
+# Auto-generated invalid tests
+# -----------------------------------------------------------------------------
+
+scenario: Auto-generated invalid tests - basic
+  when: I create a pet with invalid input
+    call ^createPet
+      # Generate tests that violate OpenAPI schema constraints
+      auto: [invalid]
+      # Base request - valid values that will be mutated
+      body:
+        name: TestPet
+        status: available
+    
+    # Invalid requests should be rejected with 4xx
+    if status 4xx
+      # Test passed - invalid request was properly rejected
+    else
+      # Log why the test failed using context variables
+      fail "Expected 4xx for {{test.type}}: {{test.field}} - {{test.description}}"
+
+# -----------------------------------------------------------------------------
+# Auto-generated security tests
+# -----------------------------------------------------------------------------
+
+scenario: Auto-generated security tests - basic
+  when: I create a pet with security payloads
+    call ^createPet
+      # Generate tests with common attack payloads
+      auto: [security]
+      body:
+        name: SecurePet
+        status: available
+    
+    if status 4xx
+      # Security payload was rejected - good
+    else if status 5xx
+      # Server error from security payload - might indicate vulnerability
+      fail "Server error from security test: {{test.description}}"
+    else
+      # Success might mean payload was accepted - investigate
+      fail "Security test did not trigger error: {{test.type}} on {{test.field}}"
+
+# -----------------------------------------------------------------------------
+# Combined invalid and security tests
+# -----------------------------------------------------------------------------
+
+scenario: Auto-generated tests - both invalid and security
+  when: I test the createPet endpoint
+    call ^createPet
+      # Generate both invalid and security tests
+      auto: [invalid security]
+      body:
+        name: CombinedTestPet
+        status: available
+    
+    if status 4xx
+      # Either invalid constraint violation or security payload rejection
+    else
+      fail "Test failed for {{test.type}}: {{test.description}}"
+
+# -----------------------------------------------------------------------------
+# Exclude specific test types
+# -----------------------------------------------------------------------------
+
+scenario: Auto-generated tests - with excludes
+  when: I test with some types excluded
+    call ^createPet
+      auto: [invalid]
+      # Exclude specific types of invalid tests
+      excludes: [overflow string_length]
+      body:
+        name: ExcludeTestPet
+        status: available
+    
+    if status 4xx
+      # Test passed
+    else
+      fail "Test failed: {{test.description}}"
+
+# -----------------------------------------------------------------------------
+# Using test context variables
+# -----------------------------------------------------------------------------
+
+scenario: Test context variables - detailed verification
+  when: I create pet with auto tests
+    call ^createPet
+      auto: [invalid security]
+      body:
+        name: ContextVarPet
+        status: available
+    
+    # Use context variables to provide detailed failure messages
+    if status 4xx
+      # Expected rejection
+    else if status 5xx
+      fail "Server error for {{test.type}} test on {{test.field}}: {{test.description}} with value: {{test.value}}"
+    else
+      fail "Test passed unexpectedly: Type={{test.type}}, Field={{test.field}}, Location={{test.location}}"
+
+# -----------------------------------------------------------------------------
+# Auto tests for different endpoints
+# -----------------------------------------------------------------------------
+
+scenario: Auto tests for update endpoint
+  # First create a pet to update
+  given: I have a pet to test
+    call ^createPet
+      body: {"name": "UpdateAutoTestPet", "status": "available"}
+    extract $.id => autoTestPetId
+  when: I test update with invalid input
+    call ^updatePet
+      auto: [invalid]
+      petId: {{autoTestPetId}}
+      body:
+        id: {{autoTestPetId}}
+        name: UpdateAutoTestPet
+        status: available
+    
+    if status 4xx
+      # Invalid update rejected
+    else
+      fail "Update test failed: {{test.description}}"
+
+# -----------------------------------------------------------------------------
+# Custom test providers (via ServiceLoader)
+# -----------------------------------------------------------------------------
+
+# Custom test providers are Java classes that implement:
+# - InvalidTestProvider: generates custom invalid test cases
+# - SecurityTestProvider: generates custom security test cases
+#
+# They are discovered via ServiceLoader and registered in:
+# META-INF/services/org.berrycrush.autotest.provider.InvalidTestProvider
+# META-INF/services/org.berrycrush.autotest.provider.SecurityTestProvider
+#
+# Example custom provider implementation:
+#
+# public class PetNameInvalidTestProvider implements InvalidTestProvider {
+#     @Override
+#     public List<InvalidTestCase> generateCases(OpenApiSpec spec, Operation op) {
+#         // Return list of custom invalid test cases
+#     }
+# }
+
+scenario: Custom test providers - using custom invalid tests
+  when: I create pet with custom invalid tests
+    call ^createPet
+      # Custom providers add their test cases to [invalid]
+      auto: [invalid]
+      body:
+        name: CustomProviderPet
+        status: available
+    
+    # Handle both built-in and custom provider test cases
+    if status 4xx
+      # Custom or built-in invalid test passed
+    else
+      fail "Custom invalid test failed: {{test.type}} - {{test.field}}"
+
+scenario: Custom test providers - using custom security tests
+  when: I create pet with custom security tests
+    call ^createPet
+      # Custom providers add their test cases to [security]
+      auto: [security]
+      body:
+        name: SecurityProviderPet
+        status: available
+    
+    if status 4xx
+      # Security payload rejected
+    else
+      fail "Custom security test failed: {{test.description}}"
+
+# -----------------------------------------------------------------------------
+# Comprehensive auto test scenario
+# -----------------------------------------------------------------------------
+
+scenario: Comprehensive auto testing
+  when: I thoroughly test the createPet endpoint
+    call ^createPet
+      auto: [invalid security]
+      body:
+        name: ComprehensivePet
+        status: available
+        category: cat
+        tags: ["test", "comprehensive"]
+    
+    if status 4xx
+      # Test generated expected rejection
+    else if status 2xx
+      # Some test cases might legitimately pass (edge cases)
+      # Log it for review
+    else
+      # 5xx or other unexpected status
+      fail "Unexpected response for {{test.type}} test: {{test.description}}"

@@ -1,12 +1,12 @@
 package org.berrycrush.junit.engine
 
-import org.berrycrush.config.BerryCrushConfiguration as Configuration
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import org.berrycrush.junit.BerryCrushBindings
 import org.berrycrush.junit.BerryCrushConfiguration
 import org.junit.jupiter.api.Test
 import org.junit.platform.engine.UniqueId
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import org.berrycrush.config.BerryCrushConfiguration as Configuration
 
 /**
  * Tests for @BerryCrushConfiguration annotation handling.

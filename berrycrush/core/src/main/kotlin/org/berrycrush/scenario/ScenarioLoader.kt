@@ -25,11 +25,13 @@ import org.berrycrush.model.LogicalOperator as ModelLogicalOperator
  * @property name Feature name
  * @property scenarios List of scenarios belonging to this feature
  * @property tags Tags applied to the feature
+ * @property parameters Feature-level parameters that override file-level parameters
  */
 data class FeatureGroup(
     val name: String,
     val scenarios: List<Scenario>,
     val tags: Set<String> = emptySet(),
+    val parameters: Map<String, Any> = emptyMap(),
 )
 
 /**
@@ -126,6 +128,7 @@ class ScenarioLoader {
                     name = feature.name,
                     scenarios = transformFeature(feature),
                     tags = feature.tags,
+                    parameters = feature.parameters?.values ?: emptyMap(),
                 )
             }
 

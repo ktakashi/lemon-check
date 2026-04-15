@@ -38,11 +38,15 @@ data class ParametersNode(
  * Represents a feature block that groups related scenarios.
  *
  * Features provide a logical grouping mechanism for scenarios
- * and can share common setup via background steps.
+ * and can share common setup via background steps. Features can
+ * also have their own parameters that override file-level parameters.
  *
  * Example:
  * ```
  * feature: Pet Store Operations
+ *   parameters:
+ *     shareVariablesAcrossScenarios: true
+ *
  *   background:
  *     given: existing pet
  *       call ^createPet
@@ -55,6 +59,7 @@ data class ParametersNode(
 data class FeatureNode(
     val name: String,
     val description: String? = null,
+    val parameters: ParametersNode? = null,
     val background: BackgroundNode? = null,
     val scenarios: List<ScenarioNode>,
     val tags: Set<String> = emptySet(),

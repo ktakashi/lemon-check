@@ -547,7 +547,12 @@ Use fragments in scenarios with ``include``:
 Parameters Block
 ----------------
 
-Override default configuration at the file level:
+Parameters can be specified at two levels:
+
+File-Level Parameters
+^^^^^^^^^^^^^^^^^^^^^
+
+Override default configuration for all scenarios in the file:
 
 .. code-block:: text
 
@@ -561,6 +566,34 @@ Override default configuration at the file level:
         call ^listPets
       then: I get results
         assert status 200
+
+Feature-Level Parameters
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Configure only scenarios within a specific feature:
+
+.. code-block:: text
+
+    feature: Pet CRUD Operations
+      parameters:
+        shareVariablesAcrossScenarios: true
+      
+      scenario: Create pet
+        when: I create a pet
+          call ^createPet
+            body: {"name": "SharedPet"}
+          extract $.id => petId
+      
+      scenario: Use shared variable
+        # Can access {{petId}} from previous scenario
+        when: I get the pet
+          call ^getPetById
+            petId: {{petId}}
+        then: I see the pet
+          assert status 200
+
+Feature-level parameters override file-level parameters for scenarios in that feature.
+Variables shared within a feature are isolated from other features and standalone scenarios.
 
 Supported Parameters
 ^^^^^^^^^^^^^^^^^^^^
@@ -643,6 +676,121 @@ Lines starting with ``#`` are comments:
       # Explain what this step does
       when: I do something
         call ^operation
+
+Custom Steps
+------------
+
+Custom steps allow you to extend BerryCrush with reusable, domain-specific steps implemented in Kotlin.
+
+Defining Custom Steps
+^^^^^^^^^^^^^^^^^^^^^
+
+Use the ``@Step`` annotation to define custom steps:
+
+.. code-block:: kotlin
+
+    import org.berrycrush.step.Step
+    import org.berrycrush.step.StepContext
+
+    class PetstoreSteps {
+        @Step("create a test pet named {string}")
+        fun createTestPet(context: StepContext, name: String) {
+            val response = context.httpClient.post("/pet") {
+                json(mapOf("name" to name, "status" to "available"))
+            }
+            context.variables["petId"] = response.jsonPath.read<Int>("$.id")
+        }
+    }
+
+Step Patterns
+^^^^^^^^^^^^^
+
+Step patterns use placeholders that match values from the scenario:
+
+============= ============ ===========
+Placeholder   Matches      Example
+============= ============ ===========
+``{string}``  Quoted text  ``"hello"``
+``{int}``     Integer      ``42``
+``{float}``   Decimal      ``3.14``
+============= ============ ===========
+
+Using Custom Steps
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: text
+
+    scenario: Create and verify pet
+      given: create a test pet named "Fluffy"
+      then: the pet should have status "available"
+
+Configuration
+^^^^^^^^^^^^^
+
+Register step classes in ``@BerryCrushConfiguration``:
+
+.. code-block:: java
+
+    @BerryCrushConfiguration(
+        openApiSpec = "petstore.yaml",
+        stepClasses = {PetstoreSteps.class}
+    )
+    public class PetstoreScenarioTest {}
+
+Custom Assertions
+-----------------
+
+Custom assertions allow you to extend BerryCrush's ``assert`` directive with domain-specific validation logic.
+
+Defining Custom Assertions
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Use the ``@Assertion`` annotation to define custom assertions:
+
+.. code-block:: kotlin
+
+    import org.berrycrush.assertion.Assertion
+    import org.berrycrush.assertion.AssertionContext
+    import org.berrycrush.assertion.AssertionResult
+
+    class PetstoreAssertions {
+        @Assertion("pet name is {string}")
+        fun assertPetName(context: AssertionContext, expectedName: String): AssertionResult {
+            val actualName: String? = context.response.jsonPath.read("$.name")
+            return if (actualName == expectedName) {
+                AssertionResult.success()
+            } else {
+                AssertionResult.failure("Expected name '$expectedName' but got '$actualName'")
+            }
+        }
+    }
+
+Using Custom Assertions
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: text
+
+    scenario: Verify pet response
+      when: I get the pet
+        call ^getPetById
+          petId: 123
+      then: the pet exists
+        assert status 200
+        assert pet name is "Fluffy"
+        assert pet is available
+
+Configuration
+^^^^^^^^^^^^^
+
+Register assertion classes in ``@BerryCrushConfiguration``:
+
+.. code-block:: java
+
+    @BerryCrushConfiguration(
+        openApiSpec = "petstore.yaml",
+        assertionClasses = {PetstoreAssertions.class}
+    )
+    public class PetstoreScenarioTest {}
 
 Best Practices
 --------------

@@ -1,0 +1,246 @@
+# =============================================================================
+# Advanced Usage
+# =============================================================================
+# This scenario file demonstrates:
+# - feature keyword to group scenarios
+# - background keyword for shared setup
+# - Multi-host/API calls (call using <spec-name>)
+# - External body files (bodyFile:)
+# - Fragment inclusion (include)
+# - Conditional assertions (if/else if/else, fail)
+
+# -----------------------------------------------------------------------------
+# Feature - grouping scenarios
+# -----------------------------------------------------------------------------
+
+feature: Pet CRUD Operations
+  # Feature description: Groups related scenarios together
+  # All scenarios in a feature run sequentially
+  
+  scenario: Create a pet
+    when: I create a new pet
+      call ^createPet
+        body: {"name": "FeaturePet", "status": "available"}
+    then: pet is created
+      assert status 2xx
+      extract $.id => featurePetId
+
+  scenario: Read the pet
+    when: I get the pet
+      call ^getPetById
+        petId: {{featurePetId}}
+    then: pet is returned
+      assert status 200
+      assert $.name equals "FeaturePet"
+
+  scenario: Update the pet
+    when: I update the pet status
+      call ^updatePet
+        petId: {{featurePetId}}
+        body: {"id": {{featurePetId}}, "name": "FeaturePet", "status": "sold"}
+    then: pet is updated
+      assert status 200
+      assert $.status equals "sold"
+
+  scenario: Delete the pet
+    when: I delete the pet
+      call ^deletePet
+        petId: {{featurePetId}}
+    then: pet is deleted
+      assert status 204
+
+# -----------------------------------------------------------------------------
+# Feature with background - shared setup
+# -----------------------------------------------------------------------------
+
+@api
+feature: Pet Operations with Background
+
+  # Background runs before EACH scenario in this feature
+  background:
+    given: I create a test pet for operations
+      call ^createPet
+        body: {"name": "BackgroundPet", "status": "available"}
+      extract $.id => bgPetId
+
+  @smoke
+  scenario: Verify pet after background setup
+    when: I get the pet created in background
+      call ^getPetById
+        petId: {{bgPetId}}
+    then: the pet exists
+      assert status 200
+      assert $.name equals "BackgroundPet"
+
+  @regression
+  scenario: Update pet from background
+    when: I update the background pet
+      call ^updatePet
+        petId: {{bgPetId}}
+        body: {"id": {{bgPetId}}, "name": "UpdatedBackgroundPet", "status": "pending"}
+    then: update succeeds
+      assert status 200
+      assert $.name equals "UpdatedBackgroundPet"
+
+# -----------------------------------------------------------------------------
+# Multi-host API calls
+# -----------------------------------------------------------------------------
+
+scenario: Multi-host API call
+  # Authenticate with auth service first
+  given: I authenticate with the auth service
+    call using auth ^login
+      body: {"username": "testuser", "password": "testpass"}
+    extract $.token => authToken
+  # Then call main API with the token
+  when: I call the main API with token
+    call ^listPets
+      header_Authorization: "Bearer {{authToken}}"
+  then: call succeeds
+    assert status 200
+
+# -----------------------------------------------------------------------------
+# External body file
+# -----------------------------------------------------------------------------
+
+# Note: Requires external body file at classpath:templates/pet-template.json
+
+scenario: External body file - create pet from template
+  when: I create a pet from template file
+    call ^createPet
+      # Load body from external file
+      # Supports: classpath:, file:, or absolute path
+      bodyFile: "classpath:templates/pet-template.json"
+  then: pet is created
+    assert status 2xx
+
+# -----------------------------------------------------------------------------
+# Fragment inclusion
+# -----------------------------------------------------------------------------
+
+# Fragment defined in fragments/auth.fragment:
+# fragment: authenticate
+#   given: login with credentials
+#     call ^login
+#       body: {"username": "test", "password": "test"}
+#     extract $.token => authToken
+
+scenario: Fragment inclusion - reusable steps
+  # Include the authenticate fragment
+  given: I am authenticated
+    include authenticate
+  # Now use the extracted token
+  when: I access protected endpoint
+    call ^listPets
+      header_Authorization: "Bearer {{authToken}}"
+  then: access is granted
+    assert status 200
+
+# -----------------------------------------------------------------------------
+# Conditional assertions - basic if/else
+# -----------------------------------------------------------------------------
+
+scenario: Conditional assertions - basic if/else
+  when: I create a pet
+    call ^createPet
+      body: {"name": "ConditionalPet", "status": "available"}
+    
+    # Check the status code and branch accordingly
+    if status 201
+      # Resource was created
+      assert $.id notEmpty
+      extract $.id => conditionalPetId
+    else
+      # Unexpected status
+      fail "Expected status 201 for new pet creation"
+
+# -----------------------------------------------------------------------------
+# Conditional assertions - if/else if/else
+# -----------------------------------------------------------------------------
+
+scenario: Conditional assertions - multiple branches
+  when: I upsert a pet
+    call ^updatePet
+      petId: {{conditionalPetId}}
+      body: {"id": {{conditionalPetId}}, "name": "UpsertedPet", "status": "pending"}
+    
+    if status 201
+      # Resource was created
+      assert $.id notEmpty
+    else if status 200
+      # Resource was updated
+      assert $.name equals "UpsertedPet"
+    else
+      fail "Expected status 200 or 201"
+
+# -----------------------------------------------------------------------------
+# Conditional assertions - JSON path condition
+# -----------------------------------------------------------------------------
+
+scenario: Conditional assertions - JSON path
+  when: I list pets
+    call ^listPets
+    
+    # Conditional based on JSON path value
+    if $ hasSize 0
+      # Empty list - acceptable
+      assert status 200
+    else
+      # Non-empty list - verify first item
+      assert $[0].id notEmpty
+
+# -----------------------------------------------------------------------------
+# Conditional assertions - header condition
+# -----------------------------------------------------------------------------
+
+scenario: Conditional assertions - header
+  when: I call the API
+    call ^listPets
+    
+    if header Content-Type equals "application/json"
+      # JSON response
+      assert $ notEmpty
+    else
+      fail "Expected JSON response from API"
+
+# -----------------------------------------------------------------------------
+# Conditional assertions - nested conditionals
+# -----------------------------------------------------------------------------
+
+scenario: Conditional assertions - nested
+  when: I get a pet
+    call ^getPetById
+      petId: 1
+    
+    if status 200
+      # Pet found - check its status
+      if $.status equals "available"
+        assert $.price notEmpty
+      else if $.status equals "pending"
+        assert $.name notEmpty
+      else
+        # sold or other status
+        assert $.id notEmpty
+    else if status 404
+      # Pet not found - acceptable
+      assert contains "not found"
+    else
+      fail "Unexpected status"
+
+# -----------------------------------------------------------------------------
+# The fail action
+# -----------------------------------------------------------------------------
+
+scenario: The fail action - explicit failure
+  when: I check for invalid pet
+    call ^getPetById
+      petId: 999999
+    
+    if status 200
+      # We expected 404, but got 200
+      fail "Expected pet 999999 to not exist, but got 200"
+    else if status 404
+      # Expected - pet not found
+      assert contains "not found"
+    else
+      fail "Unexpected status code for non-existent pet"

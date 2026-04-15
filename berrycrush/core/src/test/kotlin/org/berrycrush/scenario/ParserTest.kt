@@ -570,6 +570,109 @@ class ParserTest {
     }
 
     @Test
+    fun `should parse feature with parameters`() {
+        val source =
+            """
+            feature: Pet CRUD Operations
+              parameters:
+                shareVariablesAcrossScenarios: true
+                timeout: 60
+
+              background:
+                given: setup
+                  call ^setupPet
+
+              scenario: create pet
+                when: create
+                  call ^createPet
+                  assert status 201
+
+              scenario: use shared variable
+                when: get
+                  call ^getPet
+                  assert status 200
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        assertEquals(1, result.ast!!.features.size)
+
+        val feature = result.ast.features[0]
+        assertEquals("Pet CRUD Operations", feature.name)
+        assertNotNull(feature.parameters, "Feature should have parameters")
+        assertEquals(true, feature.parameters!!.values["shareVariablesAcrossScenarios"])
+        assertEquals(60L, feature.parameters!!.values["timeout"])
+        assertNotNull(feature.background)
+        assertEquals(2, feature.scenarios.size)
+    }
+
+    @Test
+    fun `should parse feature with parameters only (no background)`() {
+        val source =
+            """
+            feature: Simple Feature
+              parameters:
+                shareVariablesAcrossScenarios: true
+
+              scenario: test scenario
+                when: test
+                  call ^test
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        assertEquals(1, result.ast!!.features.size)
+
+        val feature = result.ast.features[0]
+        assertEquals("Simple Feature", feature.name)
+        assertNotNull(feature.parameters)
+        assertEquals(true, feature.parameters!!.values["shareVariablesAcrossScenarios"])
+        assertEquals(null, feature.background)
+        assertEquals(1, feature.scenarios.size)
+    }
+
+    @Test
+    fun `should parse feature without parameters`() {
+        val source =
+            """
+            feature: No Params Feature
+              scenario: test scenario
+                when: test
+                  call ^test
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
+        assertEquals(1, result.ast!!.features.size)
+
+        val feature = result.ast.features[0]
+        assertEquals(null, feature.parameters)
+        assertEquals(1, feature.scenarios.size)
+    }
+
+    @Test
+    fun `should report error when feature parameters appear after scenarios`() {
+        val source =
+            """
+            feature: Bad Feature
+              scenario: test scenario
+                when: test
+                  call ^test
+
+              parameters:
+                shareVariablesAcrossScenarios: true
+            """.trimIndent()
+
+        val result = Parser.parse(source)
+
+        // Should have a parse error about parameters after scenarios
+        assertTrue(result.errors.any { it.message.contains("parameters") && it.message.contains("before") })
+    }
+
+    @Test
     fun `should parse standalone tagged scenario`() {
         val source =
             """

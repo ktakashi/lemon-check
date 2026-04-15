@@ -1,0 +1,124 @@
+# =============================================================================
+# Custom Steps and Assertions
+# =============================================================================
+# This scenario file demonstrates:
+# - Custom step implementations with @Step annotation
+# - Custom assertion implementations with @Assertion annotation
+# - Parameter patterns: {string}, {int}, {word}, {float}
+#
+# Custom steps and assertions are defined in:
+# - PetCustomSteps.java (Java)
+# - PetstoreSteps.kt (Kotlin)
+# - PetstoreAssertions.kt (Kotlin)
+#
+# They must be registered in the test class:
+# @BerryCrushConfiguration(
+#   stepClasses = {PetCustomSteps.class},
+#   assertionClasses = {PetstoreAssertions.class}
+# )
+
+# -----------------------------------------------------------------------------
+# Custom Steps - string parameters
+# -----------------------------------------------------------------------------
+
+scenario: Custom steps - string parameters
+  # This step calls PetCustomSteps.setupPetData(String, String)
+  # Pattern: "I have a pet named {string} with status {string}"
+  given I have a pet named "Fluffy" with status "available"
+  # This step calls PetCustomSteps.validatePetData(String)
+  # Pattern: "the pet data should contain {string}"
+  then the pet data should contain "Fluffy"
+  then the pet data should contain "available"
+
+# -----------------------------------------------------------------------------
+# Custom Steps - mixed parameter types
+# -----------------------------------------------------------------------------
+
+scenario: Custom steps - mixed parameter types
+  # Pattern: "I reset the pet data"
+  when I reset the pet data
+  given I have a pet named "Max" with status "pending"
+  then the pet data should contain "Max"
+  # Pattern: "I should have {int} pets with status {word}"
+  # {int} matches integer, {word} matches single word
+  then I should have 1 pets with status pending
+  # Pattern: "the pet price should be {float}"
+  # {float} matches floating-point numbers
+  then the pet price should be 199.99
+
+# -----------------------------------------------------------------------------
+# Custom Steps - combined with API calls
+# -----------------------------------------------------------------------------
+
+scenario: Custom steps combined with API calls
+  # Use custom step to set up in-memory test data
+  given I have a pet named "TestPet" with status "available"
+  # Then verify via actual API call
+  when I list pets
+    call ^listPets
+  then the response is successful
+    assert status 200
+
+# -----------------------------------------------------------------------------
+# Custom Assertions - basic usage
+# -----------------------------------------------------------------------------
+
+scenario: Custom assertions - verify pet status
+  when I create a test pet
+    call ^createPet
+      body: {"name": "AssertionTestPet", "status": "available"}
+  then verify pet status using custom assertion
+    # This calls PetstoreAssertions.assertPetStatus(String, AssertionContext)
+    # Pattern: "the pet should have status {string}"
+    assert the pet should have status "available"
+
+# -----------------------------------------------------------------------------
+# Custom Assertions - multiple assertions
+# -----------------------------------------------------------------------------
+
+scenario: Custom assertions - verify multiple properties
+  when I create a pet for assertion test
+    call ^createPet
+      body: {"name": "CustomAssertPet", "status": "pending"}
+  then verify pet details using custom assertions
+    # Multiple custom assertions in single step
+    # Pattern: "the pet name should be {string}"
+    assert the pet name should be "CustomAssertPet"
+    # Pattern: "the pet should have status {string}"
+    assert the pet should have status "pending"
+
+# -----------------------------------------------------------------------------
+# Custom Assertions - with API response context
+# -----------------------------------------------------------------------------
+
+scenario: Custom assertions - access response context
+  when I get a pet by ID
+    call ^getPetById
+      petId: 1
+  then custom assertion can access response details
+    # Custom assertions receive AssertionContext with:
+    # - lastResponse: the HTTP response
+    # - variable(name): access extracted variables
+    # - allVariables(): all variables as map
+    assert the pet should have status "available"
+
+# -----------------------------------------------------------------------------
+# Combining custom steps, assertions, and built-in features
+# -----------------------------------------------------------------------------
+
+scenario: Full integration - custom and built-in features
+  # Custom step
+  given I have a pet named "IntegrationPet" with status "available"
+  # API call
+  when I create the pet via API
+    call ^createPet
+      body: {"name": "IntegrationPet", "status": "available"}
+  then verify with both custom and built-in assertions
+    # Built-in assertion
+    assert status 2xx
+    assert $.name equals "IntegrationPet"
+    # Custom assertion
+    assert the pet should have status "available"
+  # Custom verification step
+  and custom step verifies local data
+    then the pet data should contain "IntegrationPet"

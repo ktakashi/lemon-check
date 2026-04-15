@@ -19,7 +19,7 @@ All files must be UTF-8 encoded.
 (* Top-level structure *)
 scenario_file     = [ parameters_block ] , { feature | scenario | fragment } ;
 
-(* Parameters block - file-level configuration *)
+(* Parameters block - file-level or feature-level configuration *)
 parameters_block  = "parameters:" , NEWLINE , { parameter_entry } ;
 parameter_entry   = INDENT , parameter_name , ":" , parameter_value , NEWLINE ;
 
@@ -27,8 +27,9 @@ parameter_entry   = INDENT , parameter_name , ":" , parameter_value , NEWLINE ;
 tags              = { tag } ;
 tag               = "@" , identifier ;
 
-(* Feature block with optional background *)
+(* Feature block with optional parameters and background *)
 feature           = tags , "feature:" , feature_name , NEWLINE , 
+                    [ INDENT , parameters_block ] ,
                     [ background ] , { feature_scenario } ;
 background        = INDENT , "background:" , NEWLINE , { step } ;
 feature_scenario  = INDENT , tags , ( "scenario:" | "outline:" ) , 
@@ -712,7 +713,11 @@ Auto-tests appear in test reports with descriptive names:
 
 ## Parameters Block
 
-Place at the top of the file to override default configuration:
+Parameters can be specified at two levels:
+
+### File-Level Parameters
+
+Place at the top of the file to configure all scenarios:
 
 ```
 parameters:
@@ -729,6 +734,32 @@ parameters:
   autoAssertions.enabled: true
   autoAssertions.schema: false
 ```
+
+### Feature-Level Parameters
+
+Place inside a feature block to configure only scenarios in that feature:
+
+```
+feature: Pet CRUD Operations
+  parameters:
+    shareVariablesAcrossScenarios: true
+  
+  scenario: Create pet
+    when: I create a pet
+      call ^createPet
+        body: {"name": "SharedPet"}
+      extract $.id => petId
+  
+  scenario: Use shared variable
+    # Can access {{petId}} from previous scenario
+    when: I get the pet
+      call ^getPetById
+        petId: {{petId}}
+    then: I see the pet
+      assert status 200
+```
+
+Feature-level parameters override file-level parameters for scenarios in that feature.
 
 ### Supported Parameters
 
@@ -756,8 +787,15 @@ Variables are referenced using double curly braces: `{{variableName}}`
 
 1. **Bindings** - From `BerryCrushBindings.getBindings()`
 2. **Extracted values** - From `extract $.path => varName`
-3. **Cross-scenario** - When `shareVariablesAcrossScenarios: true`
-4. **Example rows** - From `examples:` table
+3. **Cross-scenario (file-level)** - When `shareVariablesAcrossScenarios: true` at file level
+4. **Cross-scenario (feature-level)** - When `shareVariablesAcrossScenarios: true` inside a feature
+5. **Example rows** - From `examples:` table
+
+### Scope Rules
+
+- File-level sharing: Variables shared across ALL scenarios in the file
+- Feature-level sharing: Variables shared only within that feature's scenarios
+- Standalone scenarios: Not affected by feature-level sharing
 
 ### Example
 
@@ -860,6 +898,165 @@ scenario: My test
   # This describes the step
   when I do something
     call ^operation
+```
+
+## Custom Steps
+
+Custom steps allow you to extend BerryCrush with reusable, domain-specific steps implemented in Kotlin.
+
+### Defining Custom Steps
+
+Use the `@Step` annotation to define custom steps:
+
+```kotlin
+import org.berrycrush.step.Step
+import org.berrycrush.step.StepContext
+
+class PetstoreSteps {
+    @Step("create a test pet named {string}")
+    fun createTestPet(context: StepContext, name: String) {
+        val response = context.httpClient.post("/pet") {
+            json(mapOf("name" to name, "status" to "available"))
+        }
+        context.variables["petId"] = response.jsonPath.read<Int>("$.id")
+    }
+    
+    @Step("the pet should have status {string}")
+    fun verifyPetStatus(context: StepContext, expectedStatus: String) {
+        val petId = context.variables["petId"]
+        val response = context.httpClient.get("/pet/$petId")
+        val actualStatus: String = response.jsonPath.read("$.status")
+        check(actualStatus == expectedStatus) {
+            "Expected status '$expectedStatus' but got '$actualStatus'"
+        }
+    }
+}
+```
+
+### Step Patterns
+
+Step patterns use `{string}`, `{int}`, `{float}` placeholders:
+
+| Placeholder | Matches | Example |
+|-------------|---------|---------|
+| `{string}` | Quoted string | `"hello"` |
+| `{int}` | Integer | `42` |
+| `{float}` | Decimal | `3.14` |
+
+### Using Custom Steps in Scenarios
+
+```
+scenario: Create and verify pet
+  given: create a test pet named "Fluffy"
+  then: the pet should have status "available"
+```
+
+### StepContext
+
+The `StepContext` provides access to:
+
+| Property | Description |
+|----------|-------------|
+| `variables` | Read/write scenario variables |
+| `httpClient` | Preconfigured HTTP client |
+| `specRegistry` | OpenAPI specs |
+| `config` | Current configuration |
+
+### Configuration
+
+Register step classes in `@BerryCrushConfiguration`:
+
+```java
+@BerryCrushConfiguration(
+    openApiSpec = "petstore.yaml",
+    stepClasses = {PetstoreSteps.class, CommonSteps.class}
+)
+public class PetstoreScenarioTest {}
+```
+
+## Custom Assertions
+
+Custom assertions allow you to extend BerryCrush's `assert` directive with domain-specific validation logic.
+
+### Defining Custom Assertions
+
+Use the `@Assertion` annotation to define custom assertions:
+
+```kotlin
+import org.berrycrush.assertion.Assertion
+import org.berrycrush.assertion.AssertionContext
+import org.berrycrush.assertion.AssertionResult
+
+class PetstoreAssertions {
+    @Assertion("pet name is {string}")
+    fun assertPetName(context: AssertionContext, expectedName: String): AssertionResult {
+        val actualName: String? = context.response.jsonPath.read("$.name")
+        return if (actualName == expectedName) {
+            AssertionResult.success()
+        } else {
+            AssertionResult.failure("Expected name '$expectedName' but got '$actualName'")
+        }
+    }
+    
+    @Assertion("pet is available")
+    fun assertPetAvailable(context: AssertionContext): AssertionResult {
+        val status: String? = context.response.jsonPath.read("$.status")
+        return if (status == "available") {
+            AssertionResult.success()
+        } else {
+            AssertionResult.failure("Pet status is '$status', expected 'available'")
+        }
+    }
+}
+```
+
+### Assertion Patterns
+
+Assertion patterns use the same placeholders as custom steps:
+- `{string}` - Quoted string
+- `{int}` - Integer
+- `{float}` - Decimal number
+
+### Using Custom Assertions in Scenarios
+
+```
+scenario: Verify pet response
+  when: I get the pet
+    call ^getPetById
+      petId: 123
+  then: the pet exists
+    assert status 200
+    assert pet name is "Fluffy"
+    assert pet is available
+```
+
+### AssertionContext
+
+The `AssertionContext` provides access to:
+
+| Property | Description |
+|----------|-------------|
+| `response` | HTTP response with jsonPath access |
+| `variables` | Current scenario variables |
+| `config` | Current configuration |
+
+### AssertionResult
+
+Return from assertion methods:
+- `AssertionResult.success()` - Assertion passed
+- `AssertionResult.failure("message")` - Assertion failed with message
+
+### Configuration
+
+Register assertion classes in `@BerryCrushConfiguration`:
+
+```java
+@BerryCrushConfiguration(
+    openApiSpec = "petstore.yaml",
+    stepClasses = {PetstoreSteps.class},
+    assertionClasses = {PetstoreAssertions.class}
+)
+public class PetstoreScenarioTest {}
 ```
 
 ## Best Practices

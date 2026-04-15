@@ -1,0 +1,7 @@
+{
+  "name": "TemplatePet",
+  "status": "available",
+  "category": "cat",
+  "tags": ["template", "test"],
+  "price": 199.99
+}

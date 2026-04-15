@@ -1,0 +1,78 @@
+# =============================================================================
+# Feature-Level Parameters
+# =============================================================================
+# This scenario file demonstrates:
+# - Feature-level parameters: block inside feature
+# - shareVariablesAcrossScenarios scoped to feature
+# - Variable isolation between features
+# - Parameter inheritance and override
+
+# -----------------------------------------------------------------------------
+# Feature with shareVariablesAcrossScenarios - variables shared within feature
+# -----------------------------------------------------------------------------
+
+feature: Pet CRUD with Shared Variables
+  # Parameters inside feature block - applies only to scenarios in this feature
+  parameters:
+    shareVariablesAcrossScenarios: true
+  
+  scenario: Create a pet
+    when: I create a new pet
+      call ^createPet
+        body: {"name": "SharedPet", "status": "available"}
+    then: pet is created
+      assert status 2xx
+      extract $.id => sharedPetId
+      # sharedPetId is now available to subsequent scenarios in this feature
+
+  scenario: Read using shared variable
+    # This scenario can access sharedPetId from the previous scenario
+    # because shareVariablesAcrossScenarios is enabled at feature level
+    when: I get the pet using shared ID
+      call ^getPetById
+        petId: {{sharedPetId}}
+    then: pet is retrieved
+      assert status 200
+      assert $.name equals "SharedPet"
+
+  scenario: Clean up shared pet
+    when: I delete the shared pet
+      call ^deletePet
+        petId: {{sharedPetId}}
+    then: deleted successfully
+      assert status 2xx
+
+# -----------------------------------------------------------------------------
+# Feature without shareVariablesAcrossScenarios - variables isolated
+# -----------------------------------------------------------------------------
+
+feature: Independent Pet Tests
+  # No parameters block = default settings (no variable sharing)
+  
+  scenario: Create independent pet
+    when: I create a pet
+      call ^createPet
+        body: {"name": "IndependentPet", "status": "available"}
+    then: pet is created
+      assert status 2xx
+      extract $.id => independentPetId
+      # independentPetId is ONLY available in this scenario
+
+  scenario: List all pets
+    # This scenario does NOT have access to independentPetId
+    # Each scenario starts fresh
+    when: I list all pets
+      call ^listPets
+    then: I see the list
+      assert status 200
+
+# -----------------------------------------------------------------------------
+# Standalone scenario - uses file-level parameters (none in this case)
+# -----------------------------------------------------------------------------
+
+scenario: Standalone test - no feature context
+  # Not inside any feature, uses file-level defaults
+  when: I check pet store status
+    call ^listPets
+  then: store is operational
+    assert status 200

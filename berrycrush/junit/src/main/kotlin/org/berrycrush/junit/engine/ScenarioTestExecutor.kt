@@ -148,10 +148,30 @@ class ScenarioTestExecutor(
     ): Boolean {
         listener.executionStarted(featureDescriptor)
 
+        // Check if feature has its own shareVariablesAcrossScenarios setting
+        val featureShareVariables =
+            featureDescriptor.parameters["shareVariablesAcrossScenarios"] as? Boolean ?: false
+
+        // Use feature-level shared context if enabled, otherwise fall back to file-level
+        val effectiveContext =
+            if (featureShareVariables && fileContext.sharedContext == null) {
+                // Feature enables sharing, but file doesn't - create feature-level context
+                fileContext.copy(sharedContext = ExecutionContext())
+            } else if (!featureShareVariables && fileContext.sharedContext != null) {
+                // Feature disables sharing while file enables it - use isolated context
+                fileContext.copy(sharedContext = null)
+            } else if (featureShareVariables) {
+                // Feature enables sharing, create separate context to isolate from other features
+                fileContext.copy(sharedContext = ExecutionContext())
+            } else {
+                // Use file-level context (includes file-level sharing if enabled)
+                fileContext
+            }
+
         val hasFailure =
             featureDescriptor.children
                 .filterIsInstance<IndividualScenarioDescriptor>()
-                .map { executeScenario(it, classDescriptor, fileContext, listener) }
+                .map { executeScenario(it, classDescriptor, effectiveContext, listener) }
                 .any { it }
 
         val result =

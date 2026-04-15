@@ -33,7 +33,8 @@ class ScenarioFileDescriptor(
  * Test descriptor representing a feature block within a .scenario file.
  *
  * Feature blocks group related scenarios together and support background
- * steps that run before each scenario in the feature.
+ * steps that run before each scenario in the feature. Features can have
+ * their own parameters that override file-level parameters.
  *
  * In JUnit reports, this appears as a nested container within the file.
  */
@@ -41,6 +42,7 @@ class FeatureDescriptor(
     uniqueId: UniqueId,
     displayName: String,
     val featureName: String,
+    val parameters: Map<String, Any> = emptyMap(),
 ) : AbstractTestDescriptor(uniqueId, displayName) {
     /**
      * Container type allows this descriptor to have child scenario descriptors.

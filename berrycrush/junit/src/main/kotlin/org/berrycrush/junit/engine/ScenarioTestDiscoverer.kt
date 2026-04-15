@@ -157,6 +157,7 @@ object ScenarioTestDiscoverer {
                 uniqueId = featureId,
                 displayName = feature.name,
                 featureName = feature.name,
+                parameters = feature.parameters,
             )
 
         feature.scenarios

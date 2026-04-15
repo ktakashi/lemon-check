@@ -1,0 +1,278 @@
+# =============================================================================
+# Basic Usage
+# =============================================================================
+# This scenario file demonstrates:
+# - scenario, given, when, then, and, but keywords
+# - Built-in assertions (status, contains, JSON path, header, responseTime, schema)
+# - Scenario outline with examples
+# - Body syntax (inline JSON, structured, triple-quoted multi-line)
+# - Tags (@tag, @ignore, @wip, @slow)
+
+# -----------------------------------------------------------------------------
+# Basic Keywords: given, when, then
+# -----------------------------------------------------------------------------
+
+scenario: Basic keywords - get a pet
+  given: the API is ready
+    call ^listPets
+    assert status 200
+  when: I request a specific pet
+    call ^getPetById
+      petId: 1
+  then: I receive the pet details
+    assert status 200
+    assert $.name notEmpty
+
+# -----------------------------------------------------------------------------
+# And keyword for continuation
+# -----------------------------------------------------------------------------
+
+scenario: And keyword - create and verify pet
+  when: I create a new pet
+    call ^createPet
+      body: {"name": "AndKeywordPet", "status": "available"}
+  then: the pet is created
+    assert status 201
+    extract $.id => petId
+  and: I can retrieve it
+    call ^getPetById
+      petId: {{petId}}
+    assert status 200
+    assert $.name equals "AndKeywordPet"
+
+# -----------------------------------------------------------------------------
+# But keyword for exceptions/negative cases
+# -----------------------------------------------------------------------------
+
+scenario: But keyword - verify pet details with exception
+  when: I create a pet
+    call ^createPet
+      body: {"name": "ButKeywordPet", "status": "available"}
+  then: the pet is created
+    assert status 201
+    assert $.name equals "ButKeywordPet"
+  but: it should not have a sold status
+    assert $.status not equals "sold"
+
+# -----------------------------------------------------------------------------
+# Status code assertions
+# -----------------------------------------------------------------------------
+
+scenario: Status assertions - various formats
+  when: I list all pets
+    call ^listPets
+  then: I receive a successful response
+    # Exact status code
+    assert status 200
+    # Alternative syntax
+    assert statusCode 200
+
+scenario: Status range assertions
+  when: I create a pet
+    call ^createPet
+      body: {"name": "StatusRangePet", "status": "available"}
+  then: I receive a 2xx response
+    # Status code in 2xx range
+    assert status 2xx
+
+# -----------------------------------------------------------------------------
+# Contains assertions
+# -----------------------------------------------------------------------------
+
+scenario: Contains assertions - body content
+  when: I create a pet with specific name
+    call ^createPet
+      body: {"name": "ContainsTestPet", "status": "available"}
+  then: the response contains the pet name
+    assert status 2xx
+    assert contains "ContainsTestPet"
+    # Negated contains
+    assert not contains "error"
+
+# -----------------------------------------------------------------------------
+# JSON path assertions
+# -----------------------------------------------------------------------------
+
+scenario: JSON path assertions - various operators
+  when: I get a pet
+    call ^getPetById
+      petId: 1
+  then: I can verify various properties
+    assert status 200
+    # Equality
+    assert $.id equals 1
+    # Alternative syntax
+    assert $.id = 1
+    # Not empty check
+    assert $.name notEmpty
+    # Negated equality
+    assert $.status not equals "sold"
+
+scenario: JSON path assertions - array operations
+  when: I list pets
+    call ^listPets
+  then: I can verify array properties
+    assert status 200
+    # Array not empty
+    assert $ notEmpty
+    # Note: hasSize checks exact count, which varies with test data
+    # Use for demo only when count is deterministic
+
+scenario: JSON path assertions - regex matching
+  when: I get a pet
+    call ^getPetById
+      petId: 1
+  then: name matches pattern
+    assert status 200
+    # Regex matching
+    assert $.name matches ".*"
+
+# -----------------------------------------------------------------------------
+# Header assertions
+# -----------------------------------------------------------------------------
+
+scenario: Header assertions
+  when: I list pets
+    call ^listPets
+  then: response has proper headers
+    assert status 200
+    # Header exists
+    assert header Content-Type
+    # Header value check
+    assert header Content-Type = "application/json"
+    # Alternative syntax
+    assert header Content-Type: "application/json"
+
+# -----------------------------------------------------------------------------
+# Response time assertions
+# -----------------------------------------------------------------------------
+
+scenario: Response time assertions
+  when: I list pets
+    call ^listPets
+  then: response is fast
+    assert status 200
+    # Response must complete within 5000ms
+    assert responseTime 5000
+
+# -----------------------------------------------------------------------------
+# Schema validation
+# -----------------------------------------------------------------------------
+
+scenario: Schema validation
+  when: I get a pet
+    call ^getPetById
+      petId: 1
+  then: response matches OpenAPI schema
+    assert status 200
+    # Validate against OpenAPI schema
+    assert schema
+
+# -----------------------------------------------------------------------------
+# Body syntax - inline JSON
+# -----------------------------------------------------------------------------
+
+scenario: Body syntax - inline JSON
+  when: I create a pet with inline body
+    call ^createPet
+      body: {"name": "InlineBodyPet", "status": "available", "category": "cat"}
+  then: the pet is created
+    assert status 2xx
+    assert $.name equals "InlineBodyPet"
+
+# -----------------------------------------------------------------------------
+# Body syntax - structured body with schema defaults
+# -----------------------------------------------------------------------------
+
+scenario: Body syntax - structured body
+  when: I create a pet with structured body
+    call ^createPet
+      # Uses OpenAPI schema defaults for unspecified fields
+      body:
+        name: StructuredBodyPet
+        status: pending
+  then: the pet is created
+    assert status 2xx
+    assert $.name equals "StructuredBodyPet"
+    assert $.status equals "pending"
+
+# -----------------------------------------------------------------------------
+# Body syntax - triple-quoted multi-line
+# -----------------------------------------------------------------------------
+
+scenario: Body syntax - multi-line triple-quoted
+  when: I create a pet with multi-line body
+    call ^createPet
+      body:
+        """
+        {
+          "name": "MultiLinePet",
+          "status": "available",
+          "tags": ["cute", "friendly"]
+        }
+        """
+  then: the pet is created
+    assert status 2xx
+    assert $.name equals "MultiLinePet"
+
+# -----------------------------------------------------------------------------
+# Scenario outline with examples
+# -----------------------------------------------------------------------------
+
+outline: Create pets with different data
+  when: I create a pet with name {{name}} and status {{status}}
+    call ^createPet
+      body: {"name": "{{name}}", "status": "{{status}}"}
+  then: the pet is created
+    assert status 2xx
+    assert $.name equals "{{name}}"
+    assert $.status equals "{{status}}"
+  examples:
+    | name    | status    |
+    | Fluffy  | available |
+    | Buddy   | pending   |
+    | Max     | sold      |
+
+# -----------------------------------------------------------------------------
+# Tags - basic tagging
+# -----------------------------------------------------------------------------
+
+@smoke
+scenario: Tagged scenario - smoke test
+  when: I check API health
+    call ^listPets
+  then: API is responsive
+    assert status 200
+
+@regression @critical
+scenario: Tagged scenario - multiple tags
+  when: I create a pet
+    call ^createPet
+      body: {"name": "CriticalPathPet", "status": "available"}
+  then: pet is created successfully
+    assert status 2xx
+
+# -----------------------------------------------------------------------------
+# Tags - built-in tags
+# -----------------------------------------------------------------------------
+
+@slow
+scenario: Slow test - marked with @slow tag
+  when: I perform a slow operation
+    call ^listPets
+  then: I get results
+    assert status 200
+
+@ignore
+scenario: Ignored test - skipped during execution
+  when: this test is skipped
+    call ^listPets
+  then: it never runs
+    assert status 200
+
+@wip
+scenario: Work in progress - marked with @wip tag
+  when: I test incomplete feature
+    call ^listPets
+  then: feature works
+    assert status 200
