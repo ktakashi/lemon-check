@@ -7,7 +7,6 @@ import org.berrycrush.config.BerryCrushConfiguration
 import org.berrycrush.dsl.BerryCrushSuite
 import org.berrycrush.exception.ConfigurationException
 import org.berrycrush.executor.BerryCrushScenarioExecutor
-import org.berrycrush.junit.BerryCrushConfiguration as BerryCrushConfigAnnotation
 import org.berrycrush.model.Scenario
 import org.berrycrush.step.AnnotationStepScanner
 import org.berrycrush.step.DefaultStepRegistry
@@ -21,6 +20,7 @@ import org.junit.jupiter.api.extension.ParameterResolver
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider
 import java.util.stream.Stream
+import org.berrycrush.junit.BerryCrushConfiguration as BerryCrushConfigAnnotation
 
 /**
  * JUnit 5 extension for BerryCrush scenarios.
@@ -140,18 +140,22 @@ class BerryCrushExtension :
      * Paths prefixed with `classpath:` are resolved from the test class's classloader.
      * Example: `classpath:/petstore.yaml` or `classpath:specs/api.yaml`
      */
-    private fun resolvePath(path: String, testClass: Class<*>): String {
+    private fun resolvePath(
+        path: String,
+        testClass: Class<*>,
+    ): String {
         if (!path.startsWith(CLASSPATH_PREFIX)) {
             return path
         }
 
         val resourcePath = path.removePrefix(CLASSPATH_PREFIX)
-        val resource = testClass.getResource(resourcePath)
-            ?: testClass.classLoader.getResource(resourcePath.removePrefix("/"))
-            ?: throw ConfigurationException(
-                "Classpath resource not found: $resourcePath. " +
-                "Make sure the file exists in src/test/resources or src/main/resources."
-            )
+        val resource =
+            testClass.getResource(resourcePath)
+                ?: testClass.classLoader.getResource(resourcePath.removePrefix("/"))
+                ?: throw ConfigurationException(
+                    "Classpath resource not found: $resourcePath. " +
+                        "Make sure the file exists in src/test/resources or src/main/resources.",
+                )
 
         return resource.path
     }
@@ -227,12 +231,13 @@ class BerryCrushExtension :
             val suite = getSuite(context)
             val stepRegistry = getOrCreateStepRegistry(context)
             val assertionRegistry = getOrCreateAssertionRegistry(context)
-            executor = BerryCrushScenarioExecutor(
-                specRegistry = suite.specRegistry,
-                configuration = suite.configuration,
-                stepRegistry = stepRegistry,
-                assertionRegistry = assertionRegistry,
-            )
+            executor =
+                BerryCrushScenarioExecutor(
+                    specRegistry = suite.specRegistry,
+                    configuration = suite.configuration,
+                    stepRegistry = stepRegistry,
+                    assertionRegistry = assertionRegistry,
+                )
             context.getStore(NAMESPACE).put(EXECUTOR_KEY, executor)
         }
         return executor
@@ -250,9 +255,10 @@ class BerryCrushExtension :
 
         // Get the test class to read configuration annotation
         val testClass = findRootTestClass(context)
-        val configAnnotation = testClass?.getAnnotation(
-            BerryCrushConfigAnnotation::class.java
-        )
+        val configAnnotation =
+            testClass?.getAnnotation(
+                BerryCrushConfigAnnotation::class.java,
+            )
 
         if (configAnnotation == null) {
             return null
@@ -306,9 +312,10 @@ class BerryCrushExtension :
 
         // Get the test class to read configuration annotation
         val testClass = findRootTestClass(context)
-        val configAnnotation = testClass?.getAnnotation(
-            BerryCrushConfigAnnotation::class.java
-        )
+        val configAnnotation =
+            testClass?.getAnnotation(
+                BerryCrushConfigAnnotation::class.java,
+            )
 
         if (configAnnotation == null) {
             return null

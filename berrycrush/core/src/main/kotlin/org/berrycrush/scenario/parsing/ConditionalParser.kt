@@ -1,10 +1,13 @@
 package org.berrycrush.scenario.parsing
 
-import org.berrycrush.scenario.*
-
-/**
- * Extension functions for parsing conditional blocks (if/else if/else).
- */
+import org.berrycrush.scenario.ActionNode
+import org.berrycrush.scenario.ConditionBranch
+import org.berrycrush.scenario.ConditionNode
+import org.berrycrush.scenario.ConditionalNode
+import org.berrycrush.scenario.FailNode
+import org.berrycrush.scenario.LogicalOperator
+import org.berrycrush.scenario.ParserState
+import org.berrycrush.scenario.TokenType
 
 /**
  * Parse a conditional block (if/else if/else).

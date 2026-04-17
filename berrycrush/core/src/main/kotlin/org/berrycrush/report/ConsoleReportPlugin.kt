@@ -123,21 +123,23 @@ class ConsoleReportPlugin(
      * Build a TestReport from collected scenario results.
      */
     private fun buildReport(): TestReport {
-        val duration = if (startTime != null && endTime != null) {
-            Duration.between(startTime, endTime)
-        } else {
-            Duration.ZERO
-        }
+        val duration =
+            if (startTime != null && endTime != null) {
+                Duration.between(startTime, endTime)
+            } else {
+                Duration.ZERO
+            }
 
         return TestReport(
             scenarios = scenarioReports,
-            summary = TestSummary(
-                total = scenarioReports.size,
-                passed = scenarioReports.count { it.status == ResultStatus.PASSED },
-                failed = scenarioReports.count { it.status == ResultStatus.FAILED },
-                skipped = scenarioReports.count { it.status == ResultStatus.SKIPPED },
-                errors = scenarioReports.count { it.status == ResultStatus.ERROR },
-            ),
+            summary =
+                TestSummary(
+                    total = scenarioReports.size,
+                    passed = scenarioReports.count { it.status == ResultStatus.PASSED },
+                    failed = scenarioReports.count { it.status == ResultStatus.FAILED },
+                    skipped = scenarioReports.count { it.status == ResultStatus.SKIPPED },
+                    errors = scenarioReports.count { it.status == ResultStatus.ERROR },
+                ),
             timestamp = startTime ?: Instant.now(),
             duration = duration,
         )
@@ -154,28 +156,30 @@ class ConsoleReportPlugin(
             name = context.scenarioName,
             status = result.status,
             duration = result.duration,
-            steps = result.stepResults.map { stepResult ->
-                StepReportEntry(
-                    description = stepResult.stepDescription,
-                    status = stepResult.status,
-                    duration = stepResult.duration,
-                    request = null,
-                    response = if (stepResult.httpStatusCode != null) {
-                        org.berrycrush.plugin.HttpResponse(
-                            statusCode = stepResult.httpStatusCode!!,
-                            statusMessage = httpStatusMessage(stepResult.httpStatusCode!!),
-                            headers = stepResult.responseHeaders,
-                            body = stepResult.responseBody,
-                            duration = stepResult.duration,
-                            timestamp = Instant.now(),
-                        )
-                    } else {
-                        null
-                    },
-                    failure = stepResult.failure,
-                    isCustomStep = stepResult.isCustomStep,
-                )
-            },
+            steps =
+                result.stepResults.map { stepResult ->
+                    StepReportEntry(
+                        description = stepResult.stepDescription,
+                        status = stepResult.status,
+                        duration = stepResult.duration,
+                        request = null,
+                        response =
+                            if (stepResult.httpStatusCode != null) {
+                                org.berrycrush.plugin.HttpResponse(
+                                    statusCode = stepResult.httpStatusCode!!,
+                                    statusMessage = httpStatusMessage(stepResult.httpStatusCode!!),
+                                    headers = stepResult.responseHeaders,
+                                    body = stepResult.responseBody,
+                                    duration = stepResult.duration,
+                                    timestamp = Instant.now(),
+                                )
+                            } else {
+                                null
+                            },
+                        failure = stepResult.failure,
+                        isCustomStep = stepResult.isCustomStep,
+                    )
+                },
             tags = context.tags,
             metadata = context.metadata,
             sourceFile = context.scenarioFile.fileName?.toString(),
@@ -214,9 +218,10 @@ class ConsoleReportPlugin(
         /**
          * Create a console report plugin with high contrast colors.
          */
-        fun highContrast(): ConsoleReportPlugin = ConsoleReportPlugin(
-            colorScheme = ColorScheme.HIGH_CONTRAST,
-        )
+        fun highContrast(): ConsoleReportPlugin =
+            ConsoleReportPlugin(
+                colorScheme = ColorScheme.HIGH_CONTRAST,
+            )
 
         /**
          * Create a console report plugin from configuration string.
@@ -243,18 +248,20 @@ class ConsoleReportPlugin(
             val optionList = options.lowercase().split(",").map { it.trim() }
 
             // Determine output stream
-            val output = when {
-                "stderr" in optionList -> System.err
-                else -> System.out
-            }
+            val output =
+                when {
+                    "stderr" in optionList -> System.err
+                    else -> System.out
+                }
 
             // Determine color scheme
-            val colorScheme = when {
-                "high-contrast" in optionList || "highcontrast" in optionList -> ColorScheme.HIGH_CONTRAST
-                "monochrome" in optionList || "mono" in optionList -> ColorScheme.MONOCHROME
-                "no-color" in optionList || "nocolor" in optionList || "none" in optionList -> ColorScheme.NONE
-                else -> ColorScheme.DEFAULT
-            }
+            val colorScheme =
+                when {
+                    "high-contrast" in optionList || "highcontrast" in optionList -> ColorScheme.HIGH_CONTRAST
+                    "monochrome" in optionList || "mono" in optionList -> ColorScheme.MONOCHROME
+                    "no-color" in optionList || "nocolor" in optionList || "none" in optionList -> ColorScheme.NONE
+                    else -> ColorScheme.DEFAULT
+                }
 
             return ConsoleReportPlugin(output = output, colorScheme = colorScheme)
         }
@@ -270,11 +277,12 @@ class ConsoleReportPlugin(
      */
     constructor(options: String) : this(
         output = if (options.lowercase().contains("stderr")) System.err else System.out,
-        colorScheme = when {
-            options.lowercase().let { it.contains("high-contrast") || it.contains("highcontrast") } -> ColorScheme.HIGH_CONTRAST
-            options.lowercase().let { it.contains("monochrome") || it.contains("mono") } -> ColorScheme.MONOCHROME
-            options.lowercase().let { it.contains("no-color") || it.contains("nocolor") || it.contains("none") } -> ColorScheme.NONE
-            else -> ColorScheme.DEFAULT
-        }
+        colorScheme =
+            when {
+                options.lowercase().let { it.contains("high-contrast") || it.contains("highcontrast") } -> ColorScheme.HIGH_CONTRAST
+                options.lowercase().let { it.contains("monochrome") || it.contains("mono") } -> ColorScheme.MONOCHROME
+                options.lowercase().let { it.contains("no-color") || it.contains("nocolor") || it.contains("none") } -> ColorScheme.NONE
+                else -> ColorScheme.DEFAULT
+            },
     )
 }

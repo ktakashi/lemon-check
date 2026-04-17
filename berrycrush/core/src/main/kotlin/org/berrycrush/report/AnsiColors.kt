@@ -63,7 +63,10 @@ object AnsiColors {
      * @param code The ANSI escape code(s) to apply
      * @return Text wrapped with escape codes and reset
      */
-    fun wrap(text: String, code: String): String = "$code$text$RESET"
+    fun wrap(
+        text: String,
+        code: String,
+    ): String = "$code$text$RESET"
 
     /**
      * Apply red color to text.
@@ -108,7 +111,10 @@ object AnsiColors {
     /**
      * Apply bold and a color to text.
      */
-    fun boldColor(text: String, color: String): String = wrap(text, BOLD + color)
+    fun boldColor(
+        text: String,
+        color: String,
+    ): String = wrap(text, BOLD + color)
 
     /**
      * Apply bright cyan color to text (useful for highlighting custom steps).

@@ -1,10 +1,10 @@
 package org.berrycrush.scenario.parsing
 
-import org.berrycrush.scenario.*
-
-/**
- * Extension functions for parsing steps and step descriptions.
- */
+import org.berrycrush.scenario.ActionNode
+import org.berrycrush.scenario.ParserState
+import org.berrycrush.scenario.StepKeyword
+import org.berrycrush.scenario.StepNode
+import org.berrycrush.scenario.TokenType
 
 /**
  * Parse steps within a scenario or background block.

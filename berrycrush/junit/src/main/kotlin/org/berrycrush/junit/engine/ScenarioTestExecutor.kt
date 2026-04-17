@@ -482,7 +482,7 @@ class ScenarioTestExecutor(
                 }
             }.onFailure { e ->
                 System.err.println(
-                    "Warning: Failed to scan step class ${klass.qualifiedName}: ${e.message}"
+                    "Warning: Failed to scan step class ${klass.qualifiedName}: ${e.message}",
                 )
             }
         }
@@ -512,7 +512,7 @@ class ScenarioTestExecutor(
                 }
             }.onFailure { e ->
                 System.err.println(
-                    "Warning: Failed to scan assertion class ${klass.qualifiedName}: ${e.message}"
+                    "Warning: Failed to scan assertion class ${klass.qualifiedName}: ${e.message}",
                 )
             }
         }

@@ -12,7 +12,6 @@ import org.berrycrush.assertion.AssertionResult
  * for domain-specific validation logic that returns explicit pass/fail results.
  */
 class PetstoreAssertions {
-
     /**
      * Assert that a pet has a specific status.
      *
@@ -22,9 +21,13 @@ class PetstoreAssertions {
      * ```
      */
     @Assertion("the pet should have status {string}")
-    fun assertPetStatus(expectedStatus: String, context: AssertionContext): AssertionResult {
-        val response = context.lastResponse
-            ?: return AssertionResult.failed("No HTTP response available")
+    fun assertPetStatus(
+        expectedStatus: String,
+        context: AssertionContext,
+    ): AssertionResult {
+        val response =
+            context.lastResponse
+                ?: return AssertionResult.failed("No HTTP response available")
 
         return try {
             val actualStatus: String = JsonPath.read(response.body(), "$.status")
@@ -34,7 +37,7 @@ class PetstoreAssertions {
                 AssertionResult.failed(
                     message = "Pet status mismatch",
                     expectedValue = expectedStatus,
-                    actualValue = actualStatus
+                    actualValue = actualStatus,
                 )
             }
         } catch (e: Exception) {
@@ -51,9 +54,13 @@ class PetstoreAssertions {
      * ```
      */
     @Assertion("the pet name should be {string}")
-    fun assertPetName(expectedName: String, context: AssertionContext): AssertionResult {
-        val response = context.lastResponse
-            ?: return AssertionResult.failed("No HTTP response available")
+    fun assertPetName(
+        expectedName: String,
+        context: AssertionContext,
+    ): AssertionResult {
+        val response =
+            context.lastResponse
+                ?: return AssertionResult.failed("No HTTP response available")
 
         return try {
             val actualName: String = JsonPath.read(response.body(), "$.name")
@@ -63,7 +70,7 @@ class PetstoreAssertions {
                 AssertionResult.failed(
                     message = "Pet name mismatch",
                     expectedValue = expectedName,
-                    actualValue = actualName
+                    actualValue = actualName,
                 )
             }
         } catch (e: Exception) {
@@ -80,9 +87,13 @@ class PetstoreAssertions {
      * ```
      */
     @Assertion("there are {int} items in the response")
-    fun assertItemCount(expectedCount: Int, context: AssertionContext): AssertionResult {
-        val response = context.lastResponse
-            ?: return AssertionResult.failed("No HTTP response available")
+    fun assertItemCount(
+        expectedCount: Int,
+        context: AssertionContext,
+    ): AssertionResult {
+        val response =
+            context.lastResponse
+                ?: return AssertionResult.failed("No HTTP response available")
 
         return try {
             val items = JsonPath.read<List<*>>(response.body(), "$")
@@ -93,7 +104,7 @@ class PetstoreAssertions {
                 AssertionResult.failed(
                     message = "Item count mismatch",
                     expectedValue = expectedCount,
-                    actualValue = actualCount
+                    actualValue = actualCount,
                 )
             }
         } catch (e: Exception) {
@@ -110,9 +121,13 @@ class PetstoreAssertions {
      * ```
      */
     @Assertion("the response body contains {string}")
-    fun assertBodyContains(expected: String, context: AssertionContext): AssertionResult {
-        val response = context.lastResponse
-            ?: return AssertionResult.failed("No HTTP response available")
+    fun assertBodyContains(
+        expected: String,
+        context: AssertionContext,
+    ): AssertionResult {
+        val response =
+            context.lastResponse
+                ?: return AssertionResult.failed("No HTTP response available")
 
         val body = response.body()
         return if (body.contains(expected)) {
@@ -121,7 +136,7 @@ class PetstoreAssertions {
             AssertionResult.failed(
                 message = "Response body does not contain expected string",
                 expectedValue = expected,
-                actualValue = body.take(200) + if (body.length > 200) "..." else ""
+                actualValue = body.take(200) + if (body.length > 200) "..." else "",
             )
         }
     }
@@ -135,12 +150,17 @@ class PetstoreAssertions {
      * ```
      */
     @Assertion("the pet name matches variable {string}")
-    fun assertPetNameMatchesVariable(variableName: String, context: AssertionContext): AssertionResult {
-        val expectedName = context.variable(variableName) as? String
-            ?: return AssertionResult.failed("Variable '$variableName' not found or not a string")
+    fun assertPetNameMatchesVariable(
+        variableName: String,
+        context: AssertionContext,
+    ): AssertionResult {
+        val expectedName =
+            context.variable(variableName) as? String
+                ?: return AssertionResult.failed("Variable '$variableName' not found or not a string")
 
-        val response = context.lastResponse
-            ?: return AssertionResult.failed("No HTTP response available")
+        val response =
+            context.lastResponse
+                ?: return AssertionResult.failed("No HTTP response available")
 
         return try {
             val actualName: String = JsonPath.read(response.body(), "$.name")
@@ -150,7 +170,7 @@ class PetstoreAssertions {
                 AssertionResult.failed(
                     message = "Pet name does not match variable",
                     expectedValue = expectedName,
-                    actualValue = actualName
+                    actualValue = actualName,
                 )
             }
         } catch (e: Exception) {
@@ -168,8 +188,9 @@ class PetstoreAssertions {
      */
     @Assertion("the response is successful")
     fun assertResponseSuccessful(context: AssertionContext): AssertionResult {
-        val response = context.lastResponse
-            ?: return AssertionResult.failed("No HTTP response available")
+        val response =
+            context.lastResponse
+                ?: return AssertionResult.failed("No HTTP response available")
 
         val statusCode = response.statusCode()
         return if (statusCode in 200..299) {
@@ -178,7 +199,7 @@ class PetstoreAssertions {
             AssertionResult.failed(
                 message = "Response is not successful",
                 expectedValue = "2xx",
-                actualValue = statusCode
+                actualValue = statusCode,
             )
         }
     }
@@ -193,8 +214,9 @@ class PetstoreAssertions {
      */
     @Assertion("the pet has a valid ID")
     fun assertPetIdValid(context: AssertionContext): AssertionResult {
-        val response = context.lastResponse
-            ?: return AssertionResult.failed("No HTTP response available")
+        val response =
+            context.lastResponse
+                ?: return AssertionResult.failed("No HTTP response available")
 
         return try {
             val id: Long = JsonPath.read(response.body(), "$.id")
@@ -204,7 +226,7 @@ class PetstoreAssertions {
                 AssertionResult.failed(
                     message = "Pet ID is not valid",
                     expectedValue = "> 0",
-                    actualValue = id
+                    actualValue = id,
                 )
             }
         } catch (e: Exception) {

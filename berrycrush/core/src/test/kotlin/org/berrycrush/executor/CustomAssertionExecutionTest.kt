@@ -37,18 +37,18 @@ class CustomAssertionExecutionTest {
         @Test
         @DisplayName("should register and find simple assertion pattern")
         fun registerAndFindSimplePattern() {
-            val assertionInstance = object {
-                @Assertion("the system is ready")
-                fun systemIsReady(context: AssertionContext): AssertionResult {
-                    return AssertionResult.passed()
+            val assertionInstance =
+                object {
+                    @Assertion("the system is ready")
+                    fun systemIsReady(context: AssertionContext): AssertionResult = AssertionResult.passed()
                 }
-            }
 
-            val definition = AssertionDefinition(
-                pattern = "the system is ready",
-                method = assertionInstance.javaClass.getMethod("systemIsReady", AssertionContext::class.java),
-                instance = assertionInstance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "the system is ready",
+                    method = assertionInstance.javaClass.getMethod("systemIsReady", AssertionContext::class.java),
+                    instance = assertionInstance,
+                )
             assertionRegistry.register(definition)
 
             val match = assertionRegistry.findMatch("the system is ready")
@@ -67,22 +67,26 @@ class CustomAssertionExecutionTest {
         @Test
         @DisplayName("should extract string parameter from pattern")
         fun extractStringParameter() {
-            val assertionInstance = object {
-                @Assertion("the user {string} is logged in")
-                fun userIsLoggedIn(name: String, context: AssertionContext): AssertionResult {
-                    return AssertionResult.passed()
+            val assertionInstance =
+                object {
+                    @Assertion("the user {string} is logged in")
+                    fun userIsLoggedIn(
+                        name: String,
+                        context: AssertionContext,
+                    ): AssertionResult = AssertionResult.passed()
                 }
-            }
 
-            val definition = AssertionDefinition(
-                pattern = "the user {string} is logged in",
-                method = assertionInstance.javaClass.getMethod(
-                    "userIsLoggedIn",
-                    String::class.java,
-                    AssertionContext::class.java,
-                ),
-                instance = assertionInstance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "the user {string} is logged in",
+                    method =
+                        assertionInstance.javaClass.getMethod(
+                            "userIsLoggedIn",
+                            String::class.java,
+                            AssertionContext::class.java,
+                        ),
+                    instance = assertionInstance,
+                )
             assertionRegistry.register(definition)
 
             val match = assertionRegistry.findMatch("the user \"admin\" is logged in")
@@ -95,22 +99,26 @@ class CustomAssertionExecutionTest {
         @Test
         @DisplayName("should extract int parameter from pattern")
         fun extractIntParameter() {
-            val assertionInstance = object {
-                @Assertion("there are {int} items")
-                fun itemCount(count: Int, context: AssertionContext): AssertionResult {
-                    return AssertionResult.passed()
+            val assertionInstance =
+                object {
+                    @Assertion("there are {int} items")
+                    fun itemCount(
+                        count: Int,
+                        context: AssertionContext,
+                    ): AssertionResult = AssertionResult.passed()
                 }
-            }
 
-            val definition = AssertionDefinition(
-                pattern = "there are {int} items",
-                method = assertionInstance.javaClass.getMethod(
-                    "itemCount",
-                    Int::class.java,
-                    AssertionContext::class.java,
-                ),
-                instance = assertionInstance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "there are {int} items",
+                    method =
+                        assertionInstance.javaClass.getMethod(
+                            "itemCount",
+                            Int::class.java,
+                            AssertionContext::class.java,
+                        ),
+                    instance = assertionInstance,
+                )
             assertionRegistry.register(definition)
 
             val match = assertionRegistry.findMatch("there are 5 items")
@@ -123,23 +131,28 @@ class CustomAssertionExecutionTest {
         @Test
         @DisplayName("should extract multiple parameters from pattern")
         fun extractMultipleParameters() {
-            val assertionInstance = object {
-                @Assertion("the {string} has {int} elements")
-                fun collectionSize(name: String, size: Int, context: AssertionContext): AssertionResult {
-                    return AssertionResult.passed()
+            val assertionInstance =
+                object {
+                    @Assertion("the {string} has {int} elements")
+                    fun collectionSize(
+                        name: String,
+                        size: Int,
+                        context: AssertionContext,
+                    ): AssertionResult = AssertionResult.passed()
                 }
-            }
 
-            val definition = AssertionDefinition(
-                pattern = "the {string} has {int} elements",
-                method = assertionInstance.javaClass.getMethod(
-                    "collectionSize",
-                    String::class.java,
-                    Int::class.java,
-                    AssertionContext::class.java,
-                ),
-                instance = assertionInstance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "the {string} has {int} elements",
+                    method =
+                        assertionInstance.javaClass.getMethod(
+                            "collectionSize",
+                            String::class.java,
+                            Int::class.java,
+                            AssertionContext::class.java,
+                        ),
+                    instance = assertionInstance,
+                )
             assertionRegistry.register(definition)
 
             val match = assertionRegistry.findMatch("the \"items\" has 10 elements")
@@ -159,19 +172,21 @@ class CustomAssertionExecutionTest {
         fun invokeAssertionMethodPassed() {
             var invoked = false
 
-            val assertionInstance = object {
-                @Assertion("assertion passes")
-                fun assertionPasses(context: AssertionContext): AssertionResult {
-                    invoked = true
-                    return AssertionResult.passed()
+            val assertionInstance =
+                object {
+                    @Assertion("assertion passes")
+                    fun assertionPasses(context: AssertionContext): AssertionResult {
+                        invoked = true
+                        return AssertionResult.passed()
+                    }
                 }
-            }
 
-            val definition = AssertionDefinition(
-                pattern = "assertion passes",
-                method = assertionInstance.javaClass.getMethod("assertionPasses", AssertionContext::class.java),
-                instance = assertionInstance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "assertion passes",
+                    method = assertionInstance.javaClass.getMethod("assertionPasses", AssertionContext::class.java),
+                    instance = assertionInstance,
+                )
             assertionRegistry.register(definition)
 
             val match = assertionRegistry.findMatch("assertion passes")!!
@@ -186,18 +201,19 @@ class CustomAssertionExecutionTest {
         @Test
         @DisplayName("should invoke assertion method and get failed result")
         fun invokeAssertionMethodFailed() {
-            val assertionInstance = object {
-                @Assertion("assertion fails")
-                fun assertionFails(context: AssertionContext): AssertionResult {
-                    return AssertionResult.failed("Expected failure", actualValue = 1, expectedValue = 2)
+            val assertionInstance =
+                object {
+                    @Assertion("assertion fails")
+                    fun assertionFails(context: AssertionContext): AssertionResult =
+                        AssertionResult.failed("Expected failure", actualValue = 1, expectedValue = 2)
                 }
-            }
 
-            val definition = AssertionDefinition(
-                pattern = "assertion fails",
-                method = assertionInstance.javaClass.getMethod("assertionFails", AssertionContext::class.java),
-                instance = assertionInstance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "assertion fails",
+                    method = assertionInstance.javaClass.getMethod("assertionFails", AssertionContext::class.java),
+                    instance = assertionInstance,
+                )
             assertionRegistry.register(definition)
 
             val match = assertionRegistry.findMatch("assertion fails")!!
@@ -217,25 +233,32 @@ class CustomAssertionExecutionTest {
             var capturedName: String? = null
             var capturedCount: Int? = null
 
-            val assertionInstance = object {
-                @Assertion("user {string} has {int} items")
-                fun userHasItems(name: String, count: Int, context: AssertionContext): AssertionResult {
-                    capturedName = name
-                    capturedCount = count
-                    return AssertionResult.passed()
+            val assertionInstance =
+                object {
+                    @Assertion("user {string} has {int} items")
+                    fun userHasItems(
+                        name: String,
+                        count: Int,
+                        context: AssertionContext,
+                    ): AssertionResult {
+                        capturedName = name
+                        capturedCount = count
+                        return AssertionResult.passed()
+                    }
                 }
-            }
 
-            val definition = AssertionDefinition(
-                pattern = "user {string} has {int} items",
-                method = assertionInstance.javaClass.getMethod(
-                    "userHasItems",
-                    String::class.java,
-                    Int::class.java,
-                    AssertionContext::class.java,
-                ),
-                instance = assertionInstance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "user {string} has {int} items",
+                    method =
+                        assertionInstance.javaClass.getMethod(
+                            "userHasItems",
+                            String::class.java,
+                            Int::class.java,
+                            AssertionContext::class.java,
+                        ),
+                    instance = assertionInstance,
+                )
             assertionRegistry.register(definition)
 
             val match = assertionRegistry.findMatch("user \"alice\" has 3 items")!!
@@ -250,18 +273,18 @@ class CustomAssertionExecutionTest {
         @Test
         @DisplayName("should handle assertion that throws exception")
         fun handleAssertionException() {
-            val assertionInstance = object {
-                @Assertion("this will throw")
-                fun throwingAssertion(context: AssertionContext): AssertionResult {
-                    throw RuntimeException("Unexpected error")
+            val assertionInstance =
+                object {
+                    @Assertion("this will throw")
+                    fun throwingAssertion(context: AssertionContext): AssertionResult = throw RuntimeException("Unexpected error")
                 }
-            }
 
-            val definition = AssertionDefinition(
-                pattern = "this will throw",
-                method = assertionInstance.javaClass.getMethod("throwingAssertion", AssertionContext::class.java),
-                instance = assertionInstance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "this will throw",
+                    method = assertionInstance.javaClass.getMethod("throwingAssertion", AssertionContext::class.java),
+                    instance = assertionInstance,
+                )
             assertionRegistry.register(definition)
 
             val match = assertionRegistry.findMatch("this will throw")!!
@@ -280,16 +303,17 @@ class CustomAssertionExecutionTest {
         @Test
         @DisplayName("should register and match multiple assertions")
         fun registerMultipleAssertions() {
-            val assertionInstance = object {
-                @Assertion("first assertion")
-                fun first(context: AssertionContext): AssertionResult = AssertionResult.passed()
+            val assertionInstance =
+                object {
+                    @Assertion("first assertion")
+                    fun first(context: AssertionContext): AssertionResult = AssertionResult.passed()
 
-                @Assertion("second assertion")
-                fun second(context: AssertionContext): AssertionResult = AssertionResult.passed()
+                    @Assertion("second assertion")
+                    fun second(context: AssertionContext): AssertionResult = AssertionResult.passed()
 
-                @Assertion("third assertion")
-                fun third(context: AssertionContext): AssertionResult = AssertionResult.passed()
-            }
+                    @Assertion("third assertion")
+                    fun third(context: AssertionContext): AssertionResult = AssertionResult.passed()
+                }
 
             assertionRegistry.register(
                 AssertionDefinition(
@@ -322,10 +346,11 @@ class CustomAssertionExecutionTest {
         @Test
         @DisplayName("should clear all registered assertions")
         fun clearAssertions() {
-            val assertionInstance = object {
-                @Assertion("to be cleared")
-                fun toBeCleared(context: AssertionContext): AssertionResult = AssertionResult.passed()
-            }
+            val assertionInstance =
+                object {
+                    @Assertion("to be cleared")
+                    fun toBeCleared(context: AssertionContext): AssertionResult = AssertionResult.passed()
+                }
 
             assertionRegistry.register(
                 AssertionDefinition(
@@ -357,34 +382,40 @@ class CustomAssertionExecutionTest {
         )
     }
 
-    private fun invokeAssertion(match: AssertionMatch, context: AssertionContext): AssertionResult {
+    private fun invokeAssertion(
+        match: AssertionMatch,
+        context: AssertionContext,
+    ): AssertionResult {
         val method = match.definition.method
         val parameters = match.parameters.toMutableList()
 
         // Check if method accepts AssertionContext
         val methodParams = method.parameters
-        val args = if (methodParams.isNotEmpty() &&
-            methodParams.last().type.isAssignableFrom(AssertionContext::class.java)
-        ) {
-            parameters.add(context)
-            parameters.toTypedArray()
-        } else {
-            parameters.toTypedArray()
-        }
+        val args =
+            if (methodParams.isNotEmpty() &&
+                methodParams.last().type.isAssignableFrom(AssertionContext::class.java)
+            ) {
+                parameters.add(context)
+                parameters.toTypedArray()
+            } else {
+                parameters.toTypedArray()
+            }
 
         return method.invoke(match.definition.instance, *args) as AssertionResult
     }
 
-    private fun invokeAssertionSafely(match: AssertionMatch, context: AssertionContext): AssertionResult {
-        return try {
+    private fun invokeAssertionSafely(
+        match: AssertionMatch,
+        context: AssertionContext,
+    ): AssertionResult =
+        try {
             invokeAssertion(match, context)
         } catch (e: Exception) {
-            val actualException = when (e) {
-                is java.lang.reflect.InvocationTargetException -> e.cause ?: e
-                else -> e
-            }
+            val actualException =
+                when (e) {
+                    is java.lang.reflect.InvocationTargetException -> e.cause ?: e
+                    else -> e
+                }
             AssertionResult.failed("Assertion threw exception: ${actualException.message}")
         }
-    }
 }
-

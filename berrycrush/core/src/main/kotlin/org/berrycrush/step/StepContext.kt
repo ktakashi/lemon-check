@@ -52,7 +52,10 @@ interface StepContext {
      * @return The variable value cast to T, or null if not found or wrong type
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T> variable(name: String, type: Class<T>): T? = variable(name) as? T
+    fun <T> variable(
+        name: String,
+        type: Class<T>,
+    ): T? = variable(name) as? T
 
     /**
      * Set a scenario-scoped variable.
@@ -63,7 +66,10 @@ interface StepContext {
      * @param name The variable name
      * @param value The variable value
      */
-    fun setVariable(name: String, value: Any?)
+    fun setVariable(
+        name: String,
+        value: Any?,
+    )
 
     /**
      * Set a suite-scoped (shared) variable.
@@ -74,7 +80,10 @@ interface StepContext {
      * @param name The variable name
      * @param value The variable value
      */
-    fun setSharedVariable(name: String, value: Any?)
+    fun setSharedVariable(
+        name: String,
+        value: Any?,
+    )
 
     /**
      * Get all current variables.

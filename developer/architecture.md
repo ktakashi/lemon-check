@@ -93,19 +93,41 @@ suite.scenario("List all pets") {
 
 ### 3. OpenAPI Integration
 
+BerryCrush uses an abstraction layer to support multiple OpenAPI versions (3.0.x, 3.1.x, and future versions).
+
 ```
 ┌─────────────────┐     ┌───────────────────┐     ┌─────────────────┐
-│   OpenAPI Spec  │────▶│   SpecRegistry    │────▶│OperationResolver│
-│  (YAML/JSON)    │     │                   │     │                 │
-│                 │     │ Manages multiple  │     │ Resolves ops by │
-│                 │     │ specs (multi-API) │     │ operationId     │
+│   OpenAPI Spec  │────▶│   OpenApiParser   │────▶│   OpenApiSpec   │
+│  (YAML/JSON)    │     │                   │     │   (interface)   │
+│  3.0.x / 3.1.x  │     │ Version-agnostic  │     │                 │
+└─────────────────┘     └───────────────────┘     └────────┬────────┘
+                                                           │
+                        ┌──────────────────────────────────┘
+                        ▼
+┌─────────────────┐     ┌───────────────────┐     ┌─────────────────┐
+│   SpecRegistry  │────▶│ OperationResolver │────▶│   HttpRequest   │
+│                 │     │                   │     │    Builder      │
+│ Manages specs   │     │ Resolves ops by   │     │                 │
+│ (multi-API)     │     │ operationId       │     │                 │
 └─────────────────┘     └───────────────────┘     └─────────────────┘
 ```
+
+**Key Interfaces:**
+- `OpenApiSpec` - Unified interface for accessing OpenAPI specs (any version)
+- `OpenApiParser` - Parses YAML/JSON into `OpenApiSpec` abstraction
+- `OpenApiVersion` - Enum for version detection (V3_0_X, V3_1_X, etc.)
 
 **Key Classes:**
 - `SpecRegistry` - Manages one or more OpenAPI specifications
 - `OperationResolver` - Resolves `operationId` to HTTP method, path, and parameters
-- `OpenApiLoader` - Loads and validates OpenAPI specifications
+- `SwaggerParserAdapter` - Default `OpenApiParser` implementation
+
+**Version-Specific Features:**
+- 3.1.x webhooks accessible via `spec.webhooks`
+- JSON Schema 2020-12 support via `SchemaSpec` abstraction
+- Feature detection: `spec.hasWebhooks()`, `spec.hasComponents()`
+
+For detailed documentation, see [OpenAPI Version Support](openapi-versioning.md).
 
 ### 4. Execution Engine
 

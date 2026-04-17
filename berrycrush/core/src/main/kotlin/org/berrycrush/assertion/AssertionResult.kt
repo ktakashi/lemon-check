@@ -38,8 +38,7 @@ data class AssertionResult(
          * @param message Optional success message
          * @return A passed AssertionResult
          */
-        fun passed(message: String? = null): AssertionResult =
-            AssertionResult(passed = true, message = message)
+        fun passed(message: String? = null): AssertionResult = AssertionResult(passed = true, message = message)
 
         /**
          * Create a failed assertion result.
@@ -53,11 +52,12 @@ data class AssertionResult(
             message: String,
             actualValue: Any? = null,
             expectedValue: Any? = null,
-        ): AssertionResult = AssertionResult(
-            passed = false,
-            message = message,
-            actualValue = actualValue,
-            expectedValue = expectedValue,
-        )
+        ): AssertionResult =
+            AssertionResult(
+                passed = false,
+                message = message,
+                actualValue = actualValue,
+                expectedValue = expectedValue,
+            )
     }
 }

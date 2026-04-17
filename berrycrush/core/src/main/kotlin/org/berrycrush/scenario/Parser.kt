@@ -1,6 +1,11 @@
 package org.berrycrush.scenario
 
-import org.berrycrush.scenario.parsing.*
+import org.berrycrush.scenario.parsing.parseFeature
+import org.berrycrush.scenario.parsing.parseFragment
+import org.berrycrush.scenario.parsing.parseParameters
+import org.berrycrush.scenario.parsing.parseScenario
+import org.berrycrush.scenario.parsing.parseScenarioOutline
+import org.berrycrush.scenario.parsing.parseTags
 
 /**
  * Parser for scenario files.

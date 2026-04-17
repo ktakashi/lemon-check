@@ -21,7 +21,11 @@ class PetstoreSteps {
     private val petDataStore = ConcurrentHashMap<String, PetData>()
 
     @Step("I have a pet named {string} with status {string}")
-    fun createPetData(name: String, status: String, context: StepContext) {
+    fun createPetData(
+        name: String,
+        status: String,
+        context: StepContext,
+    ) {
         val pet = PetData(name = name, status = status)
         petDataStore[name] = pet
 
@@ -31,15 +35,21 @@ class PetstoreSteps {
     }
 
     @Step("the pet data should contain {string}")
-    fun verifyPetDataContains(expectedValue: String, context: StepContext) {
-        val petName = context.variable("currentPetName") as? String
-            ?: throw AssertionError("No pet data set")
+    fun verifyPetDataContains(
+        expectedValue: String,
+        context: StepContext,
+    ) {
+        val petName =
+            context.variable("currentPetName") as? String
+                ?: throw AssertionError("No pet data set")
 
-        val pet = petDataStore[petName]
-            ?: throw AssertionError("Pet '$petName' not found in data store")
+        val pet =
+            petDataStore[petName]
+                ?: throw AssertionError("Pet '$petName' not found in data store")
 
-        val containsValue = pet.name.contains(expectedValue) ||
-            pet.status.contains(expectedValue)
+        val containsValue =
+            pet.name.contains(expectedValue) ||
+                pet.status.contains(expectedValue)
 
         if (!containsValue) {
             throw AssertionError("Pet data does not contain '$expectedValue'. Pet: $pet")
@@ -47,32 +57,41 @@ class PetstoreSteps {
     }
 
     @Step("I should have {int} pets with status {word}")
-    fun verifyPetCount(expectedCount: Int, expectedStatus: String, context: StepContext) {
+    fun verifyPetCount(
+        expectedCount: Int,
+        expectedStatus: String,
+        context: StepContext,
+    ) {
         val matchingPets = petDataStore.values.filter { it.status == expectedStatus }
 
         if (matchingPets.size != expectedCount) {
             throw AssertionError(
                 "Expected $expectedCount pets with status '$expectedStatus', " +
-                "but found ${matchingPets.size}"
+                    "but found ${matchingPets.size}",
             )
         }
     }
 
     @Step("the pet price should be {float}")
-    fun verifyPetPrice(expectedPrice: Double, context: StepContext) {
-        val petName = context.variable("currentPetName") as? String
-            ?: throw AssertionError("No pet data set")
+    fun verifyPetPrice(
+        expectedPrice: Double,
+        context: StepContext,
+    ) {
+        val petName =
+            context.variable("currentPetName") as? String
+                ?: throw AssertionError("No pet data set")
 
         // For demo, we update price when checking
-        val pet = petDataStore[petName]
-            ?: throw AssertionError("Pet '$petName' not found")
+        val pet =
+            petDataStore[petName]
+                ?: throw AssertionError("Pet '$petName' not found")
 
         petDataStore[petName] = pet.copy(price = 199.99)
 
         // Verify against expected
         if (petDataStore[petName]?.price != expectedPrice) {
             throw AssertionError(
-                "Expected price $expectedPrice, but got ${petDataStore[petName]?.price}"
+                "Expected price $expectedPrice, but got ${petDataStore[petName]?.price}",
             )
         }
     }
@@ -83,7 +102,10 @@ class PetstoreSteps {
     }
 
     @Step("I modify the name of the pet {string}")
-    fun modifyPetName(petName: String, context: StepContext) {
+    fun modifyPetName(
+        petName: String,
+        context: StepContext,
+    ) {
         val pet = petDataStore[petName]
         if (pet != null) {
             val newName = petName.uppercase()

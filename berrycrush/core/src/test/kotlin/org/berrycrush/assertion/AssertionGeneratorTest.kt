@@ -2,8 +2,8 @@ package org.berrycrush.assertion
 
 import org.berrycrush.model.Assertion
 import org.berrycrush.model.Condition
-import org.berrycrush.openapi.OpenApiLoader
 import org.berrycrush.openapi.OperationResolver
+import org.berrycrush.openapi.impl.SwaggerParserAdapter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -15,8 +15,8 @@ class AssertionGeneratorTest {
         val specPath =
             javaClass.getResource("/petstore.yaml")?.path
                 ?: error("petstore.yaml not found in test resources")
-        val openApi = OpenApiLoader().load(specPath)
-        return OperationResolver(openApi)
+        val spec = SwaggerParserAdapter().parse(specPath)
+        return OperationResolver(spec)
     }
 
     // Helper to check if assertion is a status assertion

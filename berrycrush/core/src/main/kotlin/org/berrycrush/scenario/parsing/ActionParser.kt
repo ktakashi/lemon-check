@@ -1,17 +1,26 @@
 package org.berrycrush.scenario.parsing
 
-import org.berrycrush.scenario.*
-
-/**
- * Extension functions for parsing actions (call, extract, assert, include).
- */
+import org.berrycrush.scenario.AutoTestConfig
+import org.berrycrush.scenario.AutoTestType
+import org.berrycrush.scenario.BodyPropertyValue
+import org.berrycrush.scenario.CallNode
+import org.berrycrush.scenario.ExtractNode
+import org.berrycrush.scenario.IncludeNode
+import org.berrycrush.scenario.ParserState
+import org.berrycrush.scenario.TokenType
+import org.berrycrush.scenario.ValueNode
 
 /**
  * Result of parsing body content.
  */
 internal sealed class BodyParseResult {
-    data class Raw(val value: ValueNode?) : BodyParseResult()
-    data class Properties(val properties: Map<String, BodyPropertyValue>) : BodyParseResult()
+    data class Raw(
+        val value: ValueNode?,
+    ) : BodyParseResult()
+
+    data class Properties(
+        val properties: Map<String, BodyPropertyValue>,
+    ) : BodyParseResult()
 }
 
 /**

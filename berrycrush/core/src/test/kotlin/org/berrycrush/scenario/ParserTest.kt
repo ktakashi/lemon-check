@@ -48,8 +48,7 @@ class ParserTest {
     /**
      * Get the pattern from a CustomAssertionCondition assertion.
      */
-    private fun AssertNode.getCustomPattern(): String? =
-        (unwrapCondition() as? ConditionNode.CustomAssertionCondition)?.pattern
+    private fun AssertNode.getCustomPattern(): String? = (unwrapCondition() as? ConditionNode.CustomAssertionCondition)?.pattern
 
     /**
      * Check if an assertion is negated (wrapped in NegatedCondition).
@@ -1064,7 +1063,7 @@ class ParserTest {
         // Unknown assertion types are now treated as custom assertion patterns
         assertTrue(result.isSuccess, "Parse should succeed for custom assertion pattern: ${result.errors}")
         assertEquals(1, result.ast!!.scenarios.size)
-        
+
         // Verify the assertion is captured as custom assertion
         val assertions = extractAssertions(result.ast.scenarios[0])
         assertEquals(1, assertions.size)
