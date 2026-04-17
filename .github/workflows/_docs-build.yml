@@ -58,11 +58,11 @@ jobs:
           sphinx-build -b html src/sphinx build/manual
           
       - name: Build KDoc
-        run: ./gradlew dokkaHtml
+        run: ./gradlew dokkaGenerateHtml
         
       - name: Assemble documentation
         run: |
-          mkdir -p _docs/{developer,manual,kdoc,assets}
+          mkdir -p _docs/{developer,manual,kdoc/core,kdoc/junit,kdoc/spring,assets}
           
           # Copy Developer's Guide
           cp -r developer/*.md _docs/developer/
@@ -70,8 +70,49 @@ jobs:
           # Copy Sphinx output
           cp -r berrycrush/doc/build/manual/* _docs/manual/
           
-          # Copy Dokka output
-          cp -r build/dokka/html/* _docs/kdoc/
+          # Copy Dokka outputs from each module
+          cp -r berrycrush/core/build/dokka/html/* _docs/kdoc/core/
+          cp -r berrycrush/junit/build/dokka/html/* _docs/kdoc/junit/
+          cp -r berrycrush/spring/build/dokka/html/* _docs/kdoc/spring/
+          
+          # Create KDoc index page
+          cat > _docs/kdoc/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>BerryCrush KDoc API Reference</title>
+            <style>
+              body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+              h1 { border-bottom: 1px solid #e1e4e8; padding-bottom: 0.5rem; }
+              .modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 2rem; }
+              .module { background: #f6f8fa; border-radius: 8px; padding: 1.5rem; text-decoration: none; color: inherit; }
+              .module:hover { background: #e1e4e8; }
+              .module h2 { margin: 0 0 0.5rem; font-size: 1.25rem; color: #0366d6; }
+              .module p { margin: 0; color: #586069; font-size: 0.9rem; }
+            </style>
+          </head>
+          <body>
+            <h1>BerryCrush KDoc API Reference</h1>
+            <p>Select a module to view its API documentation:</p>
+            <div class="modules">
+              <a href="core/" class="module">
+                <h2>Core</h2>
+                <p>Core BDD execution engine</p>
+              </a>
+              <a href="junit/" class="module">
+                <h2>JUnit</h2>
+                <p>JUnit 5 integration</p>
+              </a>
+              <a href="spring/" class="module">
+                <h2>Spring</h2>
+                <p>Spring Boot integration</p>
+              </a>
+            </div>
+          </body>
+          </html>
+          EOF
           
           # Copy logo asset
           if [ -f .github-assets/images/berrycrush-transparent.png ]; then
