@@ -54,7 +54,7 @@ jobs:
         
       - name: Build User Reference (Sphinx)
         run: |
-          cd berrycrush/berrycrush/doc
+          cd berrycrush/doc
           sphinx-build -b html src/sphinx build/manual
           
       - name: Build KDoc
@@ -68,10 +68,10 @@ jobs:
           cp -r developer/*.md _docs/developer/
           
           # Copy Sphinx output
-          cp -r berrycrush/berrycrush/doc/build/manual/* _docs/manual/
+          cp -r berrycrush/doc/build/manual/* _docs/manual/
           
           # Copy Dokka output
-          cp -r berrycrush/build/dokka/html/* _docs/kdoc/
+          cp -r build/dokka/html/* _docs/kdoc/
           
           # Copy logo asset
           if [ -f .github-assets/images/berrycrush-transparent.png ]; then
