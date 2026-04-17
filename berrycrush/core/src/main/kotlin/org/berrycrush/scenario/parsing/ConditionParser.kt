@@ -1,10 +1,12 @@
 package org.berrycrush.scenario.parsing
 
-import org.berrycrush.scenario.*
-
-/**
- * Extension functions for parsing assertions and conditions.
- */
+import org.berrycrush.scenario.AssertNode
+import org.berrycrush.scenario.ConditionNode
+import org.berrycrush.scenario.ConditionOperator
+import org.berrycrush.scenario.ParserState
+import org.berrycrush.scenario.SourceLocation
+import org.berrycrush.scenario.TokenType
+import org.berrycrush.scenario.ValueNode
 
 /**
  * Context for condition parsing - affects parsing style for some conditions.

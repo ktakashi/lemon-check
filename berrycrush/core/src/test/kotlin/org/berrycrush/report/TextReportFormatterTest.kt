@@ -14,9 +14,7 @@ import kotlin.test.assertTrue
 class TextReportFormatterTest {
     private val timestamp = Instant.parse("2024-01-15T10:30:00Z")
 
-    private fun createReport(
-        scenarios: List<ScenarioReportEntry> = emptyList(),
-    ): TestReport {
+    private fun createReport(scenarios: List<ScenarioReportEntry> = emptyList()): TestReport {
         val passed = scenarios.count { it.status == ResultStatus.PASSED }
         val failed = scenarios.count { it.status == ResultStatus.FAILED }
         val skipped = scenarios.count { it.status == ResultStatus.SKIPPED }
@@ -24,13 +22,14 @@ class TextReportFormatterTest {
         return TestReport(
             timestamp = timestamp,
             duration = Duration.ofMillis(1234),
-            summary = TestSummary(
-                total = scenarios.size,
-                passed = passed,
-                failed = failed,
-                skipped = skipped,
-                errors = errors,
-            ),
+            summary =
+                TestSummary(
+                    total = scenarios.size,
+                    passed = passed,
+                    failed = failed,
+                    skipped = skipped,
+                    errors = errors,
+                ),
             scenarios = scenarios,
         )
     }
@@ -62,9 +61,10 @@ class TextReportFormatterTest {
     @Test
     fun `plain formatter produces output without ANSI codes`() {
         val formatter = TextReportFormatter.plain()
-        val report = createReport(
-            listOf(createScenario(steps = listOf(createStep())))
-        )
+        val report =
+            createReport(
+                listOf(createScenario(steps = listOf(createStep()))),
+            )
 
         val output = formatter.formatReport(report)
 
@@ -74,9 +74,10 @@ class TextReportFormatterTest {
     @Test
     fun `colored formatter produces output with ANSI codes`() {
         val formatter = TextReportFormatter.colored()
-        val report = createReport(
-            listOf(createScenario(steps = listOf(createStep())))
-        )
+        val report =
+            createReport(
+                listOf(createScenario(steps = listOf(createStep()))),
+            )
 
         val output = formatter.formatReport(report)
 
@@ -119,9 +120,10 @@ class TextReportFormatterTest {
     @Test
     fun `report includes scenario with status icon`() {
         val formatter = TextReportFormatter.plain()
-        val report = createReport(
-            listOf(createScenario(name = "Login Test", status = ResultStatus.PASSED))
-        )
+        val report =
+            createReport(
+                listOf(createScenario(name = "Login Test", status = ResultStatus.PASSED)),
+            )
 
         val output = formatter.formatReport(report)
 
@@ -131,9 +133,10 @@ class TextReportFormatterTest {
     @Test
     fun `failed scenario shows X icon`() {
         val formatter = TextReportFormatter.plain()
-        val report = createReport(
-            listOf(createScenario(name = "Failing Test", status = ResultStatus.FAILED))
-        )
+        val report =
+            createReport(
+                listOf(createScenario(name = "Failing Test", status = ResultStatus.FAILED)),
+            )
 
         val output = formatter.formatReport(report)
 
@@ -143,9 +146,10 @@ class TextReportFormatterTest {
     @Test
     fun `skipped scenario shows circle icon`() {
         val formatter = TextReportFormatter.plain()
-        val report = createReport(
-            listOf(createScenario(name = "Skipped Test", status = ResultStatus.SKIPPED))
-        )
+        val report =
+            createReport(
+                listOf(createScenario(name = "Skipped Test", status = ResultStatus.SKIPPED)),
+            )
 
         val output = formatter.formatReport(report)
 
@@ -155,12 +159,13 @@ class TextReportFormatterTest {
     @Test
     fun `report includes summary statistics`() {
         val formatter = TextReportFormatter.plain()
-        val report = createReport(
-            listOf(
-                createScenario(status = ResultStatus.PASSED),
-                createScenario(status = ResultStatus.FAILED),
+        val report =
+            createReport(
+                listOf(
+                    createScenario(status = ResultStatus.PASSED),
+                    createScenario(status = ResultStatus.FAILED),
+                ),
             )
-        )
 
         val output = formatter.formatReport(report)
 
@@ -172,9 +177,10 @@ class TextReportFormatterTest {
     @Test
     fun `step with dotted leaders shows pass status`() {
         val formatter = TextReportFormatter.plain()
-        val report = createReport(
-            listOf(createScenario(steps = listOf(createStep(description = "assert status 200"))))
-        )
+        val report =
+            createReport(
+                listOf(createScenario(steps = listOf(createStep(description = "assert status 200")))),
+            )
 
         val output = formatter.formatReport(report)
 
@@ -186,11 +192,17 @@ class TextReportFormatterTest {
     @Test
     fun `custom step is highlighted in colored output`() {
         val formatter = TextReportFormatter.colored()
-        val report = createReport(
-            listOf(createScenario(steps = listOf(
-                createStep(description = "custom assertion", isCustomStep = true)
-            )))
-        )
+        val report =
+            createReport(
+                listOf(
+                    createScenario(
+                        steps =
+                            listOf(
+                                createStep(description = "custom assertion", isCustomStep = true),
+                            ),
+                    ),
+                ),
+            )
 
         val output = formatter.formatReport(report)
 
@@ -203,11 +215,17 @@ class TextReportFormatterTest {
     @Test
     fun `plain formatter does not highlight custom steps`() {
         val formatter = TextReportFormatter.plain()
-        val report = createReport(
-            listOf(createScenario(steps = listOf(
-                createStep(description = "custom assertion", isCustomStep = true)
-            )))
-        )
+        val report =
+            createReport(
+                listOf(
+                    createScenario(
+                        steps =
+                            listOf(
+                                createStep(description = "custom assertion", isCustomStep = true),
+                            ),
+                    ),
+                ),
+            )
 
         val output = formatter.formatReport(report)
 
@@ -218,12 +236,13 @@ class TextReportFormatterTest {
     @Test
     fun `failed scenarios are listed at the end`() {
         val formatter = TextReportFormatter.plain()
-        val report = createReport(
-            listOf(
-                createScenario(name = "Passing Test", status = ResultStatus.PASSED),
-                createScenario(name = "Failing Test", status = ResultStatus.FAILED),
+        val report =
+            createReport(
+                listOf(
+                    createScenario(name = "Passing Test", status = ResultStatus.PASSED),
+                    createScenario(name = "Failing Test", status = ResultStatus.FAILED),
+                ),
             )
-        )
 
         val output = formatter.formatReport(report)
 
@@ -233,13 +252,15 @@ class TextReportFormatterTest {
 
     @Test
     fun `colored formatter with custom scheme uses custom colors`() {
-        val customScheme = ColorScheme(
-            passed = AnsiColors.BRIGHT_GREEN,
-        )
+        val customScheme =
+            ColorScheme(
+                passed = AnsiColors.BRIGHT_GREEN,
+            )
         val formatter = TextReportFormatter.colored(customScheme)
-        val report = createReport(
-            listOf(createScenario(steps = listOf(createStep())))
-        )
+        val report =
+            createReport(
+                listOf(createScenario(steps = listOf(createStep()))),
+            )
 
         val output = formatter.formatReport(report)
 

@@ -36,14 +36,20 @@ class StepContextImpl(
         }
     }
 
-    override fun setVariable(name: String, value: Any?) {
+    override fun setVariable(
+        name: String,
+        value: Any?,
+    ) {
         if (value != null) {
             executionContext[name] = value
         }
         // Note: ExecutionContext doesn't support null values, so we just don't set
     }
 
-    override fun setSharedVariable(name: String, value: Any?) {
+    override fun setSharedVariable(
+        name: String,
+        value: Any?,
+    ) {
         if (sharingEnabled && sharedVariables != null) {
             sharedVariables[name] = value
         } else {

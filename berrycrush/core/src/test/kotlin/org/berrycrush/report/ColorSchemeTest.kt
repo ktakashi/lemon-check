@@ -96,10 +96,11 @@ class ColorSchemeTest {
 
     @Test
     fun `custom scheme allows custom colors`() {
-        val customScheme = ColorScheme(
-            passed = AnsiColors.BRIGHT_GREEN,
-            failed = AnsiColors.BRIGHT_RED,
-        )
+        val customScheme =
+            ColorScheme(
+                passed = AnsiColors.BRIGHT_GREEN,
+                failed = AnsiColors.BRIGHT_RED,
+            )
         assertEquals(AnsiColors.BRIGHT_GREEN, customScheme.passed)
         assertEquals(AnsiColors.BRIGHT_RED, customScheme.failed)
     }

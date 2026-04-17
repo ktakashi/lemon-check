@@ -27,16 +27,18 @@ class AssertionRegistryTest {
         @Test
         @DisplayName("should register and find simple assertion")
         fun registerAndFindSimple() {
-            val instance = object {
-                @Assertion("the result should be valid")
-                fun assertValid(): AssertionResult = AssertionResult.passed()
-            }
+            val instance =
+                object {
+                    @Assertion("the result should be valid")
+                    fun assertValid(): AssertionResult = AssertionResult.passed()
+                }
 
-            val definition = AssertionDefinition(
-                pattern = "the result should be valid",
-                method = instance.javaClass.getMethod("assertValid"),
-                instance = instance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "the result should be valid",
+                    method = instance.javaClass.getMethod("assertValid"),
+                    instance = instance,
+                )
             registry.register(definition)
 
             val match = registry.findMatch("the result should be valid")
@@ -49,16 +51,18 @@ class AssertionRegistryTest {
         @Test
         @DisplayName("should extract string parameter")
         fun extractStringParameter() {
-            val instance = object {
-                @Assertion("the name should be {string}")
-                fun assertName(expected: String): AssertionResult = AssertionResult.passed()
-            }
+            val instance =
+                object {
+                    @Assertion("the name should be {string}")
+                    fun assertName(expected: String): AssertionResult = AssertionResult.passed()
+                }
 
-            val definition = AssertionDefinition(
-                pattern = "the name should be {string}",
-                method = instance.javaClass.getMethod("assertName", String::class.java),
-                instance = instance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "the name should be {string}",
+                    method = instance.javaClass.getMethod("assertName", String::class.java),
+                    instance = instance,
+                )
             registry.register(definition)
 
             val match = registry.findMatch("""the name should be "John"""")
@@ -71,16 +75,18 @@ class AssertionRegistryTest {
         @Test
         @DisplayName("should extract int parameter")
         fun extractIntParameter() {
-            val instance = object {
-                @Assertion("the count should be {int}")
-                fun assertCount(expected: Int): AssertionResult = AssertionResult.passed()
-            }
+            val instance =
+                object {
+                    @Assertion("the count should be {int}")
+                    fun assertCount(expected: Int): AssertionResult = AssertionResult.passed()
+                }
 
-            val definition = AssertionDefinition(
-                pattern = "the count should be {int}",
-                method = instance.javaClass.getMethod("assertCount", Int::class.java),
-                instance = instance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "the count should be {int}",
+                    method = instance.javaClass.getMethod("assertCount", Int::class.java),
+                    instance = instance,
+                )
             registry.register(definition)
 
             val match = registry.findMatch("the count should be 42")
@@ -93,20 +99,28 @@ class AssertionRegistryTest {
         @Test
         @DisplayName("should extract multiple parameters")
         fun extractMultipleParameters() {
-            val instance = object {
-                @Assertion("the {word} with ID {int} should have status {string}")
-                fun assertStatus(entity: String, id: Int, status: String): AssertionResult =
-                    AssertionResult.passed()
-            }
+            val instance =
+                object {
+                    @Assertion("the {word} with ID {int} should have status {string}")
+                    fun assertStatus(
+                        entity: String,
+                        id: Int,
+                        status: String,
+                    ): AssertionResult = AssertionResult.passed()
+                }
 
-            val definition = AssertionDefinition(
-                pattern = "the {word} with ID {int} should have status {string}",
-                method = instance.javaClass.getMethod(
-                    "assertStatus",
-                    String::class.java, Int::class.java, String::class.java,
-                ),
-                instance = instance,
-            )
+            val definition =
+                AssertionDefinition(
+                    pattern = "the {word} with ID {int} should have status {string}",
+                    method =
+                        instance.javaClass.getMethod(
+                            "assertStatus",
+                            String::class.java,
+                            Int::class.java,
+                            String::class.java,
+                        ),
+                    instance = instance,
+                )
             registry.register(definition)
 
             val match = registry.findMatch("""the order with ID 123 should have status "completed"""")
@@ -129,13 +143,14 @@ class AssertionRegistryTest {
         @Test
         @DisplayName("should register multiple assertions")
         fun registerMultipleAssertions() {
-            val instance = object {
-                @Assertion("first assertion")
-                fun first(): AssertionResult = AssertionResult.passed()
+            val instance =
+                object {
+                    @Assertion("first assertion")
+                    fun first(): AssertionResult = AssertionResult.passed()
 
-                @Assertion("second assertion")
-                fun second(): AssertionResult = AssertionResult.passed()
-            }
+                    @Assertion("second assertion")
+                    fun second(): AssertionResult = AssertionResult.passed()
+                }
 
             registry.register(
                 AssertionDefinition(
@@ -160,10 +175,11 @@ class AssertionRegistryTest {
         @Test
         @DisplayName("should clear all assertions")
         fun clearAllAssertions() {
-            val instance = object {
-                @Assertion("test assertion")
-                fun test(): AssertionResult = AssertionResult.passed()
-            }
+            val instance =
+                object {
+                    @Assertion("test assertion")
+                    fun test(): AssertionResult = AssertionResult.passed()
+                }
 
             registry.register(
                 AssertionDefinition(
@@ -259,11 +275,12 @@ class AssertionRegistryTest {
         @Test
         @DisplayName("should create failed result with comparison values")
         fun createFailedWithComparison() {
-            val result = AssertionResult.failed(
-                message = "Values don't match",
-                expectedValue = 10,
-                actualValue = 5,
-            )
+            val result =
+                AssertionResult.failed(
+                    message = "Values don't match",
+                    expectedValue = 10,
+                    actualValue = 5,
+                )
 
             assertTrue(!result.passed)
             assertEquals("Values don't match", result.message)

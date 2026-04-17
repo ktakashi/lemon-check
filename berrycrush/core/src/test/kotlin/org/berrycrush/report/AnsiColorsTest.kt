@@ -75,24 +75,25 @@ class AnsiColorsTest {
 
     @Test
     fun `all color constants start with escape sequence`() {
-        val colors = listOf(
-            AnsiColors.RED,
-            AnsiColors.GREEN,
-            AnsiColors.YELLOW,
-            AnsiColors.BLUE,
-            AnsiColors.CYAN,
-            AnsiColors.MAGENTA,
-            AnsiColors.WHITE,
-            AnsiColors.BLACK,
-            AnsiColors.GRAY,
-            AnsiColors.BRIGHT_RED,
-            AnsiColors.BRIGHT_GREEN,
-            AnsiColors.BRIGHT_YELLOW,
-            AnsiColors.BRIGHT_BLUE,
-            AnsiColors.BRIGHT_CYAN,
-            AnsiColors.BRIGHT_MAGENTA,
-            AnsiColors.BRIGHT_WHITE,
-        )
+        val colors =
+            listOf(
+                AnsiColors.RED,
+                AnsiColors.GREEN,
+                AnsiColors.YELLOW,
+                AnsiColors.BLUE,
+                AnsiColors.CYAN,
+                AnsiColors.MAGENTA,
+                AnsiColors.WHITE,
+                AnsiColors.BLACK,
+                AnsiColors.GRAY,
+                AnsiColors.BRIGHT_RED,
+                AnsiColors.BRIGHT_GREEN,
+                AnsiColors.BRIGHT_YELLOW,
+                AnsiColors.BRIGHT_BLUE,
+                AnsiColors.BRIGHT_CYAN,
+                AnsiColors.BRIGHT_MAGENTA,
+                AnsiColors.BRIGHT_WHITE,
+            )
         for (color in colors) {
             assertTrue(color.startsWith("\u001B["), "Color should start with escape: $color")
             assertTrue(color.endsWith("m"), "Color should end with m: $color")

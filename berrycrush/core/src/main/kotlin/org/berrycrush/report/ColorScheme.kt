@@ -48,41 +48,44 @@ data class ColorScheme(
         /**
          * High contrast scheme for accessibility.
          */
-        val HIGH_CONTRAST = ColorScheme(
-            passed = AnsiColors.BOLD + AnsiColors.GREEN,
-            failed = AnsiColors.BOLD + AnsiColors.RED,
-            skipped = AnsiColors.DIM,
-            error = AnsiColors.BOLD + AnsiColors.YELLOW,
-            customHighlight = AnsiColors.BOLD + AnsiColors.BRIGHT_MAGENTA,
-            header = AnsiColors.BOLD + AnsiColors.BRIGHT_WHITE,
-            stepDescription = AnsiColors.WHITE,
-        )
+        val HIGH_CONTRAST =
+            ColorScheme(
+                passed = AnsiColors.BOLD + AnsiColors.GREEN,
+                failed = AnsiColors.BOLD + AnsiColors.RED,
+                skipped = AnsiColors.DIM,
+                error = AnsiColors.BOLD + AnsiColors.YELLOW,
+                customHighlight = AnsiColors.BOLD + AnsiColors.BRIGHT_MAGENTA,
+                header = AnsiColors.BOLD + AnsiColors.BRIGHT_WHITE,
+                stepDescription = AnsiColors.WHITE,
+            )
 
         /**
          * Monochrome scheme using only styles (bold, dim) without colors.
          */
-        val MONOCHROME = ColorScheme(
-            passed = "",
-            failed = AnsiColors.BOLD,
-            skipped = AnsiColors.DIM,
-            error = AnsiColors.BOLD + AnsiColors.UNDERLINE,
-            customHighlight = AnsiColors.BOLD,
-            header = AnsiColors.BOLD,
-            stepDescription = "",
-        )
+        val MONOCHROME =
+            ColorScheme(
+                passed = "",
+                failed = AnsiColors.BOLD,
+                skipped = AnsiColors.DIM,
+                error = AnsiColors.BOLD + AnsiColors.UNDERLINE,
+                customHighlight = AnsiColors.BOLD,
+                header = AnsiColors.BOLD,
+                stepDescription = "",
+            )
 
         /**
          * No colors - identity scheme for testing or piping.
          */
-        val NONE = ColorScheme(
-            passed = "",
-            failed = "",
-            skipped = "",
-            error = "",
-            customHighlight = "",
-            header = "",
-            stepDescription = "",
-        )
+        val NONE =
+            ColorScheme(
+                passed = "",
+                failed = "",
+                skipped = "",
+                error = "",
+                customHighlight = "",
+                header = "",
+                stepDescription = "",
+            )
     }
 
     /**
@@ -103,7 +106,10 @@ data class ColorScheme(
      * @param status The result status determining color
      * @return Colorized text with reset at end
      */
-    fun colorize(text: String, status: ResultStatus): String {
+    fun colorize(
+        text: String,
+        status: ResultStatus,
+    ): String {
         val color = forStatus(status)
         return if (color.isEmpty()) text else AnsiColors.wrap(text, color)
     }
@@ -114,8 +120,7 @@ data class ColorScheme(
      * @param text The text to highlight
      * @return Highlighted text with reset at end
      */
-    fun highlight(text: String): String =
-        if (customHighlight.isEmpty()) text else AnsiColors.wrap(text, customHighlight)
+    fun highlight(text: String): String = if (customHighlight.isEmpty()) text else AnsiColors.wrap(text, customHighlight)
 
     /**
      * Apply header styling to text.
@@ -123,6 +128,5 @@ data class ColorScheme(
      * @param text The header text
      * @return Styled header text with reset at end
      */
-    fun headerStyle(text: String): String =
-        if (header.isEmpty()) text else AnsiColors.wrap(text, header)
+    fun headerStyle(text: String): String = if (header.isEmpty()) text else AnsiColors.wrap(text, header)
 }

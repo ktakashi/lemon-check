@@ -1,6 +1,7 @@
 package org.berrycrush.openapi
 
 import org.berrycrush.exception.OperationNotFoundException
+import org.berrycrush.openapi.impl.SwaggerParserAdapter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -8,14 +9,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class OperationResolverTest {
-    private val loader = OpenApiLoader()
+    private val parser = SwaggerParserAdapter()
 
     private fun loadPetstoreResolver(): OperationResolver {
         val specPath =
             javaClass.getResource("/petstore.yaml")?.path
                 ?: error("petstore.yaml not found in test resources")
-        val openApi = loader.load(specPath)
-        return OperationResolver(openApi)
+        val spec = parser.parse(specPath)
+        return OperationResolver(spec)
     }
 
     @Test

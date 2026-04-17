@@ -50,7 +50,10 @@ interface AssertionContext {
      * @return The variable value cast to T, or null if not found or wrong type
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T> variable(name: String, type: Class<T>): T? = variable(name) as? T
+    fun <T> variable(
+        name: String,
+        type: Class<T>,
+    ): T? = variable(name) as? T
 
     /**
      * Get all current variables.

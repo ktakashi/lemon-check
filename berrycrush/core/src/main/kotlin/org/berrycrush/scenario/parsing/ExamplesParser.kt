@@ -1,10 +1,9 @@
 package org.berrycrush.scenario.parsing
 
-import org.berrycrush.scenario.*
-
-/**
- * Extension functions for parsing examples tables in scenario outlines.
- */
+import org.berrycrush.scenario.ExampleRowNode
+import org.berrycrush.scenario.ParserState
+import org.berrycrush.scenario.TokenType
+import org.berrycrush.scenario.ValueNode
 
 /**
  * Parse examples table.

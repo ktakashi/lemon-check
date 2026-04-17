@@ -144,11 +144,12 @@ class TextReportFormatter(
 
         // Apply coloring
         val coloredRightSide = colorScheme.colorize(rightSide, status)
-        val displayDescription = if (isCustom) {
-            colorScheme.highlight(description)
-        } else {
-            description
-        }
+        val displayDescription =
+            if (isCustom) {
+                colorScheme.highlight(description)
+            } else {
+                description
+            }
 
         appendLine("  $displayDescription $dots $coloredRightSide")
 

@@ -1,12 +1,12 @@
 package org.berrycrush.scenario.parsing
 
-import org.berrycrush.scenario.*
-
-/**
- * Extension functions for parsing scenario-level constructs.
- *
- * Includes: tags, scenarios, outlines, features, fragments, background, parameters
- */
+import org.berrycrush.scenario.BackgroundNode
+import org.berrycrush.scenario.FeatureNode
+import org.berrycrush.scenario.FragmentNode
+import org.berrycrush.scenario.ParametersNode
+import org.berrycrush.scenario.ParserState
+import org.berrycrush.scenario.ScenarioNode
+import org.berrycrush.scenario.TokenType
 
 /**
  * Parse tags preceding a scenario or feature.

@@ -23,12 +23,13 @@ class StepContextImplTest {
     fun setUp() {
         executionContext = ExecutionContext()
         configuration = BerryCrushConfiguration()
-        stepContext = StepContextImpl(
-            executionContext = executionContext,
-            configuration = configuration,
-            sharedVariables = null,
-            sharingEnabled = false,
-        )
+        stepContext =
+            StepContextImpl(
+                executionContext = executionContext,
+                configuration = configuration,
+                sharedVariables = null,
+                sharingEnabled = false,
+            )
     }
 
     @Nested
@@ -99,12 +100,13 @@ class StepContextImplTest {
         @DisplayName("should set variable in shared map when sharing is enabled")
         fun setVariableWhenSharingEnabled() {
             val sharedVars = mutableMapOf<String, Any?>()
-            val ctxWithSharing = StepContextImpl(
-                executionContext = executionContext,
-                configuration = configuration,
-                sharedVariables = sharedVars,
-                sharingEnabled = true,
-            )
+            val ctxWithSharing =
+                StepContextImpl(
+                    executionContext = executionContext,
+                    configuration = configuration,
+                    sharedVariables = sharedVars,
+                    sharingEnabled = true,
+                )
 
             ctxWithSharing.setSharedVariable("token", "abc123")
 
@@ -153,12 +155,13 @@ class StepContextImplTest {
         @DisplayName("should prioritize scenario variables over shared variables")
         fun prioritizeScenarioVariables() {
             val sharedVars = mutableMapOf<String, Any?>("key" to "shared")
-            val ctxWithSharing = StepContextImpl(
-                executionContext = executionContext,
-                configuration = configuration,
-                sharedVariables = sharedVars,
-                sharingEnabled = true,
-            )
+            val ctxWithSharing =
+                StepContextImpl(
+                    executionContext = executionContext,
+                    configuration = configuration,
+                    sharedVariables = sharedVars,
+                    sharingEnabled = true,
+                )
 
             // Set scenario variable
             executionContext.set("key", "scenario")
@@ -172,12 +175,13 @@ class StepContextImplTest {
         @DisplayName("should fall back to shared variable when scenario variable is null")
         fun fallBackToSharedVariable() {
             val sharedVars = mutableMapOf<String, Any?>("key" to "shared")
-            val ctxWithSharing = StepContextImpl(
-                executionContext = executionContext,
-                configuration = configuration,
-                sharedVariables = sharedVars,
-                sharingEnabled = true,
-            )
+            val ctxWithSharing =
+                StepContextImpl(
+                    executionContext = executionContext,
+                    configuration = configuration,
+                    sharedVariables = sharedVars,
+                    sharingEnabled = true,
+                )
 
             // Scenario variable does not exist
             val result = ctxWithSharing.variable("key")
@@ -189,12 +193,13 @@ class StepContextImplTest {
         @DisplayName("should return null when variable not found in any scope")
         fun returnNullWhenNotFoundInAnyScope() {
             val sharedVars = mutableMapOf<String, Any?>()
-            val ctxWithSharing = StepContextImpl(
-                executionContext = executionContext,
-                configuration = configuration,
-                sharedVariables = sharedVars,
-                sharingEnabled = true,
-            )
+            val ctxWithSharing =
+                StepContextImpl(
+                    executionContext = executionContext,
+                    configuration = configuration,
+                    sharedVariables = sharedVars,
+                    sharingEnabled = true,
+                )
 
             val result = ctxWithSharing.variable("missing")
 
@@ -205,12 +210,13 @@ class StepContextImplTest {
         @DisplayName("should ignore shared variables when sharing is disabled")
         fun ignoreSharedVariablesWhenDisabled() {
             val sharedVars = mutableMapOf<String, Any?>("key" to "shared")
-            val ctxWithoutSharing = StepContextImpl(
-                executionContext = executionContext,
-                configuration = configuration,
-                sharedVariables = sharedVars, // Map provided but sharing disabled
-                sharingEnabled = false,
-            )
+            val ctxWithoutSharing =
+                StepContextImpl(
+                    executionContext = executionContext,
+                    configuration = configuration,
+                    sharedVariables = sharedVars, // Map provided but sharing disabled
+                    sharingEnabled = false,
+                )
 
             // Variable should not be accessible because sharing is disabled
             val result = ctxWithoutSharing.variable("key")
@@ -238,12 +244,13 @@ class StepContextImplTest {
         @DisplayName("should combine scenario and shared variables when sharing is enabled")
         fun combineScenarioAndSharedVariables() {
             val sharedVars = mutableMapOf<String, Any?>("shared" to "sharedValue")
-            val ctxWithSharing = StepContextImpl(
-                executionContext = executionContext,
-                configuration = configuration,
-                sharedVariables = sharedVars,
-                sharingEnabled = true,
-            )
+            val ctxWithSharing =
+                StepContextImpl(
+                    executionContext = executionContext,
+                    configuration = configuration,
+                    sharedVariables = sharedVars,
+                    sharingEnabled = true,
+                )
             executionContext.set("scenario", "scenarioValue")
 
             val result = ctxWithSharing.allVariables()
@@ -256,12 +263,13 @@ class StepContextImplTest {
         @DisplayName("should prioritize scenario variables in allVariables")
         fun prioritizeScenarioVariablesInAll() {
             val sharedVars = mutableMapOf<String, Any?>("key" to "shared")
-            val ctxWithSharing = StepContextImpl(
-                executionContext = executionContext,
-                configuration = configuration,
-                sharedVariables = sharedVars,
-                sharingEnabled = true,
-            )
+            val ctxWithSharing =
+                StepContextImpl(
+                    executionContext = executionContext,
+                    configuration = configuration,
+                    sharedVariables = sharedVars,
+                    sharingEnabled = true,
+                )
             executionContext.set("key", "scenario")
 
             val result = ctxWithSharing.allVariables()

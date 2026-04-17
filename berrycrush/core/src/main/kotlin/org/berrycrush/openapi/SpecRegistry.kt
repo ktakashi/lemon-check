@@ -4,6 +4,7 @@ import io.swagger.v3.oas.models.OpenAPI
 import org.berrycrush.config.SpecConfiguration
 import org.berrycrush.exception.ConfigurationException
 import org.berrycrush.exception.OperationNotFoundException
+import org.berrycrush.openapi.impl.SwaggerParserAdapter
 
 /**
  * Registry for managing multiple OpenAPI specifications.
@@ -12,7 +13,7 @@ import org.berrycrush.exception.OperationNotFoundException
  */
 class SpecRegistry {
     private val specs = mutableMapOf<String, LoadedSpec>()
-    private val loader = OpenApiLoader()
+    private val parser: OpenApiParser = SwaggerParserAdapter()
     private var defaultSpec: String? = null
 
     /**
@@ -28,16 +29,14 @@ class SpecRegistry {
         config: SpecConfiguration.() -> Unit = {},
     ) {
         val specConfig = SpecConfiguration(name, path).apply(config)
-        val openApi = loader.load(path)
-        val resolver = OperationResolver(openApi)
+        val openApiSpec = parser.parse(path)
 
         specs[name] =
             LoadedSpec(
                 name = name,
                 path = path,
-                openApi = openApi,
-                resolver = resolver,
-                baseUrl = specConfig.baseUrl ?: extractBaseUrl(openApi),
+                spec = openApiSpec,
+                baseUrl = specConfig.baseUrl ?: extractBaseUrl(openApiSpec),
                 defaultHeaders = specConfig.defaultHeaders.toMap(),
             )
 
@@ -89,20 +88,24 @@ class SpecRegistry {
     ): Pair<LoadedSpec, ResolvedOperation> {
         if (specName != null) {
             val spec = get(specName)
-            return spec to spec.resolver.resolve(operationId)
+            val operation =
+                spec.spec.getOperation(operationId)
+                    ?: throw OperationNotFoundException(operationId, spec.spec.getAllOperations().mapNotNull { it.operationId })
+            return spec to operation.toResolvedOperation()
         }
 
         // Auto-resolve: find all specs containing this operationId
-        val matches = specs.values.filter { it.resolver.hasOperation(operationId) }
+        val matches = specs.values.filter { it.spec.getOperation(operationId) != null }
 
         return when {
             matches.isEmpty() -> {
-                val allOps = specs.values.flatMap { it.resolver.allOperationIds() }
+                val allOps = specs.values.flatMap { it.spec.getAllOperations().mapNotNull { op -> op.operationId } }
                 throw OperationNotFoundException(operationId, allOps)
             }
             matches.size == 1 -> {
                 val spec = matches.single()
-                spec to spec.resolver.resolve(operationId)
+                val operation = spec.spec.getOperation(operationId)!!
+                spec to operation.toResolvedOperation()
             }
             else -> {
                 throw AmbiguousOperationException(
@@ -142,7 +145,7 @@ class SpecRegistry {
             existing.copy(baseUrl = newBaseUrl)
     }
 
-    private fun extractBaseUrl(openApi: OpenAPI): String = openApi.servers?.firstOrNull()?.url ?: "http://localhost"
+    private fun extractBaseUrl(spec: OpenApiSpec): String = spec.servers.firstOrNull()?.url ?: "http://localhost"
 }
 
 /**
@@ -151,11 +154,43 @@ class SpecRegistry {
 data class LoadedSpec(
     val name: String,
     val path: String,
-    val openApi: OpenAPI,
-    val resolver: OperationResolver,
+    val spec: OpenApiSpec,
     val baseUrl: String,
     val defaultHeaders: Map<String, String>,
-)
+) {
+    /**
+     * Access the raw swagger OpenAPI model for backward compatibility.
+     * Prefer using the spec abstraction when possible.
+     */
+    val openApi: OpenAPI
+        get() = spec.rawModel as OpenAPI
+
+    /**
+     * Get an operation by ID.
+     */
+    fun getOperation(operationId: String): OperationSpec? = spec.getOperation(operationId)
+
+    /**
+     * Check if this spec contains the given operation ID.
+     */
+    fun hasOperation(operationId: String): Boolean = spec.getOperation(operationId) != null
+
+    /**
+     * Get all operation IDs in this spec.
+     */
+    fun allOperationIds(): List<String> = spec.getAllOperations().mapNotNull { it.operationId }
+}
+
+/**
+ * Convert OperationSpec to ResolvedOperation for backward compatibility.
+ */
+private fun OperationSpec.toResolvedOperation(): ResolvedOperation =
+    ResolvedOperation(
+        operationId = this.operationId ?: "",
+        path = this.path,
+        method = this.method,
+        operation = this,
+    )
 
 /**
  * Exception thrown when an operationId exists in multiple specs.

@@ -356,12 +356,13 @@ class BerryCrushScenarioExecutor(
         stepStartTime: Instant,
     ): StepResult =
         runCatching {
-            val stepContext = StepContextImpl(
-                executionContext = context,
-                configuration = configuration,
-                sharedVariables = null, // TODO: Add shared variables support
-                sharingEnabled = false,
-            )
+            val stepContext =
+                StepContextImpl(
+                    executionContext = context,
+                    configuration = configuration,
+                    sharedVariables = null, // TODO: Add shared variables support
+                    sharingEnabled = false,
+                )
 
             // Invoke the custom step method with extracted parameters and context
             val method = match.definition.method
@@ -369,14 +370,15 @@ class BerryCrushScenarioExecutor(
 
             // Check if method accepts StepContext as last parameter
             val methodParams = method.parameters
-            val args = if (methodParams.isNotEmpty() &&
-                methodParams.last().type.isAssignableFrom(StepContext::class.java)
-            ) {
-                // Append StepContext to parameters
-                arrayOf(*parameters, stepContext)
-            } else {
-                parameters
-            }
+            val args =
+                if (methodParams.isNotEmpty() &&
+                    methodParams.last().type.isAssignableFrom(StepContext::class.java)
+                ) {
+                    // Append StepContext to parameters
+                    arrayOf(*parameters, stepContext)
+                } else {
+                    parameters
+                }
 
             // Invoke the method
             val result = method.invoke(match.definition.instance, *args)
@@ -395,16 +397,18 @@ class BerryCrushScenarioExecutor(
             }
         }.getOrElse { e ->
             // Unwrap InvocationTargetException to get the actual exception
-            val actualException = when (e) {
-                is java.lang.reflect.InvocationTargetException -> e.cause ?: e
-                else -> e
-            }
+            val actualException =
+                when (e) {
+                    is java.lang.reflect.InvocationTargetException -> e.cause ?: e
+                    else -> e
+                }
 
             // Determine status based on exception type
-            val status = when (actualException) {
-                is AssertionError -> ResultStatus.FAILED
-                else -> ResultStatus.ERROR
-            }
+            val status =
+                when (actualException) {
+                    is AssertionError -> ResultStatus.FAILED
+                    else -> ResultStatus.ERROR
+                }
 
             StepResult(
                 step = step,
@@ -418,7 +422,10 @@ class BerryCrushScenarioExecutor(
     /**
      * Resolve variables in a string.
      */
-    private fun resolveVariables(text: String, context: ExecutionContext): String {
+    private fun resolveVariables(
+        text: String,
+        context: ExecutionContext,
+    ): String {
         val regex = """\{\{(\w+)}}""".toRegex()
         return regex.replace(text) { matchResult ->
             val varName = matchResult.groupValues[1]
@@ -524,13 +531,16 @@ class BerryCrushScenarioExecutor(
      */
     private fun hasCustomAssertionInConditional(conditional: ConditionalAssertion): Boolean {
         // Check if branch
-        if (conditional.ifBranch.actions.assertions.any { it.condition is Condition.CustomAssertion }) {
+        if (conditional.ifBranch.actions.assertions
+                .any { it.condition is Condition.CustomAssertion }
+        ) {
             return true
         }
         // Check else if branches
         if (conditional.elseIfBranches.any { branch ->
-            branch.actions.assertions.any { it.condition is Condition.CustomAssertion }
-        }) {
+                branch.actions.assertions.any { it.condition is Condition.CustomAssertion }
+            }
+        ) {
             return true
         }
         // Check else actions
@@ -538,11 +548,13 @@ class BerryCrushScenarioExecutor(
             return true
         }
         // Check nested conditionals
-        val hasNestedCustom = conditional.ifBranch.actions.nestedConditionals.any { hasCustomAssertionInConditional(it) } ||
-            conditional.elseIfBranches.any { branch ->
-                branch.actions.nestedConditionals.any { hasCustomAssertionInConditional(it) }
-            } ||
-            (conditional.elseActions?.nestedConditionals?.any { hasCustomAssertionInConditional(it) } == true)
+        val hasNestedCustom =
+            conditional.ifBranch.actions.nestedConditionals
+                .any { hasCustomAssertionInConditional(it) } ||
+                conditional.elseIfBranches.any { branch ->
+                    branch.actions.nestedConditionals.any { hasCustomAssertionInConditional(it) }
+                } ||
+                (conditional.elseActions?.nestedConditionals?.any { hasCustomAssertionInConditional(it) } == true)
         return hasNestedCustom
     }
 
@@ -704,23 +716,24 @@ class BerryCrushScenarioExecutor(
      */
     private fun getSchemaDefaults(resolvedOp: ResolvedOperation): Map<String, BodyProperty> {
         val requestBody = resolvedOp.operation.requestBody ?: return emptyMap()
-        val content = requestBody.content ?: return emptyMap()
+        val content = requestBody.content
+        if (content.isEmpty()) return emptyMap()
 
         // Prefer application/json schema
         val mediaType = content["application/json"] ?: content.values.firstOrNull() ?: return emptyMap()
         val schema = mediaType.schema ?: return emptyMap()
 
-        return extractPropertiesFromSchema(schema)
+        return extractPropertiesFromSchemaSpec(schema)
     }
 
     /**
-     * Extract default properties from an OpenAPI schema.
+     * Extract default properties from a SchemaSpec.
      */
-    private fun extractPropertiesFromSchema(schema: io.swagger.v3.oas.models.media.Schema<*>): Map<String, BodyProperty> {
+    private fun extractPropertiesFromSchemaSpec(schema: org.berrycrush.openapi.SchemaSpec): Map<String, BodyProperty> {
         val result = mutableMapOf<String, BodyProperty>()
 
         schema.properties?.forEach { (name, propSchema) ->
-            val defaultValue = getSchemaDefaultValue(propSchema)
+            val defaultValue = getSchemaSpecDefaultValue(propSchema)
             if (defaultValue != null) {
                 result[name] = defaultValue
             }
@@ -730,9 +743,9 @@ class BerryCrushScenarioExecutor(
     }
 
     /**
-     * Get a default value for a schema property.
+     * Get a default value for a SchemaSpec property.
      */
-    private fun getSchemaDefaultValue(schema: io.swagger.v3.oas.models.media.Schema<*>): BodyProperty? {
+    private fun getSchemaSpecDefaultValue(schema: org.berrycrush.openapi.SchemaSpec): BodyProperty? {
         // Use explicit default if provided
         schema.default?.let { return BodyProperty.Simple(it) }
 
@@ -746,7 +759,7 @@ class BerryCrushScenarioExecutor(
             "boolean" -> BodyProperty.Simple(false)
             "array" -> BodyProperty.Simple(emptyList<Any>())
             "object" -> {
-                val nestedProps = extractPropertiesFromSchema(schema)
+                val nestedProps = extractPropertiesFromSchemaSpec(schema)
                 if (nestedProps.isNotEmpty()) {
                     BodyProperty.Nested(nestedProps)
                 } else {
@@ -977,12 +990,13 @@ class BerryCrushScenarioExecutor(
 
         val match = registry.findMatch(condition.pattern) ?: return false
 
-        val assertionContext = org.berrycrush.assertion.AssertionContextImpl(
-            executionContext = context,
-            configuration = configuration,
-            sharedVariables = null,
-            sharingEnabled = false,
-        )
+        val assertionContext =
+            org.berrycrush.assertion.AssertionContextImpl(
+                executionContext = context,
+                configuration = configuration,
+                sharedVariables = null,
+                sharingEnabled = false,
+            )
 
         return runCatching {
             val method = match.definition.method
@@ -990,13 +1004,14 @@ class BerryCrushScenarioExecutor(
 
             // Check if method accepts AssertionContext as last parameter
             val methodParams = method.parameters
-            val args = if (methodParams.isNotEmpty() &&
-                methodParams.last().type.isAssignableFrom(org.berrycrush.assertion.AssertionContext::class.java)
-            ) {
-                arrayOf(*parameters, assertionContext)
-            } else {
-                parameters
-            }
+            val args =
+                if (methodParams.isNotEmpty() &&
+                    methodParams.last().type.isAssignableFrom(org.berrycrush.assertion.AssertionContext::class.java)
+                ) {
+                    arrayOf(*parameters, assertionContext)
+                } else {
+                    parameters
+                }
 
             val result = method.invoke(match.definition.instance, *args)
 
@@ -1007,10 +1022,11 @@ class BerryCrushScenarioExecutor(
             }
         }.getOrElse { e ->
             // Unwrap InvocationTargetException
-            val actualException = when (e) {
-                is java.lang.reflect.InvocationTargetException -> e.cause ?: e
-                else -> e
-            }
+            val actualException =
+                when (e) {
+                    is java.lang.reflect.InvocationTargetException -> e.cause ?: e
+                    else -> e
+                }
 
             // AssertionError means the assertion failed
             actualException !is AssertionError
@@ -1044,10 +1060,14 @@ class BerryCrushScenarioExecutor(
         val responseBody = response.body() ?: return true // Empty body passes validation
 
         // Find the schema for this response status code
-        val schema = findResponseSchema(operation, response.statusCode()) ?: return true
+        val schemaSpec = findResponseSchema(operation, response.statusCode()) ?: return true
+
+        // Get raw swagger schema for validation
+        @Suppress("UNCHECKED_CAST")
+        val rawSchema = schemaSpec.rawSchema as? io.swagger.v3.oas.models.media.Schema<*> ?: return true
 
         // Validate the response body against the schema
-        val errors = schemaValidator.validate(responseBody, schema)
+        val errors = schemaValidator.validate(responseBody, rawSchema)
         return errors.isEmpty()
     }
 
@@ -1057,10 +1077,10 @@ class BerryCrushScenarioExecutor(
     private fun findResponseSchema(
         operation: ResolvedOperation,
         statusCode: Int,
-    ): io.swagger.v3.oas.models.media.Schema<*>? {
+    ): org.berrycrush.openapi.SchemaSpec? {
         val response = operation.findResponse(statusCode) ?: return null
         return response.content
-            ?.values
+            .values
             ?.firstOrNull()
             ?.schema
     }
