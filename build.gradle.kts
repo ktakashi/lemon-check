@@ -31,6 +31,9 @@ allprojects {
 }
 
 subprojects {
+    // Skip BOM module - it uses java-platform which conflicts with java plugins
+    if (name == "bom") return@subprojects
+
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
 
