@@ -5,12 +5,10 @@ on:
     branches: [main]
     paths:
       - 'berrycrush/berrycrush/doc/**'
-      - 'developer/**/*.md'
+      - 'developer/*.md'
       - 'berrycrush/**/*.kt'
       - '.github/workflows/_docs-*.yml'
       - '.github/workflows/docs-nightly.yml'
-    paths-ignore:
-      - '**/README.md'
   workflow_dispatch:
 
 jobs:
