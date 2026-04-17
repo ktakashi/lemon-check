@@ -10,17 +10,18 @@ javaPlatform {
     allowDependencies()
 }
 
-// Version properties that users can override
+// Read versions from version catalog
 val berrycrushVersion = project.version.toString()
 
-// Dependency versions - users can override these via gradle.properties or -P flags
-val swaggerParserVersion: String by project
-val jsonPathVersion: String by project
-val jsonSchemaValidatorVersion: String by project
-val jacksonVersion: String by project
-val junitVersion: String by project
-val junitPlatformVersion: String by project
-val springBootVersion: String by project
+// Access version catalog
+val catalog = project.extensions.getByType<VersionCatalogsExtension>().named("libs")
+val swaggerParserVersion = catalog.findVersion("swagger-parser").get().requiredVersion
+val jsonPathVersion = catalog.findVersion("json-path").get().requiredVersion
+val jsonSchemaValidatorVersion = catalog.findVersion("json-schema-validator").get().requiredVersion
+val jacksonVersion = catalog.findVersion("jackson").get().requiredVersion
+val junitVersion = catalog.findVersion("junit").get().requiredVersion
+val junitPlatformVersion = catalog.findVersion("junit-platform").get().requiredVersion
+val springBootVersion = catalog.findVersion("spring-boot").get().requiredVersion
 
 dependencies {
     constraints {
