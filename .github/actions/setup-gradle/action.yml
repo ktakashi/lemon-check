@@ -1,5 +1,5 @@
 name: 'Setup Gradle Build'
-description: 'Setup JDK and Gradle for BerryCrush builds'
+description: 'Setup JDK and Gradle for BerryCrush builds. Note: checkout must be done BEFORE using this action.'
 
 inputs:
   java-version:
@@ -10,19 +10,10 @@ inputs:
     description: 'Java distribution to use'
     required: false
     default: 'temurin'
-  ref:
-    description: 'Git ref to checkout (branch, tag, SHA)'
-    required: false
-    default: ''
 
 runs:
   using: 'composite'
   steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ inputs.ref || github.ref }}
-        
     - name: Setup JDK ${{ inputs.java-version }}
       uses: actions/setup-java@v4
       with:

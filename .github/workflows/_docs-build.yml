@@ -23,10 +23,13 @@ jobs:
       artifact-name: docs-${{ inputs.version }}
     
     steps:
-      - name: Setup build environment
-        uses: ./.github/actions/setup-gradle
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
+          
+      - name: Setup build environment
+        uses: ./.github/actions/setup-gradle
           
       - name: Checkout .github repo for assets
         uses: actions/checkout@v4
