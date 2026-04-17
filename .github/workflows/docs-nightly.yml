@@ -1,0 +1,29 @@
+name: Docs (Nightly)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'berrycrush/berrycrush/doc/**'
+      - 'developer/**/*.md'
+      - 'berrycrush/**/*.kt'
+      - '.github/workflows/_docs-*.yml'
+      - '.github/workflows/docs-nightly.yml'
+    paths-ignore:
+      - '**/README.md'
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/_docs-build.yml
+    with:
+      version: nightly
+      ref: ${{ github.sha }}
+      
+  publish:
+    needs: build
+    uses: ./.github/workflows/_docs-publish.yml
+    with:
+      version: nightly
+      artifact-name: ${{ needs.build.outputs.artifact-name }}
+      set-current: false

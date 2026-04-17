@@ -1,0 +1,150 @@
+name: Publish Documentation
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version string (e.g., 1.2.3 or nightly)'
+        required: true
+        type: string
+      artifact-name:
+        description: 'Artifact to download'
+        required: true
+        type: string
+      set-current:
+        description: 'Update /current redirect'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: _docs
+          
+      - name: Checkout gh-pages for existing versions
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: _existing
+        continue-on-error: true
+          
+      - name: Prepare site structure
+        run: |
+          mkdir -p _site
+          
+          # Copy existing versions if they exist
+          if [ -d "_existing" ]; then
+            for dir in _existing/*/; do
+              if [ -d "$dir" ]; then
+                dirname=$(basename "$dir")
+                # Skip if it's the version we're deploying
+                if [ "$dirname" != "${{ inputs.version }}" ]; then
+                  cp -r "$dir" "_site/"
+                fi
+              fi
+            done
+            # Copy root files if they exist
+            [ -f "_existing/index.html" ] && cp "_existing/index.html" "_site/" || true
+            [ -d "_existing/current" ] && cp -r "_existing/current" "_site/" || true
+          fi
+          
+          # Copy new version docs
+          mkdir -p _site/${{ inputs.version }}
+          cp -r _docs/* _site/${{ inputs.version }}/
+          
+      - name: Update /current redirect
+        if: inputs.set-current
+        run: |
+          mkdir -p _site/current
+          cat > _site/current/index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta http-equiv="refresh" content="0; url=../${{ inputs.version }}/">
+            <link rel="canonical" href="../${{ inputs.version }}/">
+            <title>Redirecting...</title>
+          </head>
+          <body>
+            <p>Redirecting to <a href="../${{ inputs.version }}/">version ${{ inputs.version }}</a>...</p>
+          </body>
+          </html>
+          EOF
+          
+      - name: Create root index with version selector
+        run: |
+          # Find all versions
+          VERSIONS=$(ls -d _site/*/ 2>/dev/null | xargs -n 1 basename | grep -v current | sort -rV || echo "")
+          
+          # Build version list HTML
+          VERSION_LIST=""
+          for v in $VERSIONS; do
+            if [ "$v" = "nightly" ]; then
+              VERSION_LIST="$VERSION_LIST<li><a href=\"$v/\">nightly</a> <span class=\"badge\">latest</span></li>"
+            else
+              VERSION_LIST="$VERSION_LIST<li><a href=\"$v/\">$v</a></li>"
+            fi
+          done
+          
+          cat > _site/index.html << EOF
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>BerryCrush Documentation</title>
+            <style>
+              body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+              .logo { display: block; margin: 0 auto 2rem; max-width: 200px; }
+              h1 { text-align: center; }
+              h2 { margin-top: 2rem; border-bottom: 1px solid #e1e4e8; padding-bottom: 0.5rem; }
+              ul { list-style: none; padding: 0; }
+              li { padding: 0.5rem 0; }
+              li a { font-size: 1.1rem; color: #0366d6; text-decoration: none; }
+              li a:hover { text-decoration: underline; }
+              .badge { background: #28a745; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; margin-left: 0.5rem; }
+              .current-link { margin-bottom: 2rem; padding: 1rem; background: #f6f8fa; border-radius: 8px; }
+            </style>
+          </head>
+          <body>
+            <img src="nightly/assets/logo.png" alt="BerryCrush" class="logo" onerror="this.style.display='none'">
+            <h1>BerryCrush Documentation</h1>
+            
+            <div class="current-link">
+              <strong>Quick Links:</strong>
+              <a href="current/">Current Release</a> |
+              <a href="nightly/">Nightly (main branch)</a>
+            </div>
+            
+            <h2>Available Versions</h2>
+            <ul>
+              $VERSION_LIST
+            </ul>
+          </body>
+          </html>
+          EOF
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+          
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+          
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

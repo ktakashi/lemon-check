@@ -1,0 +1,30 @@
+name: Docs (Release)
+
+on:
+  repository_dispatch:
+    types: [release-docs]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., 1.2.3)'
+        required: true
+        type: string
+      set-current:
+        description: 'Update /current redirect to this version'
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/_docs-build.yml
+    with:
+      version: ${{ github.event.client_payload.version || inputs.version }}
+      ref: v${{ github.event.client_payload.version || inputs.version }}
+      
+  publish:
+    needs: build
+    uses: ./.github/workflows/_docs-publish.yml
+    with:
+      version: ${{ github.event.client_payload.version || inputs.version }}
+      artifact-name: ${{ needs.build.outputs.artifact-name }}
+      set-current: ${{ github.event.client_payload.current || inputs.set-current }}
