@@ -152,10 +152,10 @@ class PetApiTest {
         executor: BerryCrushScenarioExecutor,
     ) {
         val scenario = suite.scenario("List all pets") {
-            `when`("I request all pets") {
+            whenever("I request all pets") {
                 call("listPets")
             }
-            then("I get a successful response") {
+            afterwards("I get a successful response") {
                 statusCode(200)
             }
         }
@@ -191,10 +191,10 @@ class PetApiTest {
         executor: BerryCrushScenarioExecutor,
     ) {
         val scenario = suite.scenario("List all pets") {
-            `when`("I request all pets") {
+            whenever("I request all pets") {
                 call("listPets")
             }
-            then("I get a successful response") {
+            afterwards("I get a successful response") {
                 statusCode(200)
             }
         }

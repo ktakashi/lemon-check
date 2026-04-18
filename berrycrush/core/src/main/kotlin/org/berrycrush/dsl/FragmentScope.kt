@@ -25,7 +25,7 @@ class FragmentScope internal constructor(
     /**
      * Define a WHEN step.
      */
-    fun `when`(
+    fun whenever(
         description: String,
         block: FragmentStepScope.() -> Unit = {},
     ) {
@@ -35,7 +35,7 @@ class FragmentScope internal constructor(
     /**
      * Define a THEN step.
      */
-    fun then(
+    fun afterwards(
         description: String,
         block: FragmentStepScope.() -> Unit = {},
     ) {

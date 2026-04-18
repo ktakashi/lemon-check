@@ -29,9 +29,8 @@ class ScenarioScope internal constructor(
 
     /**
      * Define a WHEN step (action).
-     * Note: Uses backticks because 'when' is a Kotlin keyword.
      */
-    fun `when`(
+    fun whenever(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
@@ -41,7 +40,7 @@ class ScenarioScope internal constructor(
     /**
      * Define a THEN step (assertion).
      */
-    fun then(
+    fun afterwards(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
@@ -61,7 +60,7 @@ class ScenarioScope internal constructor(
     /**
      * Define a BUT step (exception/negative case).
      */
-    fun but(
+    fun otherwise(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {

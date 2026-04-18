@@ -30,7 +30,7 @@ class ScenarioOutlineScope internal constructor(
     /**
      * Define a WHEN step template.
      */
-    fun `when`(
+    fun whenever(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
@@ -40,7 +40,7 @@ class ScenarioOutlineScope internal constructor(
     /**
      * Define a THEN step template.
      */
-    fun then(
+    fun afterwards(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {

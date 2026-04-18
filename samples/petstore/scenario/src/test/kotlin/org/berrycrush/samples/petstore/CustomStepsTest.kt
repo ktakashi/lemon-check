@@ -52,8 +52,8 @@ class CustomStepsTest {
         val scenario =
             suite.scenario("Custom steps with string parameters") {
                 given("I have a pet named \"Fluffy\" with status \"available\"")
-                then("the pet data should contain \"Fluffy\"")
-                then("the pet data should contain \"available\"")
+                afterwards("the pet data should contain \"Fluffy\"")
+                afterwards("the pet data should contain \"available\"")
             }
 
         val result = executor.execute(scenario)
@@ -68,11 +68,11 @@ class CustomStepsTest {
     ) {
         val scenario =
             suite.scenario("Custom steps with mixed parameters") {
-                `when`("I reset the pet data")
+                whenever("I reset the pet data")
                 given("I have a pet named \"Max\" with status \"pending\"")
-                then("the pet data should contain \"Max\"")
-                then("I should have 1 pets with status pending")
-                then("the pet price should be 199.99")
+                afterwards("the pet data should contain \"Max\"")
+                afterwards("I should have 1 pets with status pending")
+                afterwards("the pet price should be 199.99")
             }
 
         val result = executor.execute(scenario)
@@ -90,10 +90,10 @@ class CustomStepsTest {
                 // First set up custom data
                 given("I have a pet named \"TestPet\" with status \"available\"")
                 // Then verify via API
-                `when`("I list pets") {
+                whenever("I list pets") {
                     call("listPets")
                 }
-                then("the response is successful") {
+                afterwards("the response is successful") {
                     statusCode(200)
                 }
             }

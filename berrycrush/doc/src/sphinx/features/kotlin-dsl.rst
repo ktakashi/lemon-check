@@ -29,11 +29,11 @@ Here's a minimal example:
     }
 
     val scenario = suite.scenario("List all pets") {
-        `when`("I request all pets") {
+        whenever("I request all pets") {
             call("listPets")
         }
 
-        then("I receive a list") {
+        afterwards("I receive a list") {
             statusCode(200)
             bodyArrayNotEmpty("$.pets")
         }
@@ -91,7 +91,7 @@ Scenarios follow the Given-When-Then pattern:
             // Optional setup
         }
 
-        `when`("I create a new pet") {
+        whenever("I create a new pet") {
             call("createPet") {
                 body(mapOf(
                     "name" to "Fluffy",
@@ -100,14 +100,14 @@ Scenarios follow the Given-When-Then pattern:
             }
         }
 
-        then("the pet is created") {
+        afterwards("the pet is created") {
             statusCode(201)
             bodyEquals("$.name", "Fluffy")
         }
     }
 
 .. note::
-    The ``when`` keyword requires backticks (``` `when` ```) because it's a Kotlin reserved word.
+    The ``whenever`` keyword is the preferred alternative to ``when``, which requires backticks.
 
 Scenario with Tags
 ^^^^^^^^^^^^^^^^^^
@@ -117,11 +117,11 @@ Add tags for filtering and organization:
 .. code-block:: kotlin
 
     suite.scenario("Smoke test", tags = setOf("smoke", "critical")) {
-        `when`("I request the health endpoint") {
+        whenever("I request the health endpoint") {
             call("healthCheck")
         }
 
-        then("the service is healthy") {
+        afterwards("the service is healthy") {
             statusCode(200)
         }
     }
@@ -136,7 +136,7 @@ Call an operation by its OpenAPI ``operationId``:
 
 .. code-block:: kotlin
 
-    `when`("I get a pet") {
+    whenever("I get a pet") {
         call("getPetById") {
             pathParam("petId", 123)
         }
@@ -212,7 +212,7 @@ Call operations from a specific spec:
 
 .. code-block:: kotlin
 
-    `when`("I authenticate") {
+    whenever("I authenticate") {
         using("auth")  // Switch to auth spec
         call("login") {
             body(mapOf("username" to "test", "password" to "secret"))
@@ -226,7 +226,7 @@ Extract values from responses for use in subsequent steps:
 
 .. code-block:: kotlin
 
-    `when`("I create a pet") {
+    whenever("I create a pet") {
         call("createPet") {
             body(mapOf("name" to "Fluffy"))
         }
@@ -252,14 +252,14 @@ Variables can be shared across scenarios when enabled in configuration:
     }
 
     suite.scenario("Create a pet") {
-        `when`("I create a pet") {
+        whenever("I create a pet") {
             call("createPet") { body(mapOf("name" to "Fluffy")) }
             extractTo("petId", "$.id")
         }
     }
 
     suite.scenario("Use the created pet") {
-        `when`("I get the pet from the previous scenario") {
+        whenever("I get the pet from the previous scenario") {
             call("getPetById") {
                 pathParam("petId", $$"${petId}")
             }
@@ -274,7 +274,7 @@ Status Code
 
 .. code-block:: kotlin
 
-    then("the response is successful") {
+    afterwards("the response is successful") {
         statusCode(200)           // Exact match
         statusCode(200..299)      // Range match
     }
@@ -284,7 +284,7 @@ Body Assertions
 
 .. code-block:: kotlin
 
-    then("the response body is correct") {
+    afterwards("the response body is correct") {
         bodyContains("Fluffy")                    // Contains substring
         bodyEquals("$.name", "Fluffy")            // JSONPath equals
         bodyMatches("$.email", ".*@.*\\.com")     // JSONPath matches regex
@@ -297,7 +297,7 @@ Header Assertions
 
 .. code-block:: kotlin
 
-    then("the headers are correct") {
+    afterwards("the headers are correct") {
         headerExists("Content-Type")
         headerEquals("Content-Type", "application/json")
     }
@@ -307,9 +307,114 @@ Schema Validation
 
 .. code-block:: kotlin
 
-    then("the response matches the OpenAPI schema") {
+    afterwards("the response matches the OpenAPI schema") {
         matchesSchema()
     }
+
+Custom Assertions
+^^^^^^^^^^^^^^^^^
+
+Define programmatic assertions with full access to the test execution context:
+
+.. code-block:: kotlin
+
+    suite.scenario("Custom assertion example") {
+        whenever("I get user profile") {
+            call("getUserProfile") {
+                pathParam("userId", 123)
+            }
+        }
+
+        afterwards("the response is valid") {
+            statusCode(200)
+
+            // Custom assertion with programmatic logic
+            assert("user age is valid") { ctx ->
+                val body = ctx.responseBody ?: error("No response body")
+                val age = """\"age\"\s*:\s*(\d+)""".toRegex().find(body)
+                    ?.groupValues?.get(1)?.toInt() ?: error("Age not found")
+
+                require(age >= 0) { "Age must be non-negative: $age" }
+                require(age <= 150) { "Age must be realistic: $age" }
+
+                // Store extracted value for later use
+                ctx.set("userAge", age)
+            }
+
+            // Use the extracted value in another assertion
+            assert("verify age was extracted") { ctx ->
+                val age = ctx.get<Int>("userAge")
+                require(age != null) { "Age should have been extracted" }
+            }
+        }
+    }
+
+**TestExecutionContext** provides:
+
++----------------------+-----------------------------------------------------------+
+| Property/Method      | Description                                               |
++======================+===========================================================+
+| ``response``         | The current HTTP response                                 |
++----------------------+-----------------------------------------------------------+
+| ``request``          | The current HTTP request                                  |
++----------------------+-----------------------------------------------------------+
+| ``statusCode``       | The response status code                                  |
++----------------------+-----------------------------------------------------------+
+| ``responseBody``     | The response body as string                               |
++----------------------+-----------------------------------------------------------+
+| ``variables``        | Read-only view of all variables                           |
++----------------------+-----------------------------------------------------------+
+| ``get<T>(key)``      | Get a variable with type casting                          |
++----------------------+-----------------------------------------------------------+
+| ``set(key, value)``  | Store a value for subsequent assertions                   |
++----------------------+-----------------------------------------------------------+
+| ``extract(name, v)`` | Store an extracted value for parameter binding            |
++----------------------+-----------------------------------------------------------+
+
+Conditionals
+------------
+
+Execute different assertions based on runtime conditions:
+
+.. code-block:: kotlin
+
+    suite.scenario("Conditional assertion example") {
+        whenever("I search for a pet") {
+            call("findPetsByStatus") {
+                queryParam("status", "available")
+            }
+        }
+
+        afterwards("I handle the response appropriately") {
+            // Conditional based on status code
+            conditional({ ctx -> ctx.statusCode == 200 }) {
+                // Success case
+                bodyArrayNotEmpty("$")
+            } orElse {
+                // Error case
+                bodyContains("error")
+            }
+
+            // Conditional based on response content
+            conditional({ ctx ->
+                ctx.responseBody?.contains("premium") == true
+            }) {
+                // Premium pets have extra fields
+                assert("verify premium fields") { ctx ->
+                    val body = ctx.responseBody ?: ""
+                    require(body.contains("premiumFeatures"))
+                }
+            }
+        }
+    }
+
+The ``conditional`` block:
+
+- Takes a predicate function ``(TestExecutionContext) -> Boolean``
+- Executes the first block if the predicate returns ``true``
+- Executes the ``orElse`` block (if present) if the predicate returns ``false``
+- Can be used multiple times in the same step
+- Supports nested standard assertions (``statusCode``, ``bodyEquals``, etc.)
 
 Scenario Outlines
 -----------------
@@ -319,13 +424,13 @@ Create parameterized scenarios with multiple data sets:
 .. code-block:: kotlin
 
     suite.scenarioOutline("Filter pets by status: <status>") {
-        `when`("I filter pets") {
+        whenever("I filter pets") {
             call("findPetsByStatus") {
                 queryParam("status", "<status>")
             }
         }
 
-        then("I receive matching pets") {
+        afterwards("I receive matching pets") {
             statusCode(200)
         }
 
@@ -357,13 +462,13 @@ Define reusable step sequences:
     suite.scenario("Access protected resource") {
         include(authenticateFragment)
 
-        `when`("I access the protected endpoint") {
+        whenever("I access the protected endpoint") {
             call("protectedResource") {
                 bearerToken($$"${authToken}")
             }
         }
 
-        then("I get the data") {
+        afterwards("I get the data") {
             statusCode(200)
         }
     }
@@ -390,10 +495,10 @@ Extend ``ScenarioTest`` for JUnit integration:
 
         override fun defineScenarios() {
             scenario("List all pets") {
-                `when`("I request pets") {
+                whenever("I request pets") {
                     call("listPets")
                 }
-                then("I get a list") {
+                afterwards("I get a list") {
                     statusCode(200)
                 }
             }
@@ -420,13 +525,13 @@ Complete Example
         override fun defineScenarios() {
             // Simple scenario
             scenario("List available pets") {
-                `when`("I request available pets") {
+                whenever("I request available pets") {
                     call("findPetsByStatus") {
                         queryParam("status", "available")
                     }
                 }
 
-                then("I receive a list") {
+                afterwards("I receive a list") {
                     statusCode(200)
                     bodyArrayNotEmpty("$")
                 }
@@ -434,7 +539,7 @@ Complete Example
 
             // CRUD flow with variable extraction
             scenario("Create a new pet") {
-                `when`("I create a pet") {
+                whenever("I create a pet") {
                     call("addPet") {
                         body(mapOf(
                             "name" to "TestPet",
@@ -445,20 +550,20 @@ Complete Example
                     extractTo("createdPetId", "$.id")
                 }
 
-                then("the pet is created") {
+                afterwards("the pet is created") {
                     statusCode(200)
                     bodyEquals("$.name", "TestPet")
                 }
             }
 
             scenario("Retrieve the created pet") {
-                `when`("I get the pet by ID") {
+                whenever("I get the pet by ID") {
                     call("getPetById") {
                         pathParam("petId", $$"${createdPetId}")
                     }
                 }
 
-                then("I see the pet details") {
+                afterwards("I see the pet details") {
                     statusCode(200)
                     matchesSchema()
                 }
@@ -466,13 +571,13 @@ Complete Example
 
             // Parameterized scenario
             scenarioOutline("Filter pets by <status>") {
-                `when`("I filter") {
+                whenever("I filter") {
                     call("findPetsByStatus") {
                         queryParam("status", "<status>")
                     }
                 }
 
-                then("I get results") {
+                afterwards("I get results") {
                     statusCode(200)
                 }
 
@@ -510,21 +615,21 @@ BerryCrushSuite
 ScenarioScope
 ^^^^^^^^^^^^^
 
-+----------------------+------------------------------------------------+
-| Method               | Description                                    |
-+======================+================================================+
-| ``given(desc, block)`` | Define a precondition step                   |
-+----------------------+------------------------------------------------+
-| ``when(desc, block)``  | Define an action step                        |
-+----------------------+------------------------------------------------+
-| ``then(desc, block)``  | Define an assertion step                     |
-+----------------------+------------------------------------------------+
-| ``and(desc, block)``   | Continue previous step type                  |
-+----------------------+------------------------------------------------+
-| ``but(desc, block)``   | Define an exception/negative case            |
-+----------------------+------------------------------------------------+
-| ``include(fragment)``  | Include a fragment's steps                   |
-+----------------------+------------------------------------------------+
++------------------------+------------------------------------------------+
+| Method                 | Description                                    |
++========================+================================================+
+| ``given(desc, block)`` | Define a precondition step                     |
++------------------------+------------------------------------------------+
+| ``whenever(desc, block)`` | Define an action step                       |
++------------------------+------------------------------------------------+
+| ``afterwards(desc, block)`` | Define an assertion step                  |
++------------------------+------------------------------------------------+
+| ``and(desc, block)``   | Continue previous step type                    |
++------------------------+------------------------------------------------+
+| ``otherwise(desc, block)`` | Define an exception/negative case           |
++------------------------+------------------------------------------------+
+| ``include(fragment)``  | Include a fragment's steps                     |
++------------------------+------------------------------------------------+
 
 StepScope
 ^^^^^^^^^
@@ -605,10 +710,10 @@ Basic Usage
             executor: BerryCrushScenarioExecutor,
         ) {
             val scenario = suite.scenario("List all pets") {
-                `when`("I request all pets") {
+                whenever("I request all pets") {
                     call("listPets")
                 }
-                then("I get a successful response") {
+                afterwards("I get a successful response") {
                     statusCode(200)
                 }
             }
@@ -657,10 +762,10 @@ directly in ``@Test`` methods:
             executor: BerryCrushScenarioExecutor,
         ) {
             val scenario = suite.scenario("List all pets") {
-                `when`("I request all pets") {
+                whenever("I request all pets") {
                     call("listPets")
                 }
-                then("I get a successful response") {
+                afterwards("I get a successful response") {
                     statusCode(200)
                 }
             }

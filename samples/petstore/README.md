@@ -54,10 +54,10 @@ class PetstoreDslTest {
         }
         
         val scenario = suite.scenario("List pets") {
-            `when`("I request all pets") {
+            whenever("I request all pets") {
                 call("listPets")
             }
-            then("I receive a successful response") {
+            afterwards("I receive a successful response") {
                 statusCode(200)
                 bodyArrayNotEmpty("$.pets")
             }

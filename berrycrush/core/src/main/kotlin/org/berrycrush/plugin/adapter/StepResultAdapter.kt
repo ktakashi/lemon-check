@@ -70,6 +70,7 @@ class StepResultAdapter(
             is Condition.Compound -> null
             is Condition.Schema -> "schema"
             is Condition.CustomAssertion -> condition.pattern
+            is Condition.Custom -> "<predicate>"
         }
 
     /**
@@ -87,5 +88,6 @@ class StepResultAdapter(
             is Condition.Negated -> "NOT_${getConditionTypeName(condition.condition)}"
             is Condition.Compound -> "COMPOUND"
             is Condition.CustomAssertion -> "CUSTOM"
+            is Condition.Custom -> "CUSTOM_PREDICATE"
         }
 }
