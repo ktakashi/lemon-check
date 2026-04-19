@@ -6,8 +6,11 @@ import org.berrycrush.dsl.berrycrush
 import org.berrycrush.executor.BerryCrushScenarioExecutor
 import org.berrycrush.junit.BerryCrushExtension
 import org.berrycrush.junit.BerryCrushSpec
+import org.berrycrush.junit.ScenarioTest
 import org.berrycrush.model.ResultStatus
+import org.berrycrush.model.Scenario
 import org.berrycrush.samples.petstore.PetstoreApplication
+import org.berrycrush.spring.BerryCrushContextConfiguration
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -24,6 +27,10 @@ import kotlin.test.assertTrue
  *
  * This test suite exercises all DSL features against the petstore application.
  * Uses BerryCrushExtension with dynamic port configuration from Spring Boot.
+ *
+ * The test demonstrates both patterns:
+ * - Traditional @Test methods with injected executor (for complex scenarios)
+ * - @ScenarioTest annotation methods (for simple, declarative scenarios)
  */
 @SpringBootTest(
     classes = [PetstoreApplication::class],
@@ -31,6 +38,7 @@ import kotlin.test.assertTrue
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith(BerryCrushExtension::class)
+@BerryCrushContextConfiguration
 @BerryCrushSpec("classpath:/petstore.yaml")
 class PetstoreDslTest {
     @LocalServerPort
@@ -51,6 +59,43 @@ class PetstoreDslTest {
     fun setup(config: BerryCrushConfiguration) {
         // Configure dynamic port - must be set before executor is used
         config.baseUrl = "http://localhost:$port/api/v1"
+    }
+
+    // ========== @ScenarioTest Annotation Tests ==========
+    // These tests demonstrate the @ScenarioTest annotation which provides
+    // a cleaner, more declarative way to define scenario tests.
+    // The port is available via @LocalServerPort since Spring context is initialized.
+
+    @ScenarioTest
+    fun listAllPetsScenario(suite: BerryCrushSuite): Scenario {
+        // Configure dynamic port - @LocalServerPort is injected by Spring
+        suite.configuration.baseUrl = "http://localhost:$port/api/v1"
+
+        return suite.scenario("List all pets (via @ScenarioTest)") {
+            whenever("I request the list of pets") {
+                call("listPets")
+            }
+            afterwards("I receive a successful response") {
+                statusCode(200)
+            }
+        }
+    }
+
+    @ScenarioTest
+    fun getPetByIdScenario(suite: BerryCrushSuite): Scenario {
+        suite.configuration.baseUrl = "http://localhost:$port/api/v1"
+
+        return suite.scenario("Get pet by ID (via @ScenarioTest)") {
+            whenever("I request a specific pet") {
+                call("getPetById") {
+                    pathParam("petId", 1)
+                }
+            }
+            afterwards("I receive the pet details") {
+                statusCode(200)
+                bodyEquals("$.name", "Max")
+            }
+        }
     }
 
     // ========== Basic Scenario Tests ==========

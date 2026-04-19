@@ -66,13 +66,14 @@ class SpringBindingsProvider : BindingsProvider {
     /**
      * Creates a BerryCrushBindings instance by retrieving it from Spring's ApplicationContext.
      *
-     * The bindings class must be a Spring bean (annotated with `@Component` or
-     * registered via `@Bean` method) for this to succeed.
+     * If the bindings class is a Spring bean (annotated with `@Component` or
+     * registered via `@Bean` method), it will be retrieved from Spring context.
+     * Otherwise, the bindings will be created via direct instantiation.
      *
      * @param testClass The test class being executed
      * @param bindingsClass The bindings class to retrieve from Spring context
      * @return The Spring-managed bindings instance with dependencies injected
-     * @throws ConfigurationException if context not initialized or bean not found
+     * @throws ConfigurationException if context not initialized
      */
     override fun createBindings(
         testClass: Class<*>,
@@ -85,7 +86,31 @@ class SpringBindingsProvider : BindingsProvider {
                         "Ensure initialize() was called before createBindings().",
                 )
 
-        return adapter.getBean(bindingsClass)
+        // Try to get from Spring context first, fall back to direct instantiation
+        return adapter.getBeanOrNull(bindingsClass)
+            ?: bindingsClass.getDeclaredConstructor().newInstance()
+    }
+
+    /**
+     * Creates a Spring-prepared test instance for @ScenarioTest method execution.
+     *
+     * The returned instance has @LocalServerPort, @Autowired, and other
+     * Spring annotations properly injected. This enables @ScenarioTest methods
+     * in Spring Boot tests to access the dynamic server port.
+     *
+     * @param testClass The test class to create an instance of
+     * @return The Spring-managed test instance with dependencies injected
+     * @throws ConfigurationException if context not initialized
+     */
+    override fun createTestInstance(testClass: Class<*>): Any {
+        val adapter =
+            contextAdapters[testClass]
+                ?: throw ConfigurationException(
+                    "Spring context not initialized for test class: ${testClass.name}. " +
+                        "Ensure initialize() was called before createTestInstance().",
+                )
+
+        return adapter.getTestInstance()
     }
 
     /**

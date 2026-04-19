@@ -1,16 +1,12 @@
 package org.berrycrush.junit
 
-import org.berrycrush.assertion.AnnotationAssertionScanner
 import org.berrycrush.assertion.AssertionRegistry
-import org.berrycrush.assertion.DefaultAssertionRegistry
 import org.berrycrush.config.BerryCrushConfiguration
 import org.berrycrush.dsl.BerryCrushSuite
 import org.berrycrush.exception.ConfigurationException
 import org.berrycrush.executor.BerryCrushScenarioExecutor
+import org.berrycrush.junit.engine.RegistryFactory
 import org.berrycrush.model.Scenario
-import org.berrycrush.step.AnnotationStepScanner
-import org.berrycrush.step.DefaultStepRegistry
-import org.berrycrush.step.PackageStepScanner
 import org.berrycrush.step.StepRegistry
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
@@ -20,7 +16,6 @@ import org.junit.jupiter.api.extension.ParameterResolver
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider
 import java.util.stream.Stream
-import org.berrycrush.junit.BerryCrushConfiguration as BerryCrushConfigAnnotation
 
 /**
  * JUnit 5 extension for BerryCrush scenarios.
@@ -248,50 +243,22 @@ class BerryCrushExtension :
      */
     private fun getOrCreateStepRegistry(context: ExtensionContext): StepRegistry? {
         // Check if already created
-        var registry = context.getStore(NAMESPACE).get(STEP_REGISTRY_KEY, StepRegistry::class.java)
+        val registry = context.getStore(NAMESPACE).get(STEP_REGISTRY_KEY, StepRegistry::class.java)
         if (registry != null) {
             return registry
         }
 
         // Get the test class to read configuration annotation
-        val testClass = findRootTestClass(context)
-        val configAnnotation =
-            testClass?.getAnnotation(
-                BerryCrushConfigAnnotation::class.java,
-            )
+        val testClass =
+            findRootTestClass(context)
+                ?: return null
 
-        if (configAnnotation == null) {
-            return null
-        }
+        val newRegistry =
+            RegistryFactory.createStepRegistry(testClass)
+                ?: return null
 
-        val stepClasses = configAnnotation.stepClasses
-        val stepPackages = configAnnotation.stepPackages
-
-        if (stepClasses.isEmpty() && stepPackages.isEmpty()) {
-            return null
-        }
-
-        // Create registry and scan classes
-        registry = DefaultStepRegistry()
-        val scanner = AnnotationStepScanner()
-
-        // Scan step classes
-        for (klass in stepClasses) {
-            val definitions = scanner.scan(klass.java)
-            registry.registerAll(definitions)
-        }
-
-        // Scan step packages
-        if (stepPackages.isNotEmpty()) {
-            val packageScanner = PackageStepScanner()
-            for (packageName in stepPackages) {
-                val definitions = packageScanner.scan(packageName)
-                registry.registerAll(definitions)
-            }
-        }
-
-        context.getStore(NAMESPACE).put(STEP_REGISTRY_KEY, registry)
-        return registry
+        context.getStore(NAMESPACE).put(STEP_REGISTRY_KEY, newRegistry)
+        return newRegistry
     }
 
     /**
@@ -305,47 +272,22 @@ class BerryCrushExtension :
      */
     private fun getOrCreateAssertionRegistry(context: ExtensionContext): AssertionRegistry? {
         // Check if already exists
-        var registry = context.getStore(NAMESPACE).get(ASSERTION_REGISTRY_KEY, AssertionRegistry::class.java)
+        val registry = context.getStore(NAMESPACE).get(ASSERTION_REGISTRY_KEY, AssertionRegistry::class.java)
         if (registry != null) {
             return registry
         }
 
         // Get the test class to read configuration annotation
-        val testClass = findRootTestClass(context)
-        val configAnnotation =
-            testClass?.getAnnotation(
-                BerryCrushConfigAnnotation::class.java,
-            )
+        val testClass =
+            findRootTestClass(context)
+                ?: return null
 
-        if (configAnnotation == null) {
-            return null
-        }
+        val newRegistry =
+            RegistryFactory.createAssertionRegistry(testClass)
+                ?: return null
 
-        val assertionClasses = configAnnotation.assertionClasses
-        val assertionPackages = configAnnotation.assertionPackages
-
-        if (assertionClasses.isEmpty() && assertionPackages.isEmpty()) {
-            return null
-        }
-
-        // Create registry and scan classes
-        registry = DefaultAssertionRegistry()
-        val scanner = AnnotationAssertionScanner()
-
-        // Scan assertion classes
-        for (klass in assertionClasses) {
-            val definitions = scanner.scan(klass.java)
-            registry.registerAll(definitions)
-        }
-
-        // Scan assertion packages
-        if (assertionPackages.isNotEmpty()) {
-            // TODO: Implement PackageAssertionScanner if needed
-            // For now, only class-based registration is supported
-        }
-
-        context.getStore(NAMESPACE).put(ASSERTION_REGISTRY_KEY, registry)
-        return registry
+        context.getStore(NAMESPACE).put(ASSERTION_REGISTRY_KEY, newRegistry)
+        return newRegistry
     }
 
     /**

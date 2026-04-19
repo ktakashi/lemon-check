@@ -36,19 +36,3 @@ class BerryCrushExtensionTest {
 
 @BerryCrushSpec("test-spec.yaml", baseUrl = "http://localhost:8080")
 class TestClassWithSpec
-
-/**
- * Example test class extending ScenarioTest.
- */
-class ExampleScenarioTest : ScenarioTest() {
-    override fun defineScenarios() {
-        // Define scenarios here
-        // This is a placeholder - actual scenarios would be defined when spec is loaded
-    }
-
-    @Test
-    fun `scenario test base class should work`() {
-        val suite = getSuite()
-        assertNotNull(suite)
-    }
-}

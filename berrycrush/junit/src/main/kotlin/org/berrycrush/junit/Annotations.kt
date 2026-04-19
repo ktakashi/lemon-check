@@ -67,3 +67,65 @@ annotation class BerryCrushTimeout(
     val value: Long,
     val unit: java.util.concurrent.TimeUnit = java.util.concurrent.TimeUnit.SECONDS,
 )
+
+/**
+ * Marks a method as a BerryCrush scenario test.
+ *
+ * Methods annotated with `@ScenarioTest` must return a [org.berrycrush.model.Scenario] object
+ * that will be automatically executed by the BerryCrush test engine.
+ *
+ * ## Usage
+ *
+ * ```kotlin
+ * @Suite
+ * @BerryCrushSpec(paths = ["petstore.yaml"])
+ * class PetstoreTest {
+ *
+ *     @ScenarioTest
+ *     fun createPet(suite: BerryCrushSuite): Scenario =
+ *         suite.scenario("Create a pet") {
+ *             whenever("I create a pet") {
+ *                 call("createPet") { body(mapOf("name" to "Fluffy")) }
+ *             }
+ *             afterwards("it is created") {
+ *                 statusCode(201)
+ *             }
+ *         }
+ * }
+ * ```
+ *
+ * ## Spring Boot Integration
+ *
+ * ```kotlin
+ * @SpringBootTest(webEnvironment = RANDOM_PORT)
+ * @BerryCrushSpec(paths = ["petstore.yaml"])
+ * @BerryCrushContextConfiguration
+ * class PetstoreSpringTest {
+ *
+ *     @LocalServerPort
+ *     var port: Int = 0
+ *
+ *     @BeforeEach
+ *     fun setup(config: BerryCrushConfiguration) {
+ *         config.baseUrl = "http://localhost:$port/api"
+ *     }
+ *
+ *     @ScenarioTest
+ *     fun createPet(suite: BerryCrushSuite): Scenario = ...
+ * }
+ * ```
+ *
+ * ## Method Requirements
+ *
+ * - Must return `Scenario` (from `BerryCrushSuite.scenario()`)
+ * - Can accept `BerryCrushSuite` as parameter (injected by engine)
+ * - Can be a member function of a class annotated with `@BerryCrushSpec`
+ *
+ * @see BerryCrushSpec
+ * @see org.berrycrush.dsl.BerryCrushSuite
+ * @see org.berrycrush.model.Scenario
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+@MustBeDocumented
+annotation class ScenarioTest

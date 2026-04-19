@@ -1,6 +1,8 @@
 package org.berrycrush.junit.engine
 
 import org.berrycrush.junit.BerryCrushScenarios
+import org.berrycrush.junit.BerryCrushSpec
+import org.berrycrush.junit.ScenarioTest
 import org.berrycrush.junit.spi.BindingsProvider
 import org.junit.platform.engine.EngineDiscoveryRequest
 import org.junit.platform.engine.ExecutionRequest
@@ -17,7 +19,6 @@ import java.util.ServiceLoader
  *
  * This engine discovers and executes .scenario files based on the
  * @BerryCrushScenarios annotation. It integrates with the JUnit Platform
- * to provide IDE support, CI/CD integration, and build tool compatibility.
  *
  * Usage:
  * ```
@@ -60,14 +61,27 @@ class BerryCrushTestEngine : TestEngine {
             collectFromClassSelectors(discoveryRequest) +
                 collectFromPackageSelectors(discoveryRequest)
 
-        // Discover scenarios for each unique test class
+        // Discover scenarios for each unique test class with @BerryCrushScenarios
         testClasses
             .distinct()
             .filter { it.isAnnotationPresent(BerryCrushScenarios::class.java) }
             .forEach { ScenarioTestDiscoverer.discoverScenariosForClass(engineDescriptor, it) }
 
+        // Discover @ScenarioTest methods for classes with @BerryCrushSpec
+        testClasses
+            .distinct()
+            .filter { it.isAnnotationPresent(BerryCrushSpec::class.java) }
+            .filter { hasScenarioMethods(it) }
+            .forEach { ScenarioMethodDiscoverer.discoverScenariosForClass(engineDescriptor, it) }
+
         return engineDescriptor
     }
+
+    /**
+     * Check if a class has any methods annotated with @ScenarioTest.
+     */
+    private fun hasScenarioMethods(testClass: Class<*>): Boolean =
+        testClass.declaredMethods.any { it.isAnnotationPresent(ScenarioTest::class.java) }
 
     override fun execute(request: ExecutionRequest) {
         val engineDescriptor = request.rootTestDescriptor

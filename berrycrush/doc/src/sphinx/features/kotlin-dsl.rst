@@ -28,10 +28,10 @@ Here's a minimal example:
         baseUrl = "https://api.example.com"
     }
 
-    val scenario = suite.scenario("List all pets") {
-        whenever("I request all pets") {
+    @ScenarioTest Annotation
+    -------------------------
             call("listPets")
-        }
+    The ``@ScenarioTest`` annotation provides a cleaner way to define scenarios
 
         afterwards("I receive a list") {
             statusCode(200)
@@ -43,13 +43,13 @@ Creating a Test Suite
 ---------------------
 
 Single Spec
-^^^^^^^^^^^
+        import org.berrycrush.junit.ScenarioTest
 
 For APIs with a single OpenAPI specification:
 
 .. code-block:: kotlin
 
-    val suite = berryCrush("petstore.yaml") {
+            @ScenarioTest
         baseUrl = "https://api.example.com"
         timeout(30) // seconds
         header("Accept", "application/json")
@@ -60,7 +60,7 @@ Multi-Spec
 
 For APIs with multiple OpenAPI specifications:
 
-.. code-block:: kotlin
+            @ScenarioTest
 
     val suite = berryCrush {
         spec("petstore", "petstore.yaml") {
@@ -78,20 +78,20 @@ For APIs with multiple OpenAPI specifications:
 
 Defining Scenarios
 ------------------
-
-Basic Structure
+    2. Methods annotated with ``@ScenarioTest`` that return ``Scenario`` are automatically discovered
+    3. Each ``@ScenarioTest`` method becomes a separate test in the JUnit test tree
 ^^^^^^^^^^^^^^^
 
 Scenarios follow the Given-When-Then pattern:
 
 .. code-block:: kotlin
-
+    **Using @ScenarioTest (recommended for most cases):**
     suite.scenario("Create and retrieve a pet") {
         given("the API is available") {
             // Optional setup
         }
 
-        whenever("I create a new pet") {
+            @ScenarioTest
             call("createPet") {
                 body(mapOf(
                     "name" to "Fluffy",
@@ -111,7 +111,7 @@ Scenarios follow the Given-When-Then pattern:
 
 Scenario with Tags
 ^^^^^^^^^^^^^^^^^^
-
+    Use ``@ScenarioTest`` when you want:
 Add tags for filtering and organization:
 
 .. code-block:: kotlin
@@ -133,7 +133,7 @@ Basic Call
 ^^^^^^^^^^
 
 Call an operation by its OpenAPI ``operationId``:
-
+        Methods annotated with ``@ScenarioTest`` must:
 .. code-block:: kotlin
 
     whenever("I get a pet") {
@@ -518,25 +518,28 @@ Define reusable step sequences:
 JUnit Integration
 -----------------
 
-Extend ``ScenarioTest`` for JUnit integration:
+Use ``BerryCrushExtension`` for JUnit integration:
 
 .. code-block:: kotlin
 
-    import org.berrycrush.berrycrush.junit.BerryCrushSpec
-    import org.berrycrush.berrycrush.junit.ScenarioTest
+    import org.berrycrush.junit.BerryCrushExtension
+    import org.berrycrush.junit.BerryCrushSpec
+    import org.berrycrush.dsl.BerryCrushSuite
+    import org.berrycrush.executor.BerryCrushScenarioExecutor
+    import org.junit.jupiter.api.Test
+    import org.junit.jupiter.api.extension.ExtendWith
 
+    @ExtendWith(BerryCrushExtension::class)
     @BerryCrushSpec("petstore.yaml")
-    class PetstoreKotlinScenarios : ScenarioTest() {
-        
-        override fun configureSuite() {
-            configure {
-                baseUrl = "https://api.example.com"
-                timeout(30)
-            }
-        }
+    class PetstoreKotlinScenarios {
 
-        override fun defineScenarios() {
-            scenario("List all pets") {
+        @Test
+        fun `list all pets`(suite: BerryCrushSuite, executor: BerryCrushScenarioExecutor) {
+            suite.configure {
+                baseUrl = "https://api.example.com"
+            }
+            
+            val scenario = suite.scenario("List all pets") {
                 whenever("I request pets") {
                     call("listPets")
                 }
@@ -544,6 +547,8 @@ Extend ``ScenarioTest`` for JUnit integration:
                     statusCode(200)
                 }
             }
+            
+            executor.execute(scenario)
         }
     }
 
@@ -552,21 +557,19 @@ Complete Example
 
 .. code-block:: kotlin
 
+    @ExtendWith(BerryCrushExtension::class)
     @BerryCrushSpec("petstore.yaml")
-    class PetstoreApiTests : ScenarioTest() {
+    class PetstoreApiTests {
 
-        override fun configureSuite() {
-            configure {
+        @Test
+        fun `list available pets`(suite: BerryCrushSuite, executor: BerryCrushScenarioExecutor) {
+            suite.configure {
                 baseUrl = "https://petstore.swagger.io/v2"
                 timeout(30)
                 header("Accept", "application/json")
-                shareVariablesAcrossScenarios = true
             }
-        }
 
-        override fun defineScenarios() {
-            // Simple scenario
-            scenario("List available pets") {
+            val scenario = suite.scenario("List available pets") {
                 whenever("I request available pets") {
                     call("findPetsByStatus") {
                         queryParam("status", "available")
@@ -579,56 +582,7 @@ Complete Example
                 }
             }
 
-            // CRUD flow with variable extraction
-            scenario("Create a new pet") {
-                whenever("I create a pet") {
-                    call("addPet") {
-                        body(mapOf(
-                            "name" to "TestPet",
-                            "photoUrls" to listOf("https://example.com/photo.jpg"),
-                            "status" to "available"
-                        ))
-                    }
-                    extractTo("createdPetId", "$.id")
-                }
-
-                afterwards("the pet is created") {
-                    statusCode(200)
-                    bodyEquals("$.name", "TestPet")
-                }
-            }
-
-            scenario("Retrieve the created pet") {
-                whenever("I get the pet by ID") {
-                    call("getPetById") {
-                        pathParam("petId", $$"${createdPetId}")
-                    }
-                }
-
-                afterwards("I see the pet details") {
-                    statusCode(200)
-                    matchesSchema()
-                }
-            }
-
-            // Parameterized scenario
-            scenarioOutline("Filter pets by <status>") {
-                whenever("I filter") {
-                    call("findPetsByStatus") {
-                        queryParam("status", "<status>")
-                    }
-                }
-
-                afterwards("I get results") {
-                    statusCode(200)
-                }
-
-                examples(
-                    row("status" to "available"),
-                    row("status" to "pending"),
-                    row("status" to "sold")
-                )
-            }
+            executor.execute(scenario)
         }
     }
 
@@ -863,6 +817,116 @@ The extension can inject the following types into ``@BeforeEach`` or ``@Test`` m
 .. note::
     The ``BerryCrushConfiguration`` object is shared between the suite and executor.
     Changes to the configuration affect the executor, even after the executor is created.
+
+@ScenarioTest Annotation
+-------------------------
+
+The ``@ScenarioTest`` annotation provides a cleaner way to define scenarios
+as JUnit test methods. Instead of manually calling ``executor.execute()``, you can
+simply annotate a method that returns a ``Scenario`` and BerryCrush will automatically
+discover and execute it.
+
+Basic Usage
+^^^^^^^^^^^
+
+.. code-block:: kotlin
+
+    import org.berrycrush.dsl.BerryCrushSuite
+    import org.berrycrush.junit.BerryCrushSpec
+    import org.berrycrush.junit.ScenarioTest
+    import org.berrycrush.model.Scenario
+
+    @BerryCrushSpec("petstore.yaml", baseUrl = "http://localhost:8080/api")
+    class PetApiTest {
+
+        @ScenarioTest
+        fun `list all pets`(): Scenario =
+            BerryCrushSuite.create().scenario("List all pets") {
+                whenever("I request all pets") {
+                    call("listPets")
+                }
+                afterwards("I get a successful response") {
+                    statusCode(200)
+                }
+            }
+
+        @ScenarioTest
+        fun createPet(): Scenario =
+            BerryCrushSuite.create().scenario("Create a new pet") {
+                whenever("I create a pet") {
+                    call("createPet") {
+                        body(mapOf("name" to "Fluffy"))
+                    }
+                }
+                afterwards("the pet is created") {
+                    statusCode(201)
+                }
+            }
+    }
+
+How It Works
+^^^^^^^^^^^^
+
+1. The BerryCrush test engine discovers classes annotated with ``@BerryCrushSpec``
+2. Methods annotated with ``@ScenarioTest`` that return ``Scenario`` are automatically discovered
+3. Each ``@ScenarioTest`` method becomes a separate test in the JUnit test tree
+4. The test engine executes each scenario and reports results to JUnit
+
+Comparison with BerryCrushExtension
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Using @ScenarioTest (recommended for most cases):**
+
+.. code-block:: kotlin
+
+    @BerryCrushSpec("petstore.yaml")
+    class PetApiTest {
+        @ScenarioTest
+        fun `list pets`(): Scenario =
+            BerryCrushSuite.create().scenario("List pets") { ... }
+    }
+
+**Using BerryCrushExtension (for more control):**
+
+.. code-block:: kotlin
+
+    @ExtendWith(BerryCrushExtension::class)
+    @BerryCrushSpec("petstore.yaml")
+    class PetApiTest {
+        @Test
+        fun `list pets`(suite: BerryCrushSuite, executor: BerryCrushScenarioExecutor) {
+            val scenario = suite.scenario("List pets") { ... }
+            val result = executor.execute(scenario)
+            assertEquals(ResultStatus.PASSED, result.status)
+        }
+    }
+
+Use ``@ScenarioTest`` when you want:
+
+- Simpler, more concise test code
+- Automatic test discovery and execution
+- Less boilerplate code
+
+Use ``BerryCrushExtension`` when you need:
+
+- Access to the ``ScenarioResult`` for custom assertions
+- Dynamic configuration per test (e.g., Spring Boot's random port)
+- Complex test setup that requires injected parameters
+
+Method Naming Conventions
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The method name is converted to a display name in the JUnit test tree:
+
+- ``createPet`` → "Create Pet"
+- ``listAllPets`` → "List All Pets"
+- ``` `list all pets` ``` → "List all pets" (backtick-wrapped names)
+
+.. note::
+    Methods annotated with ``@ScenarioTest`` must:
+    - Return ``Scenario`` or a subtype
+    - Have no parameters (or only ``BerryCrushSuite`` if needed)
+    - Be public
 
 See Also
 --------
