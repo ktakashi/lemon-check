@@ -10,7 +10,7 @@ import sys
 # -- Project information -----------------------------------------------------
 
 project = 'BerryCrush Developer Guide'
-copyright = '2024-2025, BerryCrush Team'
+copyright = '2026, BerryCrush Team'
 author = 'BerryCrush Team'
 
 # -- General configuration ---------------------------------------------------
