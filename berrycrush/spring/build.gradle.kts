@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     id("org.jetbrains.dokka")
     id("org.jetbrains.dokka-javadoc")
+    `maven-publish`
+    signing
     id("berrycrush.maven-publish")
     kotlin("plugin.spring")
 }

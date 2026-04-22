@@ -20,6 +20,7 @@ develocity {
 
 rootProject.name = "berrycrush"
 
+include("berrycrush:bom")
 include("berrycrush:core")
 include("berrycrush:junit")
 include("berrycrush:spring")

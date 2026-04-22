@@ -1,21 +1,36 @@
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.publish.PublishingExtension
-import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.kotlin.dsl.*
 import org.gradle.plugins.signing.SigningExtension
+
 /**
- * Convention plugin for Maven publishing to OSSRH/Sonatype.
+ * Convention plugin for Maven publishing to Central Portal.
  *
- * Apply this plugin to modules that should be published:
+ * Apply this plugin to modules that should be published. This plugin only configures
+ * repositories and signing - it does NOT apply maven-publish or signing plugins.
+ * The consuming module must apply these plugins first.
+ *
+ * For Java/Kotlin modules:
  * ```kotlin
  * plugins {
+ *     `maven-publish`
+ *     signing
+ *     id("berrycrush.maven-publish")
+ * }
+ * ```
+ *
+ * For platform (BOM) modules:
+ * ```kotlin
+ * plugins {
+ *     `java-platform`
+ *     `maven-publish`
+ *     signing
  *     id("berrycrush.maven-publish")
  * }
  * ```
  *
  * The plugin configures:
- * - Maven publication from Java component with sources and javadoc
  * - Central Portal repositories (snapshots and releases)
  * - In-memory GPG signing for CI
  *
@@ -28,10 +43,13 @@ import org.gradle.plugins.signing.SigningExtension
 class MavenPublishConventionPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         with(project) {
-            pluginManager.apply("maven-publish")
-            pluginManager.apply("signing")
-
             afterEvaluate {
+                // Ensure maven-publish is applied
+                if (!pluginManager.hasPlugin("maven-publish")) {
+                    logger.warn("berrycrush.maven-publish: maven-publish plugin not applied, skipping configuration")
+                    return@afterEvaluate
+                }
+                
                 extensions.configure<PublishingExtension> {
                     repositories {
                         maven {
