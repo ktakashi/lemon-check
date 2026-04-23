@@ -26,6 +26,22 @@ class SpringContextAdapter(
     private var testInstance: Any? = null
 
     /**
+     * Returns the Spring-prepared test instance.
+     *
+     * This instance has been processed by Spring's TestContextManager,
+     * meaning @LocalServerPort, @Autowired, and other Spring annotations
+     * are properly injected.
+     *
+     * @return The test instance with dependencies injected
+     * @throws ConfigurationException if context not initialized
+     */
+    fun getTestInstance(): Any =
+        testInstance
+            ?: throw ConfigurationException(
+                "Spring context not initialized. Call initializeContext() first.",
+            )
+
+    /**
      * Initializes the Spring context for the test class.
      *
      * This creates a TestContextManager, instantiates the test class,
@@ -78,6 +94,22 @@ class SpringContextAdapter(
                     "Add @Component annotation to the class or define a @Bean method.",
             )
         }
+    }
+
+    /**
+     * Retrieves a bean from the Spring ApplicationContext, or returns null if not found.
+     *
+     * This is a safer alternative to [getBean] when the bean may not be registered.
+     *
+     * @param beanClass The class of the bean to retrieve
+     * @return The bean instance, or null if not found
+     * @throws ConfigurationException if context not initialized
+     */
+    fun <T : Any> getBeanOrNull(beanClass: Class<T>): T? {
+        val context = getApplicationContext()
+        return runCatching {
+            context.getBeansOfType(beanClass).values.firstOrNull()
+        }.getOrNull()
     }
 
     /**

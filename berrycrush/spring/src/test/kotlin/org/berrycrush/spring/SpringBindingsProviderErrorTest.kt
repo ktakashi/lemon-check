@@ -8,6 +8,7 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
 import org.springframework.boot.test.context.SpringBootTest
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -39,29 +40,21 @@ class SpringBindingsProviderErrorTest {
     }
 
     @Test
-    fun `createBindings throws error when bean not found in Spring context`() {
+    fun `createBindings falls back to direct instantiation when bean not found in Spring context`() {
         // Initialize with valid test class
         provider.initialize(ValidTestClassWithoutBindings::class.java)
 
         try {
-            val exception =
-                assertThrows<ConfigurationException> {
-                    provider.createBindings(
-                        ValidTestClassWithoutBindings::class.java,
-                        NonExistentBindings::class.java,
-                    )
-                }
+            // When bean is not found in Spring context, fall back to direct instantiation
+            val bindings =
+                provider.createBindings(
+                    ValidTestClassWithoutBindings::class.java,
+                    NonExistentBindings::class.java,
+                )
 
-            // Verify error message contains helpful information
-            assertTrue(
-                exception.message!!.contains("NonExistentBindings"),
-                "Error should mention the bindings class name",
-            )
-            assertTrue(
-                exception.message!!.contains("Spring bean") ||
-                    exception.message!!.contains("not registered"),
-                "Error should explain the bean is not registered",
-            )
+            // Verify bindings were created via direct instantiation
+            assertNotNull(bindings, "Bindings should be created via fallback")
+            assertTrue(bindings is NonExistentBindings, "Should be instance of NonExistentBindings")
         } finally {
             provider.cleanup(ValidTestClassWithoutBindings::class.java)
         }

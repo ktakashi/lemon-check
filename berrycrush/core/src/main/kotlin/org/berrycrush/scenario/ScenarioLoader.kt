@@ -441,6 +441,7 @@ class ScenarioLoader {
                 condition.left,
             )}) ${condition.operator.name} (${describeCondition(condition.right)})"
             is Condition.CustomAssertion -> condition.pattern
+            is Condition.Custom -> "<custom predicate>"
         }
 
     private fun transformExampleRow(node: ExampleRowNode): ExampleRow {

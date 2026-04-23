@@ -28,12 +28,12 @@ Here's a minimal example:
         baseUrl = "https://api.example.com"
     }
 
-    val scenario = suite.scenario("List all pets") {
-        `when`("I request all pets") {
+    @ScenarioTest Annotation
+    -------------------------
             call("listPets")
-        }
+    The ``@ScenarioTest`` annotation provides a cleaner way to define scenarios
 
-        then("I receive a list") {
+        afterwards("I receive a list") {
             statusCode(200)
             bodyArrayNotEmpty("$.pets")
         }
@@ -43,13 +43,13 @@ Creating a Test Suite
 ---------------------
 
 Single Spec
-^^^^^^^^^^^
+        import org.berrycrush.junit.ScenarioTest
 
 For APIs with a single OpenAPI specification:
 
 .. code-block:: kotlin
 
-    val suite = berryCrush("petstore.yaml") {
+            @ScenarioTest
         baseUrl = "https://api.example.com"
         timeout(30) // seconds
         header("Accept", "application/json")
@@ -60,7 +60,7 @@ Multi-Spec
 
 For APIs with multiple OpenAPI specifications:
 
-.. code-block:: kotlin
+            @ScenarioTest
 
     val suite = berryCrush {
         spec("petstore", "petstore.yaml") {
@@ -78,20 +78,20 @@ For APIs with multiple OpenAPI specifications:
 
 Defining Scenarios
 ------------------
-
-Basic Structure
+    2. Methods annotated with ``@ScenarioTest`` that return ``Scenario`` are automatically discovered
+    3. Each ``@ScenarioTest`` method becomes a separate test in the JUnit test tree
 ^^^^^^^^^^^^^^^
 
 Scenarios follow the Given-When-Then pattern:
 
 .. code-block:: kotlin
-
+    **Using @ScenarioTest (recommended for most cases):**
     suite.scenario("Create and retrieve a pet") {
         given("the API is available") {
             // Optional setup
         }
 
-        `when`("I create a new pet") {
+            @ScenarioTest
             call("createPet") {
                 body(mapOf(
                     "name" to "Fluffy",
@@ -100,28 +100,28 @@ Scenarios follow the Given-When-Then pattern:
             }
         }
 
-        then("the pet is created") {
+        afterwards("the pet is created") {
             statusCode(201)
             bodyEquals("$.name", "Fluffy")
         }
     }
 
 .. note::
-    The ``when`` keyword requires backticks (``` `when` ```) because it's a Kotlin reserved word.
+    The ``whenever`` keyword is the preferred alternative to ``when``, which requires backticks.
 
 Scenario with Tags
 ^^^^^^^^^^^^^^^^^^
-
+    Use ``@ScenarioTest`` when you want:
 Add tags for filtering and organization:
 
 .. code-block:: kotlin
 
     suite.scenario("Smoke test", tags = setOf("smoke", "critical")) {
-        `when`("I request the health endpoint") {
+        whenever("I request the health endpoint") {
             call("healthCheck")
         }
 
-        then("the service is healthy") {
+        afterwards("the service is healthy") {
             statusCode(200)
         }
     }
@@ -133,10 +133,10 @@ Basic Call
 ^^^^^^^^^^
 
 Call an operation by its OpenAPI ``operationId``:
-
+        Methods annotated with ``@ScenarioTest`` must:
 .. code-block:: kotlin
 
-    `when`("I get a pet") {
+    whenever("I get a pet") {
         call("getPetById") {
             pathParam("petId", 123)
         }
@@ -212,7 +212,7 @@ Call operations from a specific spec:
 
 .. code-block:: kotlin
 
-    `when`("I authenticate") {
+    whenever("I authenticate") {
         using("auth")  // Switch to auth spec
         call("login") {
             body(mapOf("username" to "test", "password" to "secret"))
@@ -226,7 +226,7 @@ Extract values from responses for use in subsequent steps:
 
 .. code-block:: kotlin
 
-    `when`("I create a pet") {
+    whenever("I create a pet") {
         call("createPet") {
             body(mapOf("name" to "Fluffy"))
         }
@@ -252,14 +252,14 @@ Variables can be shared across scenarios when enabled in configuration:
     }
 
     suite.scenario("Create a pet") {
-        `when`("I create a pet") {
+        whenever("I create a pet") {
             call("createPet") { body(mapOf("name" to "Fluffy")) }
             extractTo("petId", "$.id")
         }
     }
 
     suite.scenario("Use the created pet") {
-        `when`("I get the pet from the previous scenario") {
+        whenever("I get the pet from the previous scenario") {
             call("getPetById") {
                 pathParam("petId", $$"${petId}")
             }
@@ -274,7 +274,7 @@ Status Code
 
 .. code-block:: kotlin
 
-    then("the response is successful") {
+    afterwards("the response is successful") {
         statusCode(200)           // Exact match
         statusCode(200..299)      // Range match
     }
@@ -284,7 +284,7 @@ Body Assertions
 
 .. code-block:: kotlin
 
-    then("the response body is correct") {
+    afterwards("the response body is correct") {
         bodyContains("Fluffy")                    // Contains substring
         bodyEquals("$.name", "Fluffy")            // JSONPath equals
         bodyMatches("$.email", ".*@.*\\.com")     // JSONPath matches regex
@@ -297,7 +297,7 @@ Header Assertions
 
 .. code-block:: kotlin
 
-    then("the headers are correct") {
+    afterwards("the headers are correct") {
         headerExists("Content-Type")
         headerEquals("Content-Type", "application/json")
     }
@@ -307,9 +307,156 @@ Schema Validation
 
 .. code-block:: kotlin
 
-    then("the response matches the OpenAPI schema") {
+    afterwards("the response matches the OpenAPI schema") {
         matchesSchema()
     }
+
+Custom Assertions
+^^^^^^^^^^^^^^^^^
+
+Define programmatic assertions with full access to the test execution context:
+
+.. code-block:: kotlin
+
+    suite.scenario("Custom assertion example") {
+        whenever("I get user profile") {
+            call("getUserProfile") {
+                pathParam("userId", 123)
+            }
+        }
+
+        afterwards("the response is valid") {
+            statusCode(200)
+
+            // Custom assertion with programmatic logic
+            assert("user age is valid") { ctx ->
+                val body = ctx.responseBody ?: error("No response body")
+                val age = """\"age\"\s*:\s*(\d+)""".toRegex().find(body)
+                    ?.groupValues?.get(1)?.toInt() ?: error("Age not found")
+
+                require(age >= 0) { "Age must be non-negative: $age" }
+                require(age <= 150) { "Age must be realistic: $age" }
+
+                // Store extracted value for later use
+                ctx.set("userAge", age)
+            }
+
+            // Use the extracted value in another assertion
+            assert("verify age was extracted") { ctx ->
+                val age = ctx.get<Int>("userAge")
+                require(age != null) { "Age should have been extracted" }
+            }
+        }
+    }
+
+**TestExecutionContext** provides:
+
++----------------------+-----------------------------------------------------------+
+| Property/Method      | Description                                               |
++======================+===========================================================+
+| ``response``         | The current HTTP response                                 |
++----------------------+-----------------------------------------------------------+
+| ``request``          | The current HTTP request                                  |
++----------------------+-----------------------------------------------------------+
+| ``statusCode``       | The response status code                                  |
++----------------------+-----------------------------------------------------------+
+| ``responseBody``     | The response body as string                               |
++----------------------+-----------------------------------------------------------+
+| ``variables``        | Read-only view of all variables                           |
++----------------------+-----------------------------------------------------------+
+| ``get<T>(key)``      | Get a variable with type casting                          |
++----------------------+-----------------------------------------------------------+
+| ``set(key, value)``  | Store a value for subsequent assertions                   |
++----------------------+-----------------------------------------------------------+
+| ``extract(name, v)`` | Store an extracted value for parameter binding            |
++----------------------+-----------------------------------------------------------+
+
+Conditionals
+------------
+
+Execute different assertions based on runtime conditions:
+
+.. code-block:: kotlin
+
+    suite.scenario("Conditional assertion example") {
+        whenever("I search for a pet") {
+            call("findPetsByStatus") {
+                queryParam("status", "available")
+            }
+        }
+
+        afterwards("I handle the response appropriately") {
+            // Conditional based on status code
+            conditional({ ctx -> ctx.statusCode == 200 }) {
+                // Success case
+                bodyArrayNotEmpty("$")
+            } orElse {
+                // Error case
+                bodyContains("error")
+            }
+
+            // Conditional based on response content
+            conditional({ ctx ->
+                ctx.responseBody?.contains("premium") == true
+            }) {
+                // Premium pets have extra fields
+                assert("verify premium fields") { ctx ->
+                    val body = ctx.responseBody ?: ""
+                    require(body.contains("premiumFeatures"))
+                }
+            }
+        }
+    }
+
+The ``conditional`` block:
+
+- Takes a predicate function ``(TestExecutionContext) -> Boolean``
+- Executes the first block if the predicate returns ``true``
+- Executes the ``orElse`` block (if present) if the predicate returns ``false``
+- Can be used multiple times in the same step
+- Supports nested standard assertions (``statusCode``, ``bodyEquals``, etc.)
+
+Scenario File Compatibility
+---------------------------
+
+For consistency with ``.scenario`` file keywords, the DSL provides aliases:
+
++-------------+------------------+------------------------------------------------+
+| Alias       | Primary Method   | Description                                    |
++=============+==================+================================================+
+| ``when``    | ``whenever``     | Matches ``when`` keyword in scenario files     |
++-------------+------------------+------------------------------------------------+
+| ``then``    | ``afterwards``   | Matches ``then`` keyword in scenario files     |
++-------------+------------------+------------------------------------------------+
+| ``but``     | ``otherwise``    | Matches ``but`` keyword in scenario files      |
++-------------+------------------+------------------------------------------------+
+
+These aliases allow you to use the same keywords in Kotlin DSL that you would use
+in ``.scenario`` files:
+
+.. code-block:: kotlin
+
+    suite.scenario("Using scenario file keywords") {
+        `when`("I request a pet") {       // Same as whenever
+            call("getPetById") {
+                pathParam("petId", 1)
+            }
+        }
+
+        then("I receive the pet") {       // Same as afterwards
+            statusCode(200)
+            bodyEquals("$.name", "Fluffy")
+        }
+
+        but("no error is returned") {     // Same as otherwise
+            bodyEquals("$.error", null)
+        }
+    }
+
+.. note::
+    The ``when`` keyword requires backticks (``` `when` ```) because it's a Kotlin
+    reserved word. The primary methods (``whenever``, ``afterwards``, ``otherwise``)
+    don't have this limitation.
 
 Scenario Outlines
 -----------------
@@ -319,13 +466,13 @@ Create parameterized scenarios with multiple data sets:
 .. code-block:: kotlin
 
     suite.scenarioOutline("Filter pets by status: <status>") {
-        `when`("I filter pets") {
+        whenever("I filter pets") {
             call("findPetsByStatus") {
                 queryParam("status", "<status>")
             }
         }
 
-        then("I receive matching pets") {
+        afterwards("I receive matching pets") {
             statusCode(200)
         }
 
@@ -357,13 +504,13 @@ Define reusable step sequences:
     suite.scenario("Access protected resource") {
         include(authenticateFragment)
 
-        `when`("I access the protected endpoint") {
+        whenever("I access the protected endpoint") {
             call("protectedResource") {
                 bearerToken($$"${authToken}")
             }
         }
 
-        then("I get the data") {
+        afterwards("I get the data") {
             statusCode(200)
         }
     }
@@ -371,32 +518,37 @@ Define reusable step sequences:
 JUnit Integration
 -----------------
 
-Extend ``ScenarioTest`` for JUnit integration:
+Use ``BerryCrushExtension`` for JUnit integration:
 
 .. code-block:: kotlin
 
-    import org.berrycrush.berrycrush.junit.BerryCrushSpec
-    import org.berrycrush.berrycrush.junit.ScenarioTest
+    import org.berrycrush.junit.BerryCrushExtension
+    import org.berrycrush.junit.BerryCrushSpec
+    import org.berrycrush.dsl.BerryCrushSuite
+    import org.berrycrush.executor.BerryCrushScenarioExecutor
+    import org.junit.jupiter.api.Test
+    import org.junit.jupiter.api.extension.ExtendWith
 
+    @ExtendWith(BerryCrushExtension::class)
     @BerryCrushSpec("petstore.yaml")
-    class PetstoreKotlinScenarios : ScenarioTest() {
-        
-        override fun configureSuite() {
-            configure {
-                baseUrl = "https://api.example.com"
-                timeout(30)
-            }
-        }
+    class PetstoreKotlinScenarios {
 
-        override fun defineScenarios() {
-            scenario("List all pets") {
-                `when`("I request pets") {
+        @Test
+        fun `list all pets`(suite: BerryCrushSuite, executor: BerryCrushScenarioExecutor) {
+            suite.configure {
+                baseUrl = "https://api.example.com"
+            }
+            
+            val scenario = suite.scenario("List all pets") {
+                whenever("I request pets") {
                     call("listPets")
                 }
-                then("I get a list") {
+                afterwards("I get a list") {
                     statusCode(200)
                 }
             }
+            
+            executor.execute(scenario)
         }
     }
 
@@ -405,83 +557,32 @@ Complete Example
 
 .. code-block:: kotlin
 
+    @ExtendWith(BerryCrushExtension::class)
     @BerryCrushSpec("petstore.yaml")
-    class PetstoreApiTests : ScenarioTest() {
+    class PetstoreApiTests {
 
-        override fun configureSuite() {
-            configure {
+        @Test
+        fun `list available pets`(suite: BerryCrushSuite, executor: BerryCrushScenarioExecutor) {
+            suite.configure {
                 baseUrl = "https://petstore.swagger.io/v2"
                 timeout(30)
                 header("Accept", "application/json")
-                shareVariablesAcrossScenarios = true
             }
-        }
 
-        override fun defineScenarios() {
-            // Simple scenario
-            scenario("List available pets") {
-                `when`("I request available pets") {
+            val scenario = suite.scenario("List available pets") {
+                whenever("I request available pets") {
                     call("findPetsByStatus") {
                         queryParam("status", "available")
                     }
                 }
 
-                then("I receive a list") {
+                afterwards("I receive a list") {
                     statusCode(200)
                     bodyArrayNotEmpty("$")
                 }
             }
 
-            // CRUD flow with variable extraction
-            scenario("Create a new pet") {
-                `when`("I create a pet") {
-                    call("addPet") {
-                        body(mapOf(
-                            "name" to "TestPet",
-                            "photoUrls" to listOf("https://example.com/photo.jpg"),
-                            "status" to "available"
-                        ))
-                    }
-                    extractTo("createdPetId", "$.id")
-                }
-
-                then("the pet is created") {
-                    statusCode(200)
-                    bodyEquals("$.name", "TestPet")
-                }
-            }
-
-            scenario("Retrieve the created pet") {
-                `when`("I get the pet by ID") {
-                    call("getPetById") {
-                        pathParam("petId", $$"${createdPetId}")
-                    }
-                }
-
-                then("I see the pet details") {
-                    statusCode(200)
-                    matchesSchema()
-                }
-            }
-
-            // Parameterized scenario
-            scenarioOutline("Filter pets by <status>") {
-                `when`("I filter") {
-                    call("findPetsByStatus") {
-                        queryParam("status", "<status>")
-                    }
-                }
-
-                then("I get results") {
-                    statusCode(200)
-                }
-
-                examples(
-                    row("status" to "available"),
-                    row("status" to "pending"),
-                    row("status" to "sold")
-                )
-            }
+            executor.execute(scenario)
         }
     }
 
@@ -510,21 +611,21 @@ BerryCrushSuite
 ScenarioScope
 ^^^^^^^^^^^^^
 
-+----------------------+------------------------------------------------+
-| Method               | Description                                    |
-+======================+================================================+
-| ``given(desc, block)`` | Define a precondition step                   |
-+----------------------+------------------------------------------------+
-| ``when(desc, block)``  | Define an action step                        |
-+----------------------+------------------------------------------------+
-| ``then(desc, block)``  | Define an assertion step                     |
-+----------------------+------------------------------------------------+
-| ``and(desc, block)``   | Continue previous step type                  |
-+----------------------+------------------------------------------------+
-| ``but(desc, block)``   | Define an exception/negative case            |
-+----------------------+------------------------------------------------+
-| ``include(fragment)``  | Include a fragment's steps                   |
-+----------------------+------------------------------------------------+
++------------------------+------------------------------------------------+
+| Method                 | Description                                    |
++========================+================================================+
+| ``given(desc, block)`` | Define a precondition step                     |
++------------------------+------------------------------------------------+
+| ``whenever(desc, block)`` | Define an action step                       |
++------------------------+------------------------------------------------+
+| ``afterwards(desc, block)`` | Define an assertion step                  |
++------------------------+------------------------------------------------+
+| ``and(desc, block)``   | Continue previous step type                    |
++------------------------+------------------------------------------------+
+| ``otherwise(desc, block)`` | Define an exception/negative case           |
++------------------------+------------------------------------------------+
+| ``include(fragment)``  | Include a fragment's steps                     |
++------------------------+------------------------------------------------+
 
 StepScope
 ^^^^^^^^^
@@ -605,10 +706,10 @@ Basic Usage
             executor: BerryCrushScenarioExecutor,
         ) {
             val scenario = suite.scenario("List all pets") {
-                `when`("I request all pets") {
+                whenever("I request all pets") {
                     call("listPets")
                 }
-                then("I get a successful response") {
+                afterwards("I get a successful response") {
                     statusCode(200)
                 }
             }
@@ -657,10 +758,10 @@ directly in ``@Test`` methods:
             executor: BerryCrushScenarioExecutor,
         ) {
             val scenario = suite.scenario("List all pets") {
-                `when`("I request all pets") {
+                whenever("I request all pets") {
                     call("listPets")
                 }
-                then("I get a successful response") {
+                afterwards("I get a successful response") {
                     statusCode(200)
                 }
             }
@@ -716,6 +817,116 @@ The extension can inject the following types into ``@BeforeEach`` or ``@Test`` m
 .. note::
     The ``BerryCrushConfiguration`` object is shared between the suite and executor.
     Changes to the configuration affect the executor, even after the executor is created.
+
+@ScenarioTest Annotation
+-------------------------
+
+The ``@ScenarioTest`` annotation provides a cleaner way to define scenarios
+as JUnit test methods. Instead of manually calling ``executor.execute()``, you can
+simply annotate a method that returns a ``Scenario`` and BerryCrush will automatically
+discover and execute it.
+
+Basic Usage
+^^^^^^^^^^^
+
+.. code-block:: kotlin
+
+    import org.berrycrush.dsl.BerryCrushSuite
+    import org.berrycrush.junit.BerryCrushSpec
+    import org.berrycrush.junit.ScenarioTest
+    import org.berrycrush.model.Scenario
+
+    @BerryCrushSpec("petstore.yaml", baseUrl = "http://localhost:8080/api")
+    class PetApiTest {
+
+        @ScenarioTest
+        fun `list all pets`(): Scenario =
+            BerryCrushSuite.create().scenario("List all pets") {
+                whenever("I request all pets") {
+                    call("listPets")
+                }
+                afterwards("I get a successful response") {
+                    statusCode(200)
+                }
+            }
+
+        @ScenarioTest
+        fun createPet(): Scenario =
+            BerryCrushSuite.create().scenario("Create a new pet") {
+                whenever("I create a pet") {
+                    call("createPet") {
+                        body(mapOf("name" to "Fluffy"))
+                    }
+                }
+                afterwards("the pet is created") {
+                    statusCode(201)
+                }
+            }
+    }
+
+How It Works
+^^^^^^^^^^^^
+
+1. The BerryCrush test engine discovers classes annotated with ``@BerryCrushSpec``
+2. Methods annotated with ``@ScenarioTest`` that return ``Scenario`` are automatically discovered
+3. Each ``@ScenarioTest`` method becomes a separate test in the JUnit test tree
+4. The test engine executes each scenario and reports results to JUnit
+
+Comparison with BerryCrushExtension
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Using @ScenarioTest (recommended for most cases):**
+
+.. code-block:: kotlin
+
+    @BerryCrushSpec("petstore.yaml")
+    class PetApiTest {
+        @ScenarioTest
+        fun `list pets`(): Scenario =
+            BerryCrushSuite.create().scenario("List pets") { ... }
+    }
+
+**Using BerryCrushExtension (for more control):**
+
+.. code-block:: kotlin
+
+    @ExtendWith(BerryCrushExtension::class)
+    @BerryCrushSpec("petstore.yaml")
+    class PetApiTest {
+        @Test
+        fun `list pets`(suite: BerryCrushSuite, executor: BerryCrushScenarioExecutor) {
+            val scenario = suite.scenario("List pets") { ... }
+            val result = executor.execute(scenario)
+            assertEquals(ResultStatus.PASSED, result.status)
+        }
+    }
+
+Use ``@ScenarioTest`` when you want:
+
+- Simpler, more concise test code
+- Automatic test discovery and execution
+- Less boilerplate code
+
+Use ``BerryCrushExtension`` when you need:
+
+- Access to the ``ScenarioResult`` for custom assertions
+- Dynamic configuration per test (e.g., Spring Boot's random port)
+- Complex test setup that requires injected parameters
+
+Method Naming Conventions
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The method name is converted to a display name in the JUnit test tree:
+
+- ``createPet`` → "Create Pet"
+- ``listAllPets`` → "List All Pets"
+- ``` `list all pets` ``` → "List all pets" (backtick-wrapped names)
+
+.. note::
+    Methods annotated with ``@ScenarioTest`` must:
+    - Return ``Scenario`` or a subtype
+    - Have no parameters (or only ``BerryCrushSuite`` if needed)
+    - Be public
 
 See Also
 --------

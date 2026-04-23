@@ -6,8 +6,11 @@ import org.berrycrush.dsl.berrycrush
 import org.berrycrush.executor.BerryCrushScenarioExecutor
 import org.berrycrush.junit.BerryCrushExtension
 import org.berrycrush.junit.BerryCrushSpec
+import org.berrycrush.junit.ScenarioTest
 import org.berrycrush.model.ResultStatus
+import org.berrycrush.model.Scenario
 import org.berrycrush.samples.petstore.PetstoreApplication
+import org.berrycrush.spring.BerryCrushContextConfiguration
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -24,6 +27,10 @@ import kotlin.test.assertTrue
  *
  * This test suite exercises all DSL features against the petstore application.
  * Uses BerryCrushExtension with dynamic port configuration from Spring Boot.
+ *
+ * The test demonstrates both patterns:
+ * - Traditional @Test methods with injected executor (for complex scenarios)
+ * - @ScenarioTest annotation methods (for simple, declarative scenarios)
  */
 @SpringBootTest(
     classes = [PetstoreApplication::class],
@@ -31,6 +38,7 @@ import kotlin.test.assertTrue
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith(BerryCrushExtension::class)
+@BerryCrushContextConfiguration
 @BerryCrushSpec("classpath:/petstore.yaml")
 class PetstoreDslTest {
     @LocalServerPort
@@ -53,6 +61,43 @@ class PetstoreDslTest {
         config.baseUrl = "http://localhost:$port/api/v1"
     }
 
+    // ========== @ScenarioTest Annotation Tests ==========
+    // These tests demonstrate the @ScenarioTest annotation which provides
+    // a cleaner, more declarative way to define scenario tests.
+    // The port is available via @LocalServerPort since Spring context is initialized.
+
+    @ScenarioTest
+    fun listAllPetsScenario(suite: BerryCrushSuite): Scenario {
+        // Configure dynamic port - @LocalServerPort is injected by Spring
+        suite.configuration.baseUrl = "http://localhost:$port/api/v1"
+
+        return suite.scenario("List all pets (via @ScenarioTest)") {
+            whenever("I request the list of pets") {
+                call("listPets")
+            }
+            afterwards("I receive a successful response") {
+                statusCode(200)
+            }
+        }
+    }
+
+    @ScenarioTest
+    fun getPetByIdScenario(suite: BerryCrushSuite): Scenario {
+        suite.configuration.baseUrl = "http://localhost:$port/api/v1"
+
+        return suite.scenario("Get pet by ID (via @ScenarioTest)") {
+            whenever("I request a specific pet") {
+                call("getPetById") {
+                    pathParam("petId", 1)
+                }
+            }
+            afterwards("I receive the pet details") {
+                statusCode(200)
+                bodyEquals("$.name", "Max")
+            }
+        }
+    }
+
     // ========== Basic Scenario Tests ==========
 
     @Nested
@@ -67,10 +112,10 @@ class PetstoreDslTest {
             val scenario =
                 suite.scenario("List all pets") {
                     given("a request is prepared") {}
-                    `when`("I request the list of pets") {
+                    whenever("I request the list of pets") {
                         call("listPets")
                     }
-                    then("I receive a successful response") {
+                    afterwards("I receive a successful response") {
                         statusCode(200)
                     }
                 }
@@ -87,12 +132,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Get pet and verify") {
-                    `when`("I get a pet") {
+                    whenever("I get a pet") {
                         call("getPetById") {
                             pathParam("petId", 1)
                         }
                     }
-                    then("response is successful") {
+                    afterwards("response is successful") {
                         statusCode(200)
                     }
                     and("pet has a name") {
@@ -112,15 +157,15 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Get pet but not error") {
-                    `when`("I get a pet") {
+                    whenever("I get a pet") {
                         call("getPetById") {
                             pathParam("petId", 1)
                         }
                     }
-                    then("response is successful") {
+                    afterwards("response is successful") {
                         statusCode(200)
                     }
-                    but("no error field exists") {
+                    otherwise("no error field exists") {
                         bodyEquals("$.name", "Max")
                     }
                 }
@@ -134,10 +179,10 @@ class PetstoreDslTest {
         fun `scenario with tags`(suite: BerryCrushSuite) {
             val scenario =
                 suite.scenario("Tagged scenario", tags = setOf("smoke", "api")) {
-                    `when`("I list pets") {
+                    whenever("I list pets") {
                         call("listPets")
                     }
-                    then("I get results") {
+                    afterwards("I get results") {
                         statusCode(200)
                     }
                 }
@@ -159,12 +204,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Get pet by ID") {
-                    `when`("I get pet by ID") {
+                    whenever("I get pet by ID") {
                         call("getPetById") {
                             pathParam("petId", 1)
                         }
                     }
-                    then("pet is returned") {
+                    afterwards("pet is returned") {
                         statusCode(200)
                         bodyEquals("$.id", 1)
                     }
@@ -182,12 +227,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("List pets with limit") {
-                    `when`("I list pets with limit") {
+                    whenever("I list pets with limit") {
                         call("listPets") {
                             queryParam("limit", 10)
                         }
                     }
-                    then("pets are returned") {
+                    afterwards("pets are returned") {
                         statusCode(200)
                     }
                 }
@@ -204,13 +249,13 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Request with custom header") {
-                    `when`("I make a request with headers") {
+                    whenever("I make a request with headers") {
                         call("listPets") {
                             header("X-Request-Id", "test-123")
                             header("Accept", "application/json")
                         }
                     }
-                    then("request succeeds") {
+                    afterwards("request succeeds") {
                         statusCode(200)
                     }
                 }
@@ -227,12 +272,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Create pet with string body") {
-                    `when`("I create a pet") {
+                    whenever("I create a pet") {
                         call("createPet") {
                             body("""{"name": "TestPet", "status": "available"}""")
                         }
                     }
-                    then("pet is created") {
+                    afterwards("pet is created") {
                         statusCode(201)
                     }
                 }
@@ -249,7 +294,7 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Create pet with map body") {
-                    `when`("I create a pet") {
+                    whenever("I create a pet") {
                         call("createPet") {
                             body(
                                 mapOf(
@@ -259,7 +304,7 @@ class PetstoreDslTest {
                             )
                         }
                     }
-                    then("pet is created") {
+                    afterwards("pet is created") {
                         statusCode(201)
                     }
                 }
@@ -276,12 +321,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Request with bearer token") {
-                    `when`("I make an authenticated request") {
+                    whenever("I make an authenticated request") {
                         call("listPets") {
                             bearerToken("test-token-123")
                         }
                     }
-                    then("request succeeds") {
+                    afterwards("request succeeds") {
                         statusCode(200)
                     }
                 }
@@ -298,12 +343,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Request with basic auth") {
-                    `when`("I make a basic auth request") {
+                    whenever("I make a basic auth request") {
                         call("listPets") {
                             basicAuth("admin", "password")
                         }
                     }
-                    then("request succeeds") {
+                    afterwards("request succeeds") {
                         statusCode(200)
                     }
                 }
@@ -320,12 +365,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Request with API key") {
-                    `when`("I make an API key request") {
+                    whenever("I make an API key request") {
                         call("listPets") {
                             apiKey("my-secret-api-key")
                         }
                     }
-                    then("request succeeds") {
+                    afterwards("request succeeds") {
                         statusCode(200)
                     }
                 }
@@ -342,12 +387,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Request with custom API key header") {
-                    `when`("I make a request with custom API key header") {
+                    whenever("I make a request with custom API key header") {
                         call("listPets") {
                             apiKey("X-Custom-Key", "custom-key-value")
                         }
                     }
-                    then("request succeeds") {
+                    afterwards("request succeeds") {
                         statusCode(200)
                     }
                 }
@@ -370,10 +415,10 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Status code exact") {
-                    `when`("I list pets") {
+                    whenever("I list pets") {
                         call("listPets")
                     }
-                    then("status is 200") {
+                    afterwards("status is 200") {
                         statusCode(200)
                     }
                 }
@@ -390,10 +435,10 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Status code range") {
-                    `when`("I list pets") {
+                    whenever("I list pets") {
                         call("listPets")
                     }
-                    then("status is 2xx") {
+                    afterwards("status is 2xx") {
                         statusCode(200..299)
                     }
                 }
@@ -410,12 +455,12 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Body equals") {
-                    `when`("I get pet") {
+                    whenever("I get pet") {
                         call("getPetById") {
                             pathParam("petId", 1)
                         }
                     }
-                    then("pet name matches") {
+                    afterwards("pet name matches") {
                         bodyEquals("$.name", "Max")
                     }
                 }
@@ -432,10 +477,10 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Array not empty") {
-                    `when`("I list pets") {
+                    whenever("I list pets") {
                         call("listPets")
                     }
-                    then("list is not empty") {
+                    afterwards("list is not empty") {
                         bodyArrayNotEmpty("$.pets")
                     }
                 }
@@ -452,10 +497,10 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Header exists") {
-                    `when`("I list pets") {
+                    whenever("I list pets") {
                         call("listPets")
                     }
-                    then("content-type header exists") {
+                    afterwards("content-type header exists") {
                         headerExists("Content-Type")
                     }
                 }
@@ -472,10 +517,10 @@ class PetstoreDslTest {
         ) {
             val scenario =
                 suite.scenario("Header equals") {
-                    `when`("I list pets") {
+                    whenever("I list pets") {
                         call("listPets")
                     }
-                    then("content-type is JSON") {
+                    afterwards("content-type is JSON") {
                         headerEquals("Content-Type", "application/json")
                     }
                 }
@@ -499,12 +544,12 @@ class PetstoreDslTest {
             // Create a pet first
             val createScenario =
                 suite.scenario("Create and extract ID") {
-                    `when`("I create a pet") {
+                    whenever("I create a pet") {
                         call("createPet") {
                             body(mapOf("name" to "ExtractTest", "status" to "available"))
                         }
                     }
-                    then("pet is created") {
+                    afterwards("pet is created") {
                         statusCode(201)
                         extractTo("createdPetId", "$.id")
                     }
@@ -542,7 +587,7 @@ class PetstoreDslTest {
             val scenario =
                 suite.scenario("Use fragment") {
                     include(authFragment)
-                    then("we have a pet ID") {
+                    afterwards("we have a pet ID") {
                         statusCode(201)
                     }
                 }
@@ -559,7 +604,7 @@ class PetstoreDslTest {
         ) {
             // Define the fragment first
             suite.fragment("create_pet_fragment") {
-                `when`("creating a pet") {
+                whenever("creating a pet") {
                     call("createPet") {
                         body(mapOf("name" to "NamedFragmentPet", "status" to "available"))
                     }
@@ -570,7 +615,7 @@ class PetstoreDslTest {
             val scenario =
                 suite.scenario("Use named fragment") {
                     include("create_pet_fragment")
-                    then("pet is created") {
+                    afterwards("pet is created") {
                         statusCode(201)
                     }
                 }
@@ -593,12 +638,12 @@ class PetstoreDslTest {
         ) {
             val scenarios =
                 suite.scenarioOutline("Get pets by ID") {
-                    `when`("I get pet with ID <petId>") {
+                    whenever("I get pet with ID <petId>") {
                         call("getPetById") {
                             pathParam("petId", 1)
                         }
                     }
-                    then("I see the pet") {
+                    afterwards("I see the pet") {
                         statusCode(200)
                     }
                     examples(
@@ -698,11 +743,11 @@ class PetstoreDslTest {
 
             val scenario =
                 multiSpecSuite.scenario("Use specific spec") {
-                    `when`("I call using petstore spec") {
+                    whenever("I call using petstore spec") {
                         using("petstore")
                         call("listPets")
                     }
-                    then("request succeeds") {
+                    afterwards("request succeeds") {
                         statusCode(200)
                     }
                 }
@@ -737,14 +782,14 @@ class PetstoreDslTest {
                     given("step 1") {}
                     and("step 2") {}
                     and("step 3") {}
-                    `when`("step 4") {
+                    whenever("step 4") {
                         call("listPets")
                     }
-                    then("step 5") {
+                    afterwards("step 5") {
                         statusCode(200)
                     }
                     and("step 6") {}
-                    but("step 7") {}
+                    otherwise("step 7") {}
                 }
 
             assertEquals(7, scenario.steps.size)

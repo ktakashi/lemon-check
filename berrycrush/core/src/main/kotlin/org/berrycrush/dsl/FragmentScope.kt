@@ -25,7 +25,7 @@ class FragmentScope internal constructor(
     /**
      * Define a WHEN step.
      */
-    fun `when`(
+    fun whenever(
         description: String,
         block: FragmentStepScope.() -> Unit = {},
     ) {
@@ -35,7 +35,7 @@ class FragmentScope internal constructor(
     /**
      * Define a THEN step.
      */
-    fun then(
+    fun afterwards(
         description: String,
         block: FragmentStepScope.() -> Unit = {},
     ) {
@@ -51,6 +51,24 @@ class FragmentScope internal constructor(
     ) {
         addStep(org.berrycrush.model.StepType.AND, description, block)
     }
+
+    // ========== Scenario File Compatibility Aliases ==========
+
+    /**
+     * Alias for [whenever] - matches scenario file `when` keyword.
+     */
+    fun `when`(
+        description: String,
+        block: FragmentStepScope.() -> Unit = {},
+    ) = whenever(description, block)
+
+    /**
+     * Alias for [afterwards] - matches scenario file `then` keyword.
+     */
+    fun then(
+        description: String,
+        block: FragmentStepScope.() -> Unit = {},
+    ) = afterwards(description, block)
 
     private fun addStep(
         type: org.berrycrush.model.StepType,

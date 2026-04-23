@@ -12,6 +12,9 @@ dependencies {
     // BerryCrush JUnit extension
     testImplementation(project(":berrycrush:junit"))
 
+    // BerryCrush Spring integration (for @ScenarioTest with @LocalServerPort)
+    testImplementation(project(":berrycrush:spring"))
+
     // JUnit
     testImplementation(libs.bundles.junit)
     testImplementation(libs.junit.platform.launcher)

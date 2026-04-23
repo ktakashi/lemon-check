@@ -1,9 +1,11 @@
 package org.berrycrush.dsl
 
 import org.berrycrush.context.ExecutionContext
+import org.berrycrush.context.TestExecutionContext
 import org.berrycrush.model.Assertion
 import org.berrycrush.model.Condition
 import org.berrycrush.model.ConditionOperator
+import org.berrycrush.model.CustomAssertionDefinition
 import org.berrycrush.model.Extraction
 import org.berrycrush.model.Step
 import org.berrycrush.model.StepType
@@ -25,6 +27,8 @@ class StepScope internal constructor(
     private var body: String? = null
     private val extractions = mutableListOf<Extraction>()
     private val assertions = mutableListOf<Assertion>()
+    private val customAssertions = mutableListOf<CustomAssertionDefinition>()
+    private val conditionals = mutableListOf<org.berrycrush.model.ConditionalAssertion>()
     private var autoAssert: Boolean = true
 
     /**
@@ -245,6 +249,71 @@ class StepScope internal constructor(
         )
     }
 
+    // ========== Custom Assertions ==========
+
+    /**
+     * Define a custom assertion with programmatic logic.
+     *
+     * The assertion callback receives the [TestExecutionContext] which provides
+     * access to the current response, request history, variables, and the ability
+     * to store extracted values for subsequent steps.
+     *
+     * Any exception thrown within the callback is treated as an assertion failure,
+     * including exceptions from Kotlin's `require()`, `check()`, and `assert()`.
+     *
+     * Example:
+     * ```kotlin
+     * afterwards("response is valid") {
+     *     assert("user ID is positive") { ctx ->
+     *         val userId = ctx.responseBody?.let { /* parse userId */ }
+     *         require(userId != null && userId > 0) { "Invalid user ID" }
+     *         ctx.extract("userId", userId)
+     *     }
+     * }
+     * ```
+     *
+     * @param description Human-readable description of what this assertion checks
+     * @param assertion Callback that performs the assertion logic
+     */
+    fun assert(
+        description: String,
+        assertion: (TestExecutionContext) -> Unit,
+    ) {
+        customAssertions.add(CustomAssertionDefinition(description, assertion))
+    }
+
+    // ========== Conditional Logic ==========
+
+    /**
+     * Define conditional logic that executes different assertions based on runtime state.
+     *
+     * The predicate receives the [TestExecutionContext] and returns true/false to determine
+     * which branch to execute.
+     *
+     * Use the `orElse` infix function to define the else branch:
+     * ```kotlin
+     * conditional({ ctx -> ctx.statusCode == 200 }) {
+     *     bodyEquals("$.status", "success")
+     * } orElse {
+     *     bodyContains("error")
+     * }
+     * ```
+     *
+     * @param predicate Function that determines which branch to execute
+     * @param block Assertions to run when predicate returns true
+     * @return ConditionalBuilder to chain with orElse
+     */
+    fun conditional(
+        predicate: (TestExecutionContext) -> Boolean,
+        block: StepScope.() -> Unit,
+    ): ConditionalBuilder {
+        val builder = ConditionalBuilder(predicate, block, this)
+        conditionalBuilders.add(builder)
+        return builder
+    }
+
+    private val conditionalBuilders = mutableListOf<ConditionalBuilder>()
+
     internal fun build(): Step =
         Step(
             type = type,
@@ -257,6 +326,16 @@ class StepScope internal constructor(
             body = body,
             extractions = extractions.toList(),
             assertions = assertions.toList(),
+            customAssertions = customAssertions.toList(),
+            conditionals = conditionals + conditionalBuilders.map { it.build() },
             autoAssert = autoAssert,
         )
+
+    // Internal constructor for conditional scopes
+    internal constructor(
+        type: StepType,
+        description: String,
+        suite: BerryCrushSuite,
+        @Suppress("UNUSED_PARAMETER") internal: Boolean,
+    ) : this(type, description, suite)
 }

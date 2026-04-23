@@ -1,8 +1,6 @@
 package org.berrycrush.junit.engine
 
-import org.berrycrush.assertion.AnnotationAssertionScanner
 import org.berrycrush.assertion.AssertionRegistry
-import org.berrycrush.assertion.DefaultAssertionRegistry
 import org.berrycrush.autotest.AutoTestCase
 import org.berrycrush.context.ExecutionContext
 import org.berrycrush.dsl.BerryCrushSuite
@@ -10,6 +8,7 @@ import org.berrycrush.executor.BerryCrushExecutionListener
 import org.berrycrush.executor.BerryCrushScenarioExecutor
 import org.berrycrush.junit.BerryCrushBindings
 import org.berrycrush.junit.BerryCrushConfiguration
+import org.berrycrush.junit.BerryCrushSpec
 import org.berrycrush.junit.DefaultBindings
 import org.berrycrush.junit.discovery.FragmentDiscovery
 import org.berrycrush.junit.spi.BindingsProvider
@@ -23,8 +22,6 @@ import org.berrycrush.model.StepResult
 import org.berrycrush.plugin.PluginRegistry
 import org.berrycrush.runner.ScenarioRunner
 import org.berrycrush.scenario.ScenarioLoader
-import org.berrycrush.step.AnnotationStepScanner
-import org.berrycrush.step.DefaultStepRegistry
 import org.berrycrush.step.StepRegistry
 import org.junit.platform.engine.EngineExecutionListener
 import org.junit.platform.engine.TestExecutionResult
@@ -71,9 +68,88 @@ class ScenarioTestExecutor(
         context.runner.beginExecution()
         try {
             executeFileDescriptors(classDescriptor, context, listener)
+            executeScenarioMethods(classDescriptor, context, listener, provider)
         } finally {
             context.runner.endExecution()
         }
+    }
+
+    /**
+     * Execute @Scenario methods.
+     */
+    private fun executeScenarioMethods(
+        classDescriptor: ClassTestDescriptor,
+        context: TestExecutionContext,
+        listener: EngineExecutionListener,
+        provider: BindingsProvider?,
+    ) {
+        classDescriptor.children
+            .filterIsInstance<ScenarioMethodDescriptor>()
+            .forEach { scenarioDescriptor ->
+                executeScenarioMethod(scenarioDescriptor, classDescriptor, context, listener, provider)
+            }
+    }
+
+    /**
+     * Execute a single @Scenario method.
+     */
+    private fun executeScenarioMethod(
+        scenarioDescriptor: ScenarioMethodDescriptor,
+        classDescriptor: ClassTestDescriptor,
+        context: TestExecutionContext,
+        listener: EngineExecutionListener,
+        provider: BindingsProvider?,
+    ) {
+        listener.executionStarted(scenarioDescriptor)
+
+        val result =
+            runCatching {
+                // Create test instance - use Spring-managed instance if available
+                val testInstance =
+                    provider?.createTestInstance(classDescriptor.testClass)
+                        ?: classDescriptor.testClass.getDeclaredConstructor().newInstance()
+
+                // Invoke the @Scenario method to get the Scenario
+                val scenario = scenarioDescriptor.invokeMethod(testInstance, context.suite)
+
+                // Check if scenario should be skipped based on tags
+                if (!classDescriptor.shouldExecuteScenario(scenario.tags)) {
+                    return@runCatching ResultStatus.SKIPPED
+                }
+
+                // Create executor for scenario
+                val executor =
+                    BerryCrushScenarioExecutor(
+                        context.suite.specRegistry,
+                        context.suite.configuration,
+                        context.pluginRegistry,
+                        context.fragmentRegistry,
+                        context.stepRegistry,
+                        context.assertionRegistry,
+                    )
+
+                // Execute the scenario
+                val scenarioResult = executor.execute(scenario)
+                scenarioResult.status
+            }
+
+        result.fold(
+            onSuccess = { status ->
+                val testResult =
+                    when (status) {
+                        ResultStatus.PASSED -> TestExecutionResult.successful()
+                        ResultStatus.SKIPPED -> TestExecutionResult.aborted(null)
+                        ResultStatus.FAILED,
+                        ResultStatus.ERROR,
+                        -> TestExecutionResult.failed(AssertionError("Scenario failed"))
+                        ResultStatus.PENDING -> TestExecutionResult.aborted(null)
+                    }
+                listener.executionFinished(scenarioDescriptor, testResult)
+            },
+            onFailure = { e ->
+                listener.executionFinished(scenarioDescriptor, TestExecutionResult.failed(e))
+            },
+        )
     }
 
     private fun executeFileDescriptors(
@@ -374,7 +450,8 @@ class ScenarioTestExecutor(
         }
 
         val specBaseUrls = bindings.getSpecBaseUrls()
-        val specPath = bindings.getOpenApiSpec() ?: classDescriptor.openApiSpec
+        val rawSpecPath = bindings.getOpenApiSpec() ?: classDescriptor.openApiSpec
+        val specPath = rawSpecPath?.let { resolvePath(it, classDescriptor.testClass) }
 
         if (!specPath.isNullOrBlank()) {
             suite.spec(specPath) {
@@ -383,10 +460,42 @@ class ScenarioTestExecutor(
         }
 
         bindings.getAdditionalSpecs().forEach { (name, path) ->
-            suite.spec(name, path) {
+            val resolvedPath = resolvePath(path, classDescriptor.testClass)
+            suite.spec(name, resolvedPath) {
                 specBaseUrls[name]?.let { baseUrl = it }
             }
         }
+
+        // Apply baseUrl from @BerryCrushSpec if set
+        val spec = classDescriptor.testClass.getAnnotation(BerryCrushSpec::class.java)
+        spec?.baseUrl?.takeIf { it.isNotBlank() }?.let {
+            suite.configuration.baseUrl = it
+        }
+    }
+
+    /**
+     * Resolve a spec path, supporting both file paths and classpath resources.
+     *
+     * Paths prefixed with `classpath:` are resolved from the test class's classloader.
+     */
+    private fun resolvePath(
+        path: String,
+        testClass: Class<*>,
+    ): String {
+        if (!path.startsWith(CLASSPATH_PREFIX)) {
+            return path
+        }
+
+        val resourcePath = path.removePrefix(CLASSPATH_PREFIX)
+        val resource =
+            testClass.getResource(resourcePath)
+                ?: testClass.classLoader.getResource(resourcePath.removePrefix("/"))
+                ?: throw IllegalArgumentException(
+                    "Classpath resource not found: $resourcePath. " +
+                        "Make sure the file exists in src/test/resources or src/main/resources.",
+                )
+
+        return resource.path
     }
 
     private fun createBindings(
@@ -464,61 +573,15 @@ class ScenarioTestExecutor(
      * Creates a StepRegistry with step definitions from @BerryCrushConfiguration.stepClasses.
      * Returns null if no step classes are configured.
      */
-    private fun createStepRegistry(classDescriptor: ClassTestDescriptor): StepRegistry? {
-        val config =
-            classDescriptor.testClass.getAnnotation(BerryCrushConfiguration::class.java)
-                ?: return null
-
-        val stepClasses = config.stepClasses
-        if (stepClasses.isEmpty()) return null
-
-        val registry = DefaultStepRegistry()
-        val scanner = AnnotationStepScanner()
-
-        stepClasses.forEach { klass ->
-            runCatching {
-                scanner.scan(klass.java).forEach { definition ->
-                    registry.register(definition)
-                }
-            }.onFailure { e ->
-                System.err.println(
-                    "Warning: Failed to scan step class ${klass.qualifiedName}: ${e.message}",
-                )
-            }
-        }
-
-        return if (registry.allDefinitions().isEmpty()) null else registry
-    }
+    private fun createStepRegistry(classDescriptor: ClassTestDescriptor): StepRegistry? =
+        RegistryFactory.createStepRegistry(classDescriptor.testClass)
 
     /**
      * Creates an AssertionRegistry with assertion definitions from @BerryCrushConfiguration.assertionClasses.
      * Returns null if no assertion classes are configured.
      */
-    private fun createAssertionRegistry(classDescriptor: ClassTestDescriptor): AssertionRegistry? {
-        val config =
-            classDescriptor.testClass.getAnnotation(BerryCrushConfiguration::class.java)
-                ?: return null
-
-        val assertionClasses = config.assertionClasses
-        if (assertionClasses.isEmpty()) return null
-
-        val registry = DefaultAssertionRegistry()
-        val scanner = AnnotationAssertionScanner()
-
-        assertionClasses.forEach { klass ->
-            runCatching {
-                scanner.scan(klass.java).forEach { definition ->
-                    registry.register(definition)
-                }
-            }.onFailure { e ->
-                System.err.println(
-                    "Warning: Failed to scan assertion class ${klass.qualifiedName}: ${e.message}",
-                )
-            }
-        }
-
-        return if (registry.allDefinitions().isEmpty()) null else registry
-    }
+    private fun createAssertionRegistry(classDescriptor: ClassTestDescriptor): AssertionRegistry? =
+        RegistryFactory.createAssertionRegistry(classDescriptor.testClass)
 
     /**
      * Adapter that bridges [BerryCrushExecutionListener] to JUnit's [EngineExecutionListener].
@@ -648,6 +711,8 @@ class ScenarioTestExecutor(
     }
 
     companion object {
+        private const val CLASSPATH_PREFIX = "classpath:"
+
         /**
          * Builds a formatted error message for failed steps in a scenario.
          */

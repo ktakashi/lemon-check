@@ -1,5 +1,6 @@
 package org.berrycrush.model
 
+import org.berrycrush.context.TestExecutionContext
 import org.berrycrush.scenario.SourceLocation
 
 /**
@@ -160,6 +161,17 @@ sealed class Condition {
      */
     data class CustomAssertion(
         val pattern: String,
+    ) : Condition()
+
+    /**
+     * Programmatic condition using a predicate function.
+     *
+     * Used by the Kotlin DSL for dynamic conditional logic.
+     *
+     * @property predicate Function that evaluates the condition against the test context
+     */
+    data class Custom(
+        val predicate: (TestExecutionContext) -> Boolean,
     ) : Condition()
 }
 

@@ -79,11 +79,11 @@ class BerryCrushDslTest {
                     // No-op for this test
                 }
 
-                `when`("I request all pets") {
+                whenever("I request all pets") {
                     call("listPets")
                 }
 
-                then("I receive a list of pets") {
+                afterwards("I receive a list of pets") {
                     statusCode(200)
                     bodyContains("pets")
                 }
@@ -106,14 +106,14 @@ class BerryCrushDslTest {
 
         val scenario =
             suite.scenario("Get pet by ID") {
-                `when`("I fetch pet 123") {
+                whenever("I fetch pet 123") {
                     call("getPetById") {
                         pathParam("petId", 123)
                         header("Accept", "application/json")
                     }
                 }
 
-                then("I get the pet") {
+                afterwards("I get the pet") {
                     statusCode(200)
                 }
             }
@@ -156,7 +156,7 @@ class BerryCrushDslTest {
 
         val scenario =
             suite.scenario("Verify response") {
-                then("verify all conditions") {
+                afterwards("verify all conditions") {
                     statusCode(200)
                     bodyContains("name")
                     bodyEquals("$.status", "available")
@@ -183,7 +183,7 @@ class BerryCrushDslTest {
 
         val scenario =
             suite.scenario("Tagged scenario", tags = setOf("smoke", "api")) {
-                then("do something") {}
+                afterwards("do something") {}
             }
 
         assertEquals(setOf("smoke", "api"), scenario.tags)
@@ -211,7 +211,7 @@ class BerryCrushDslTest {
             suite.scenario("Protected operation") {
                 include(authFragment)
 
-                `when`("I create a pet") {
+                whenever("I create a pet") {
                     call("createPet")
                 }
             }
@@ -232,7 +232,7 @@ class BerryCrushDslTest {
 
         val scenario =
             suite.scenario("Auth test") {
-                `when`("I call with auth") {
+                whenever("I call with auth") {
                     call("listPets") {
                         bearerToken("my-token")
                     }

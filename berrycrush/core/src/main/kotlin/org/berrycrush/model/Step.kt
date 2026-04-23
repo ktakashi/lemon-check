@@ -34,6 +34,7 @@ sealed class BodyProperty {
  *                    Variables in the file content are interpolated at runtime.
  * @property extractions Values to extract from response
  * @property assertions Assertions to verify on response
+ * @property customAssertions Custom assertions with programmatic logic
  * @property conditionals Conditional assertions (if/else if/else branches)
  * @property failMessage If set, fail with this message unconditionally
  * @property autoAssert Whether to generate assertions from OpenAPI spec
@@ -54,6 +55,7 @@ data class Step(
     val bodyFile: String? = null,
     val extractions: List<Extraction> = emptyList(),
     val assertions: List<Assertion> = emptyList(),
+    val customAssertions: List<CustomAssertionDefinition> = emptyList(),
     val conditionals: List<ConditionalAssertion> = emptyList(),
     val failMessage: String? = null,
     val autoAssert: Boolean = true,

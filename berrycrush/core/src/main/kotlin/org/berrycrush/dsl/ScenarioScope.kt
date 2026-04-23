@@ -29,9 +29,8 @@ class ScenarioScope internal constructor(
 
     /**
      * Define a WHEN step (action).
-     * Note: Uses backticks because 'when' is a Kotlin keyword.
      */
-    fun `when`(
+    fun whenever(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
@@ -41,7 +40,7 @@ class ScenarioScope internal constructor(
     /**
      * Define a THEN step (assertion).
      */
-    fun then(
+    fun afterwards(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
@@ -61,12 +60,38 @@ class ScenarioScope internal constructor(
     /**
      * Define a BUT step (exception/negative case).
      */
-    fun but(
+    fun otherwise(
         description: String,
         block: StepScope.() -> Unit = {},
     ) {
         addStep(StepType.BUT, description, block)
     }
+
+    // ========== Scenario File Compatibility Aliases ==========
+
+    /**
+     * Alias for [whenever] - matches scenario file `when` keyword.
+     */
+    fun `when`(
+        description: String,
+        block: StepScope.() -> Unit = {},
+    ) = whenever(description, block)
+
+    /**
+     * Alias for [afterwards] - matches scenario file `then` keyword.
+     */
+    fun then(
+        description: String,
+        block: StepScope.() -> Unit = {},
+    ) = afterwards(description, block)
+
+    /**
+     * Alias for [otherwise] - matches scenario file `but` keyword.
+     */
+    fun but(
+        description: String,
+        block: StepScope.() -> Unit = {},
+    ) = otherwise(description, block)
 
     /**
      * Include a fragment's steps in this scenario.

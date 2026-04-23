@@ -70,6 +70,22 @@ interface BindingsProvider {
     ): BerryCrushBindings
 
     /**
+     * Creates a test instance for executing @ScenarioTest methods.
+     *
+     * For providers that manage test lifecycle (e.g., Spring integration),
+     * this returns a properly initialized test instance with dependencies injected.
+     * The default implementation returns null, causing the executor to create
+     * the instance directly via reflection.
+     *
+     * For Spring integration, this returns a test instance with @LocalServerPort,
+     * @Autowired, and other Spring annotations properly injected.
+     *
+     * @param testClass The test class to create an instance of
+     * @return A test instance with dependencies injected, or null to use default instantiation
+     */
+    fun createTestInstance(testClass: Class<*>): Any? = null
+
+    /**
      * Cleans up resources after test execution completes.
      * Called once after all scenarios have executed.
      *

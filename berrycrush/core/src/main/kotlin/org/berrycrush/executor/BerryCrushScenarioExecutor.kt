@@ -590,6 +590,10 @@ class BerryCrushScenarioExecutor(
         val conditionalResults = runConditionals(response, step.conditionals, context)
         assertionResults.addAll(conditionalResults.assertionResults)
 
+        // Run custom assertions (DSL assert blocks)
+        val customAssertionResults = runCustomAssertions(response, step.customAssertions, context)
+        assertionResults.addAll(customAssertionResults)
+
         // Check for conditional fail
         if (conditionalResults.failMessage != null) {
             return StepResult(
@@ -952,6 +956,58 @@ class BerryCrushScenarioExecutor(
     }
 
     /**
+     * Run custom assertions defined via DSL assert blocks.
+     *
+     * Custom assertions receive a TestExecutionContext and can throw any exception
+     * (including AssertionError from require/check/assert) to indicate failure.
+     */
+    private fun runCustomAssertions(
+        response: HttpResponse<String>,
+        customAssertions: List<org.berrycrush.model.CustomAssertionDefinition>,
+        context: ExecutionContext,
+    ): List<AssertionResult> =
+        customAssertions.map { customAssertion ->
+            runCustomAssertion(response, customAssertion, context)
+        }
+
+    /**
+     * Run a single custom assertion.
+     */
+    private fun runCustomAssertion(
+        response: HttpResponse<String>,
+        customAssertion: org.berrycrush.model.CustomAssertionDefinition,
+        context: ExecutionContext,
+    ): AssertionResult {
+        val testContext = org.berrycrush.context.MutableTestExecutionContext(context)
+        val assertion =
+            Assertion(
+                condition = Condition.CustomAssertion(customAssertion.description),
+                description = customAssertion.description,
+            )
+        return runCatching {
+            customAssertion.assertion(testContext)
+            AssertionResult(
+                assertion = assertion,
+                passed = true,
+                message = "Custom assertion passed: ${customAssertion.description}",
+            )
+        }.getOrElse { e ->
+            // Unwrap AssertionFailureException if present
+            val actualException =
+                when (e) {
+                    is org.berrycrush.exception.AssertionFailureException -> e.cause ?: e
+                    else -> e
+                }
+            AssertionResult(
+                assertion = assertion,
+                passed = false,
+                message = actualException.message ?: "Custom assertion failed: ${customAssertion.description}",
+                actual = actualException.message,
+            )
+        }
+    }
+
+    /**
      * Evaluate a condition against the response.
      */
     private fun evaluateCondition(
@@ -976,6 +1032,7 @@ class BerryCrushScenarioExecutor(
             is Condition.Schema -> evaluateSchemaCondition(response, context)
             is Condition.ResponseTime -> evaluateResponseTimeCondition(response, condition, context)
             is Condition.CustomAssertion -> evaluateCustomAssertionCondition(response, condition, context)
+            is Condition.Custom -> evaluateCustomPredicateCondition(response, condition, context)
         }
 
     /**
@@ -1031,6 +1088,21 @@ class BerryCrushScenarioExecutor(
             // AssertionError means the assertion failed
             actualException !is AssertionError
         }
+    }
+
+    /**
+     * Evaluate a custom predicate condition (from DSL conditional).
+     */
+    private fun evaluateCustomPredicateCondition(
+        response: HttpResponse<String>,
+        condition: Condition.Custom,
+        context: ExecutionContext,
+    ): Boolean {
+        // Note: lastResponse should already be set by the executor before evaluating conditions
+        val testContext = org.berrycrush.context.MutableTestExecutionContext(context)
+        return runCatching {
+            condition.predicate(testContext)
+        }.getOrElse { false }
     }
 
     /**
@@ -1365,6 +1437,9 @@ class BerryCrushScenarioExecutor(
             }
             is Condition.CustomAssertion -> {
                 if (passed) "Custom assertion passed: ${condition.pattern}" else "Custom assertion failed: ${condition.pattern}"
+            }
+            is Condition.Custom -> {
+                if (passed) "Custom predicate passed" else "Custom predicate failed"
             }
         }
 
