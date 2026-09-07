@@ -9,7 +9,6 @@ import org.berrycrush.executor.assertion.AssertionExecutor
 import org.berrycrush.executor.assertion.DefaultAssertionEngine
 import org.berrycrush.executor.enricher.ErrorEnricher
 import org.berrycrush.executor.fragment.DefaultFragmentExecutor
-import org.berrycrush.executor.fragment.FragmentExecutor
 import org.berrycrush.executor.response.ResponseProcessor
 import org.berrycrush.executor.step.OperationStepExecutor
 import org.berrycrush.executor.step.StepExecutor
@@ -19,6 +18,8 @@ import org.berrycrush.model.Scenario
 import org.berrycrush.model.ScenarioResult
 import org.berrycrush.model.Step
 import org.berrycrush.model.StepResult
+import org.berrycrush.model.includeDirective
+import org.berrycrush.model.webhookDirective
 import org.berrycrush.openapi.SpecRegistry
 import org.berrycrush.plugin.PluginRegistry
 import org.berrycrush.plugin.StepContext
@@ -217,27 +218,28 @@ class BerryCrushScenarioExecutor(
         context: StepContext,
         startTime: Instant,
     ): StepResult? =
-        step.webhookConfig?.let { config ->
+        step.webhookDirective?.config?.let { config ->
             stepExecutor.executeWebhookStep(step, config, context, startTime)
         }
 }
 
-internal inline fun ExecutionContext.withIncludeParameters(
+internal inline fun <T> ExecutionContext.withIncludeParameters(
     step: Step,
-    block: () -> Unit,
-) {
-    if (step.includeParameters.isEmpty()) {
-        block()
+    block: () -> T,
+): T {
+    val includeParameters = step.includeDirective?.parameters ?: emptyMap()
+    if (includeParameters.isEmpty()) {
+        return block()
     } else {
         val saved =
-            step.includeParameters.keys
+            includeParameters.keys
                 .filter { this.contains(it) }
                 .associateWith { this.get<Any>(it) as Any }
         try {
             this
-                .resolveParams(step.includeParameters)
+                .resolveParams(includeParameters)
                 .forEach { (key, value) -> value?.let { this[key] = it } }
-            block()
+            return block()
         } finally {
             // Restore original values
             for ((key, value) in saved) {

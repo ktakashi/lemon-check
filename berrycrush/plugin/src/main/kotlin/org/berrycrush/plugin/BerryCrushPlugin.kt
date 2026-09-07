@@ -85,8 +85,6 @@ interface BerryCrushPlugin {
      * Use this hook to perform one-time setup at the beginning of test execution,
      * such as initializing test data, starting external services, or setting up
      * shared resources.
-     *
-     * @throws Any exception will fail the entire test run
      */
     fun onTestExecutionStart() {
         // Default: no-op
@@ -98,8 +96,6 @@ interface BerryCrushPlugin {
      * Use this hook to perform cleanup or finalization at the end of test execution,
      * such as generating reports, stopping services, or cleaning up resources.
      * This is called regardless of whether scenarios passed or failed.
-     *
-     * @throws Any exception will fail the entire test run
      */
     fun onTestExecutionEnd() {
         // Default: no-op
@@ -112,7 +108,6 @@ interface BerryCrushPlugin {
      * or log scenario start events.
      *
      * @param context Scenario execution context with metadata and variables
-     * @throws Any exception will fail the entire test run
      */
     fun onScenarioStart(context: ScenarioContext) {
         // Default: no-op
@@ -126,7 +121,6 @@ interface BerryCrushPlugin {
      *
      * @param context Scenario execution context
      * @param result Scenario execution result with status and step results
-     * @throws Any exception will fail the entire test run
      */
     fun onScenarioEnd(
         context: ScenarioContext,
@@ -142,7 +136,6 @@ interface BerryCrushPlugin {
      * or capture pre-execution state.
      *
      * @param context Step execution context with request details and parent scenario
-     * @throws Any exception will fail the entire test run
      */
     fun onStepStart(context: StepContext) {
         // Default: no-op
@@ -156,7 +149,6 @@ interface BerryCrushPlugin {
      *
      * @param context Step execution context
      * @param result Step execution result with status and failure details
-     * @throws Any exception will fail the entire test run
      */
     fun onStepEnd(
         context: StepContext,

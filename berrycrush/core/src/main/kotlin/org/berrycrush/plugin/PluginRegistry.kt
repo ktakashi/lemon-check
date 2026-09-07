@@ -91,8 +91,6 @@ class PluginRegistry {
      * Dispatch onTestExecutionStart to all plugins in priority order.
      *
      * Call this once before the first scenario starts.
-     *
-     * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchTestExecutionStart() {
         sortedPlugins.forEach { it.onTestExecutionStart() }
@@ -102,8 +100,6 @@ class PluginRegistry {
      * Dispatch onTestExecutionEnd to all plugins in priority order.
      *
      * Call this once after all scenarios have completed.
-     *
-     * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchTestExecutionEnd() {
         sortedPlugins.forEach { it.onTestExecutionEnd() }
@@ -113,7 +109,6 @@ class PluginRegistry {
      * Dispatch onScenarioStart to all plugins in priority order.
      *
      * @param context Scenario execution context
-     * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchScenarioStart(context: ScenarioContext) {
         sortedPlugins.forEach { it.onScenarioStart(context) }
@@ -124,7 +119,6 @@ class PluginRegistry {
      *
      * @param context Scenario execution context
      * @param result Scenario execution result
-     * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchScenarioEnd(
         context: ScenarioContext,
@@ -137,7 +131,6 @@ class PluginRegistry {
      * Dispatch onStepStart to all plugins in priority order.
      *
      * @param context Step execution context
-     * @throws Any exception thrown by a plugin will propagate immediately
      */
     fun dispatchStepStart(context: StepContext) {
         sortedPlugins.forEach { it.onStepStart(context) }

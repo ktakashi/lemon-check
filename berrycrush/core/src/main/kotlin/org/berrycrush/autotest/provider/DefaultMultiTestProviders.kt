@@ -102,11 +102,11 @@ private fun buildResult(
     results: List<RequestResult>,
     totalDuration: Duration,
 ): MultiTestResult {
-    val passed = results.all { it.assertionResults.all { it.passed } }
+    val passed = results.all { it.assertionResults.all { r -> r.passed } }
     val failureReason =
         if (!passed) {
             results
-                .filter { it.assertionResults.any { !it.passed } }
+                .filter { it.assertionResults.any { r -> !r.passed } }
                 .joinToString("\n") { result ->
                     val failedAssertions =
                         result.assertionResults.filter { !it.passed }

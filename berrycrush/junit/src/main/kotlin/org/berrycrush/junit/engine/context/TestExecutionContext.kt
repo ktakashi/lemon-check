@@ -27,7 +27,6 @@ import org.junit.platform.engine.EngineExecutionListener
 import org.junit.platform.engine.TestExecutionResult
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-import java.util.Collections
 import java.util.logging.Logger
 import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.jvm.jvmName
@@ -313,7 +312,7 @@ private class ScenarioMethodLifecycleController(
         }
 
         if (topDown) {
-            Collections.reverse(classHierarchy)
+            classHierarchy.reverse()
         }
 
         return classHierarchy

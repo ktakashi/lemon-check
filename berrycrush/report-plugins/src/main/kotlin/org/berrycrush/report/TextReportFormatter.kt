@@ -116,8 +116,8 @@ class TextReportFormatter(
             if (failedScenarios.isNotEmpty()) {
                 appendLine()
                 appendLine("Failed Scenarios:")
-                for (scenario in failedScenarios) {
-                    appendLine("  - ${colorScheme.colorize(scenario.name, ResultStatus.FAILED)}")
+                for ((name) in failedScenarios) {
+                    appendLine("  - ${colorScheme.colorize(name, ResultStatus.FAILED)}")
                 }
             }
             appendLine(colorScheme.headerStyle(SEPARATOR))

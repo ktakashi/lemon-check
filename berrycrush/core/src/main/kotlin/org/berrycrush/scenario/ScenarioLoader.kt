@@ -6,6 +6,7 @@ import org.berrycrush.model.BodyProperty
 import org.berrycrush.model.Condition
 import org.berrycrush.model.ConditionalActions
 import org.berrycrush.model.ConditionalAssertion
+import org.berrycrush.model.Directive
 import org.berrycrush.model.ExampleRow
 import org.berrycrush.model.Extraction
 import org.berrycrush.model.Feature
@@ -307,14 +308,20 @@ object ScenarioLoader {
                 Step(
                     type = stepType,
                     description = description,
-                    sourceLocation = webhook.location,
-                    webhookConfig =
-                        WebhookConfig(
-                            name = webhook.name,
-                            port = webhook.port,
-                            hooks = webhook.hooks,
-                            scope = webhook.scope,
+                    directives =
+                        listOf(
+                            Directive.WebhookDirective(
+                                config =
+                                    WebhookConfig(
+                                        name = webhook.name,
+                                        port = webhook.port,
+                                        hooks = webhook.hooks,
+                                        scope = webhook.scope,
+                                    ),
+                                sourceLocation = webhook.location,
+                            ),
                         ),
+                    sourceLocation = webhook.location,
                 ),
             )
         }
@@ -332,8 +339,14 @@ object ScenarioLoader {
                 Step(
                     type = stepType,
                     description = "include ${include.fragmentName}",
-                    fragmentName = include.fragmentName,
-                    includeParameters = parameters,
+                    directives =
+                        listOf(
+                            Directive.IncludeDirective(
+                                fragmentName = include.fragmentName,
+                                parameters = parameters,
+                                sourceLocation = include.location,
+                            ),
+                        ),
                     sourceLocation = include.location,
                 ),
             )
@@ -356,22 +369,47 @@ object ScenarioLoader {
                     .mapKeys { it.key.removePrefix("query_") }
                     .mapValues { extractValue(it.value) }
 
+            val directives = mutableListOf<Directive>()
+            directives +=
+                Directive.CallDirective(
+                    operationId = call.operationId,
+                    rawRequest = call.rawMethod?.let { method -> call.rawPath?.let { path -> RawRequest(method, path) } },
+                    specName = call.specName,
+                    pathParams = pathParams.toNonNullMap(),
+                    queryParams = queryParams.toNonNullMap(),
+                    headers = call.headers.mapValues { extractValue(it.value).toString() },
+                    body = call.body?.let { extractStringValue(it) },
+                    bodyProperties = call.bodyProperties?.let { transformBodyProperties(it) },
+                    bodyFile = call.bodyFile,
+                    autoTestConfig = call.autoTestConfig?.let { transformAutoTestConfig(it) },
+                    sourceLocation = call.location,
+                )
+            extractions.forEach { extraction ->
+                directives += Directive.ExtractionDirective(extraction = extraction, sourceLocation = call.location)
+            }
+            assertions.forEach { assertion ->
+                directives +=
+                    when (assertion) {
+                        is Assertion.ConditionalAssertion -> {
+                            Directive.ConditionalDirective(
+                                assertion = assertion,
+                                sourceLocation = assertion.sourceLocation ?: call.location,
+                            )
+                        }
+
+                        else -> {
+                            Directive.AssertionDirective(assertion = assertion, sourceLocation = assertion.sourceLocation ?: call.location)
+                        }
+                    }
+            }
+            failMessage?.let { message ->
+                directives += Directive.FailDirective(message = message, sourceLocation = call.location)
+            }
+
             return Step(
                 type = stepType,
                 description = description,
-                operationId = call.operationId,
-                rawRequest = call.rawMethod?.let { method -> call.rawPath?.let { path -> RawRequest(method, path) } },
-                specName = call.specName,
-                pathParams = pathParams.toNonNullMap(),
-                queryParams = queryParams.toNonNullMap(),
-                headers = call.headers.mapValues { extractValue(it.value).toString() },
-                body = call.body?.let { extractStringValue(it) },
-                bodyProperties = call.bodyProperties?.let { transformBodyProperties(it) },
-                bodyFile = call.bodyFile,
-                extractions = extractions.toList(),
-                assertions = assertions.toList(),
-                failMessage = failMessage,
-                autoTestConfig = call.autoTestConfig?.let { transformAutoTestConfig(it) },
+                directives = directives,
                 sourceLocation = call.location,
             )
         }
@@ -398,9 +436,36 @@ object ScenarioLoader {
                     Step(
                         type = stepType,
                         description = description,
-                        extractions = extractions.toList(),
-                        assertions = assertions.toList(),
-                        failMessage = failMessage,
+                        directives =
+                            buildList {
+                                extractions.forEach { extraction ->
+                                    add(Directive.ExtractionDirective(extraction = extraction, sourceLocation = defaultLocation))
+                                }
+                                assertions.forEach { assertion ->
+                                    add(
+                                        when (assertion) {
+                                            is Assertion.ConditionalAssertion -> {
+                                                Directive.ConditionalDirective(
+                                                    assertion = assertion,
+                                                    sourceLocation =
+                                                        assertion.sourceLocation ?: defaultLocation,
+                                                )
+                                            }
+
+                                            else -> {
+                                                Directive.AssertionDirective(
+                                                    assertion = assertion,
+                                                    sourceLocation =
+                                                        assertion.sourceLocation ?: defaultLocation,
+                                                )
+                                            }
+                                        },
+                                    )
+                                }
+                                failMessage?.let { message ->
+                                    add(Directive.FailDirective(message = message, sourceLocation = defaultLocation))
+                                }
+                            },
                         sourceLocation = defaultLocation,
                     ),
                 )

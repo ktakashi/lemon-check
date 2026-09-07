@@ -236,9 +236,7 @@ internal fun ParserState.parseBuiltinOrCustomAssertCondition(
     }
 
     // No built-in condition matched - treat as custom assertion pattern
-    val pattern = parseInlineTextUntilLineEnd()
-
-    return when (pattern) {
+    return when (val pattern = parseInlineTextUntilLineEnd()) {
         "" -> {
             addError("Empty assertion pattern")
         }

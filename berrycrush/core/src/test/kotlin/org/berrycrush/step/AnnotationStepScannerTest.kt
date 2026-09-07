@@ -43,8 +43,8 @@ class AnnotationStepScannerTest {
         val definitions = scanner.scan(SampleSteps::class.java, instance)
 
         // All non-static methods should use the same instance
-        for (definition in definitions) {
-            assertEquals(instance, definition.instance)
+        for ((_, _, instance1) in definitions) {
+            assertEquals(instance, instance1)
         }
     }
 

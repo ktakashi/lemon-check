@@ -6,6 +6,7 @@ import org.berrycrush.executor.HttpRequestBuilder
 import org.berrycrush.model.BodyProperty
 import org.berrycrush.model.HttpRequest
 import org.berrycrush.model.Step
+import org.berrycrush.model.callDirective
 import org.berrycrush.openapi.LoadedSpec
 import org.berrycrush.openapi.ResolvedOperation
 import org.berrycrush.openapi.SchemaSpec
@@ -113,13 +114,15 @@ private class DefaultUrlResolver(
         context: StepContext,
         pathParams: Map<String, Any>?,
         queryParams: Map<String, Any>?,
-    ): String =
-        httpBuilder.buildUrl(
-            baseUrl = getBinding(step.specName)?.baseUrl ?: spec.baseUrl,
+    ): String {
+        val call = step.callDirective
+        return httpBuilder.buildUrl(
+            baseUrl = getBinding(call?.specName)?.baseUrl ?: spec.baseUrl,
             path = operation.path,
-            pathParams = context.resolveParams(pathParams ?: step.pathParams).toNonNullMap(),
-            queryParams = context.resolveParams(queryParams ?: step.queryParams).toNonNullMap(),
+            pathParams = context.resolveParams(pathParams ?: (call?.pathParams ?: emptyMap())).toNonNullMap(),
+            queryParams = context.resolveParams(queryParams ?: (call?.queryParams ?: emptyMap())).toNonNullMap(),
         )
+    }
 
     fun getBinding(name: String?) =
         name?.let {
@@ -134,8 +137,12 @@ private class DefaultHeaderResolver(
         step: Step,
         spec: LoadedSpec,
         context: StepContext,
-    ): Map<String, String> =
-        (configuration.defaultHeaders + spec.defaultHeaders + step.headers).mapValues { (_, value) -> context.interpolate(value) }
+    ): Map<String, String> {
+        val call = step.callDirective
+        return (configuration.defaultHeaders + spec.defaultHeaders + (call?.headers ?: emptyMap())).mapValues { (_, value) ->
+            context.interpolate(value)
+        }
+    }
 }
 
 private class DefaultBodyResolver(
@@ -156,14 +163,15 @@ private class DefaultBodyResolver(
         operation: ResolvedOperation?,
         context: StepContext,
     ): String? {
+        val call = step.callDirective
         // Inline body takes precedence
-        step.body?.let { return context.interpolate(it) }
+        call?.body?.let { return context.interpolate(it) }
 
         // Structured body properties - generate from schema and merge
-        step.bodyProperties?.let { props ->
+        call?.bodyProperties?.let { props ->
             return objectMapper.writeValueAsString(resolveBody(props, operation, context))
         }
-        return step.bodyFile?.let { file ->
+        return call?.bodyFile?.let { file ->
             context.interpolate(FileLoader.load(context.interpolate(file)))
         }
     }

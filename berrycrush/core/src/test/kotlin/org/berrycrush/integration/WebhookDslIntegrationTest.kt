@@ -43,10 +43,13 @@ class WebhookDslIntegrationTest {
 
         // Verify webhook config is parsed correctly
         val step = scenario.steps.first()
-        assertNotNull(step.webhookConfig)
-        assertEquals("payments", step.webhookConfig.name)
-        assertEquals(0, step.webhookConfig.port)
-        assertEquals(listOf("onPaymentReceived"), step.webhookConfig.hooks)
+
+        @Suppress("DEPRECATION")
+        val webhookConfig = step.webhookConfig
+        assertNotNull(webhookConfig)
+        assertEquals("payments", webhookConfig.name)
+        assertEquals(0, webhookConfig.port)
+        assertEquals(listOf("onPaymentReceived"), webhookConfig.hooks)
 
         // Execute scenario - should succeed
         val executor = BerryCrushScenarioExecutor(specRegistry, config)
@@ -71,10 +74,12 @@ class WebhookDslIntegrationTest {
         val scenarios = ScenarioLoader.loadFileContentFromString(source).scenarios
         val step = scenarios.first().steps.first()
 
-        assertNotNull(step.webhookConfig)
-        assertEquals("notifications", step.webhookConfig.name)
-        assertEquals(8080, step.webhookConfig.port)
-        assertEquals(listOf("onEmail", "onSms", "onPush"), step.webhookConfig.hooks)
+        @Suppress("DEPRECATION")
+        val webhookConfig = step.webhookConfig
+        assertNotNull(webhookConfig)
+        assertEquals("notifications", webhookConfig.name)
+        assertEquals(8080, webhookConfig.port)
+        assertEquals(listOf("onEmail", "onSms", "onPush"), webhookConfig.hooks)
     }
 
     @Test
@@ -92,7 +97,10 @@ class WebhookDslIntegrationTest {
         val scenarios = ScenarioLoader.loadFileContentFromString(source).scenarios
         val step = scenarios.first().steps.first()
 
-        assertEquals(WebhookScope.FEATURE, step.webhookConfig!!.scope)
+        @Suppress("DEPRECATION")
+        val webhookConfig = step.webhookConfig
+        assertNotNull(webhookConfig)
+        assertEquals(WebhookScope.FEATURE, webhookConfig.scope)
     }
 
     @Test
@@ -119,9 +127,16 @@ class WebhookDslIntegrationTest {
         val step1 = scenarios.first().steps[0]
         val step2 = scenarios.first().steps[1]
 
-        assertEquals("payments", step1.webhookConfig!!.name)
-        assertEquals("notifications", step2.webhookConfig!!.name)
-        assertEquals(listOf("onEmail", "onSms"), step2.webhookConfig.hooks)
+        @Suppress("DEPRECATION")
+        val webhookConfig1 = step1.webhookConfig
+
+        @Suppress("DEPRECATION")
+        val webhookConfig2 = step2.webhookConfig
+        assertNotNull(webhookConfig1)
+        assertNotNull(webhookConfig2)
+        assertEquals("payments", webhookConfig1.name)
+        assertEquals("notifications", webhookConfig2.name)
+        assertEquals(listOf("onEmail", "onSms"), webhookConfig2.hooks)
     }
 
     @Test

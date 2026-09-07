@@ -5,6 +5,7 @@ import org.berrycrush.executor.resolvers.resolveCall
 import org.berrycrush.model.HttpRequest
 import org.berrycrush.model.HttpResponse
 import org.berrycrush.model.Step
+import org.berrycrush.model.callDirective
 import org.berrycrush.openapi.LoadedSpec
 import org.berrycrush.openapi.ResolvedOperation
 import org.berrycrush.openapi.SpecRegistry
@@ -28,12 +29,13 @@ interface HttpExecutor : RequestResolver {
     ): HttpResponse {
         val resolvedStep = stepContext.resolveCall(step)
         val executor = directExecutor
+        val call = resolvedStep.callDirective
         return when {
-            resolvedStep.rawRequest != null && executor != null -> {
+            call?.rawRequest != null && executor != null -> {
                 executor.execute(step, stepContext)
             }
 
-            resolvedStep.operationId != null -> {
+            call?.operationId != null -> {
                 val (spec, resolvedOp) = resolve(resolvedStep, specRegistry)
                 // Execute the HTTP request using the HttpExecutor
                 val response = execute(resolvedStep, spec, resolvedOp, stepContext)
@@ -78,7 +80,9 @@ interface HttpExecutor : RequestResolver {
     fun resolve(
         step: Step,
         specRegistry: SpecRegistry,
-    ) = specRegistry.resolve(requireNotNull(step.operationId), step.specName)
+    ) = step.callDirective?.let { call ->
+        specRegistry.resolve(requireNotNull(call.operationId), call.specName)
+    } ?: throw IllegalArgumentException("Step must have a call directive")
 }
 
 fun interface DirectHttpExecutor {

@@ -1,6 +1,7 @@
 package org.berrycrush.executor.fragment
 
 import org.berrycrush.model.Step
+import org.berrycrush.model.includeDirective
 import org.berrycrush.plugin.ScenarioContext
 
 /**
@@ -47,5 +48,5 @@ fun interface FragmentExecutor {
     fun includeParameters(
         step: Step,
         context: ScenarioContext?,
-    ): Map<String, Any?> = step.includeParameters
+    ): Map<String, Any?> = step.includeDirective?.parameters ?: emptyMap()
 }

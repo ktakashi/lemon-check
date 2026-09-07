@@ -90,7 +90,7 @@ class PluginExceptionTest {
             assertThrows<IllegalArgumentException> {
                 registry.register(plugin2)
             }
-        assertEquals(exception.message?.contains("duplicate-id"), true)
+        assertEquals(true, exception.message?.contains("duplicate-id"))
     }
 
     @Test

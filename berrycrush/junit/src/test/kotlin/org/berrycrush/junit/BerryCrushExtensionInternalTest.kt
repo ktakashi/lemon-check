@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ParameterContext
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.Optional
-import kotlin.reflect.KClass
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull

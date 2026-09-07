@@ -462,11 +462,11 @@ class CustomStepExecutionTest {
             assertEquals(ResultStatus.ERROR, result.status)
             assertNotNull(result.stepResults[0].error)
             assertEquals(
+                true,
                 result.stepResults[0]
                     .error!!
                     .message
                     ?.contains("Step failure"),
-                true,
             )
         }
 
@@ -502,11 +502,11 @@ class CustomStepExecutionTest {
             assertEquals(ResultStatus.FAILED, result.status)
             assertNotNull(result.stepResults[0].error)
             assertEquals(
+                true,
                 result.stepResults[0]
                     .error!!
                     .message
                     ?.contains("Assertion failed"),
-                true,
             )
         }
     }

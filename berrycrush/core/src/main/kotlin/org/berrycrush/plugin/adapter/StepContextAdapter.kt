@@ -3,6 +3,7 @@ package org.berrycrush.plugin.adapter
 import org.berrycrush.model.HttpRequest
 import org.berrycrush.model.HttpResponse
 import org.berrycrush.model.Step
+import org.berrycrush.model.callDirective
 import org.berrycrush.plugin.ScenarioContext
 import org.berrycrush.plugin.StepContext
 import org.berrycrush.plugin.StepOperation
@@ -34,7 +35,7 @@ class StepContextAdapter(
         get() = mapStepType(step.type)
 
     override val operationId: String?
-        get() = step.operationId
+        get() = step.callDirective?.operationId
 
     override val request: HttpRequest?
         get() = httpRequest

@@ -10,6 +10,9 @@ import org.berrycrush.model.HttpResponse
 import org.berrycrush.model.ResultStatus
 import org.berrycrush.model.Step
 import org.berrycrush.model.StepResult
+import org.berrycrush.model.directiveAssertions
+import org.berrycrush.model.directiveExtractions
+import org.berrycrush.model.failDirective
 import org.berrycrush.plugin.StepContext
 import java.time.Duration
 
@@ -49,19 +52,19 @@ class ResponseProcessor(
         val isCustom = assertionExecutor.hasCustomAssertion(step)
 
         // Check for unconditional fail
-        if (step.failMessage != null) {
+        if (step.failDirective?.message != null) {
             return StepResult(
                 step = step,
                 status = ResultStatus.FAILED,
                 response = response,
                 duration = context.response?.duration ?: Duration.ZERO,
-                error = AssertionError(step.failMessage),
+                error = AssertionError(step.failDirective?.message),
                 isCustomStep = isCustom,
             )
         }
 
         val extractedValues = extractValues(step, context)
-        val evaluatedAssertions = assertionExecutor.runAssertions(response, autoAssertions + step.assertions, context)
+        val evaluatedAssertions = assertionExecutor.runAssertions(response, autoAssertions + step.directiveAssertions, context)
         val assertionResults = evaluatedAssertions.assertionResults
 
         // Check for conditional fail
@@ -94,7 +97,7 @@ class ResponseProcessor(
         step: Step,
         context: StepContext,
     ): Map<String, Any?> =
-        step.extractions.associate { extraction ->
+        step.directiveExtractions.associate { extraction ->
             val value =
                 runCatching {
                     val body = context.response?.body ?: ""

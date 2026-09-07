@@ -9,6 +9,7 @@ import org.berrycrush.executor.resolvers.RequestResolver
 import org.berrycrush.model.HttpRequest
 import org.berrycrush.model.HttpResponse
 import org.berrycrush.model.Step
+import org.berrycrush.model.callDirective
 import org.berrycrush.openapi.HttpMethod
 import org.berrycrush.openapi.LoadedSpec
 import org.berrycrush.openapi.ResolvedOperation
@@ -111,7 +112,10 @@ class DefaultHttpExecutor(
     override fun resolve(
         step: Step,
         specRegistry: SpecRegistry,
-    ): Pair<LoadedSpec, ResolvedOperation> = specRegistry.resolve(requireNotNull(step.operationId), step.specName, configuration.bindings)
+    ): Pair<LoadedSpec, ResolvedOperation> {
+        val call = step.callDirective ?: throw IllegalArgumentException("Step must have a call directive")
+        return specRegistry.resolve(requireNotNull(call.operationId), call.specName, configuration.bindings)
+    }
 
     override fun execute(
         step: Step,
@@ -122,23 +126,24 @@ class DefaultHttpExecutor(
         step: Step,
         context: StepContext,
     ): HttpRequest {
-        requireNotNull(step.rawRequest)
-        val rawMethod = context.interpolate(step.rawRequest.method)
+        val call = step.callDirective ?: throw IllegalArgumentException("Step must have a call directive")
+        val rawRequest = requireNotNull(call.rawRequest)
+        val rawMethod = context.interpolate(rawRequest.method)
         val resolvedMethod =
             HttpMethod.fromName(rawMethod)
                 ?: throw IllegalArgumentException("Unsupported HTTP method '$rawMethod' in 'call raw'.")
-        val rawPath = context.interpolate(step.rawRequest.path)
-        val baseUrl = resolveRawBaseUrl(step.specName ?: BindingConfig.DEFAULT_BINDING_NAME)
+        val rawPath = context.interpolate(rawRequest.path)
+        val baseUrl = resolveRawBaseUrl(call.specName ?: BindingConfig.DEFAULT_BINDING_NAME)
 
         val url =
             httpBuilder.buildUrl(
                 baseUrl = baseUrl,
                 path = rawPath,
-                pathParams = context.resolveParams(step.pathParams).toNonNullMap(),
-                queryParams = context.resolveParams(step.queryParams).toNonNullMap(),
+                pathParams = context.resolveParams(call.pathParams).toNonNullMap(),
+                queryParams = context.resolveParams(call.queryParams).toNonNullMap(),
             )
         val headers =
-            (configuration.defaultHeaders + step.headers)
+            (configuration.defaultHeaders + call.headers)
                 .mapValues { (_, value) -> context.interpolate(value) }
         val body = resolveBody(step, null, context)
 
