@@ -69,7 +69,7 @@ internal fun StepContext.resolveCall(step: Step): Step {
 private fun List<Directive>.replaceFirstCallDirective(replace: (Directive.CallDirective) -> Directive): List<Directive> {
     var replaced = false
     return map { directive ->
-        if (!replaced && directive is org.berrycrush.model.Directive.CallDirective) {
+        if (!replaced && directive is Directive.CallDirective) {
             replaced = true
             replace(directive)
         } else {

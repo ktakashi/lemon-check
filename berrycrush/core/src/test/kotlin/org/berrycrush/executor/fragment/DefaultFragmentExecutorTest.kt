@@ -5,7 +5,6 @@ import org.berrycrush.exception.ConfigurationException
 import org.berrycrush.executor.withIncludeParameters
 import org.berrycrush.model.Fragment
 import org.berrycrush.model.FragmentRegistry
-import org.berrycrush.model.ParameterFragment
 import org.berrycrush.model.Step
 import org.berrycrush.model.StepType
 import kotlin.test.Test

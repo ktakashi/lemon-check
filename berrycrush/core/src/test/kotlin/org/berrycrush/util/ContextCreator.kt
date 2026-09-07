@@ -15,7 +15,14 @@ import org.berrycrush.context.ExecutionContext as CoreExecutionContext
 
 fun createStepContext(context: ExecutionContext = ExecutionContextAdapter(CoreExecutionContext())) =
     object : StepContext {
-        private val dummyScenarioContext =
+        override val stepDescription: String
+            get() = TODO("Not yet implemented")
+        override val stepType: org.berrycrush.plugin.StepType
+            get() = TODO("Not yet implemented")
+        override val stepIndex: Int
+            get() = TODO("Not yet implemented")
+        override val scenarioContext: ScenarioContext
+            field =
             object : ScenarioContext {
                 override val scenarioName: String
                     get() = TODO("Not yet implemented")
@@ -38,23 +45,15 @@ fun createStepContext(context: ExecutionContext = ExecutionContextAdapter(CoreEx
                 override val configuration: Configuration
                     get() = TODO("Not yet implemented")
             }
-        override val stepDescription: String
-            get() = TODO("Not yet implemented")
-        override val stepType: org.berrycrush.plugin.StepType
-            get() = TODO("Not yet implemented")
-        override val stepIndex: Int
-            get() = TODO("Not yet implemented")
-        override val scenarioContext: ScenarioContext
-            get() = dummyScenarioContext
         override val request: HttpRequest
             get() = TODO("Not yet implemented")
         override val response: HttpResponse? = null
-        override val operationId: String?
+        override val operationId: String
             get() = TODO("Not yet implemented")
-        override val responseTime: Duration?
+        override val responseTime: Duration
             get() = TODO("Not yet implemented")
         override val operation: StepOperation?
             get() = null
         override val configuration: Configuration
-            get() = dummyScenarioContext.configuration
+            get() = scenarioContext.configuration
     }

@@ -28,7 +28,7 @@ class ScenarioMethodDescriptorEdgeTest {
             }
 
         assertEquals(TestDescriptor.Type.TEST, descriptor.type)
-        assertEquals(error.message?.contains("Unsupported parameter type"), true)
+        assertEquals(true, error.message?.contains("Unsupported parameter type"))
     }
 
     @Test
@@ -46,7 +46,7 @@ class ScenarioMethodDescriptorEdgeTest {
                 descriptor.invokeMethod(InvalidScenarioMethods(), BerryCrushSuite.create())
             }
 
-        assertEquals(error.message?.contains("must return Scenario"), true)
+        assertEquals(true, error.message?.contains("must return Scenario"))
     }
 }
 

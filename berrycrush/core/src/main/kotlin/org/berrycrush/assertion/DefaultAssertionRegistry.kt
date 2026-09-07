@@ -23,10 +23,10 @@ class DefaultAssertionRegistry : AssertionRegistry {
     }
 
     override fun findMatch(assertionText: String): AssertionMatch? {
-        for (registered in definitions) {
-            val parameters = matcher.match(assertionText, registered.compiled)
+        for ((definition, compiled) in definitions) {
+            val parameters = matcher.match(assertionText, compiled)
             if (parameters != null) {
-                return AssertionMatch(registered.definition, parameters)
+                return AssertionMatch(definition, parameters)
             }
         }
         return null

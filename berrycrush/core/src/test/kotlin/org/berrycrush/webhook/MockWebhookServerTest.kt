@@ -78,7 +78,7 @@ class MockWebhookServerTest {
         val call = calls.first()
         assertEquals(body, call.body)
         assertEquals("application/json", call.contentType)
-        assertEquals(call.headers["X-custom-header"]?.contains("custom-value"), true)
+        assertEquals(true, call.headers["X-custom-header"]?.contains("custom-value"))
     }
 
     @Test

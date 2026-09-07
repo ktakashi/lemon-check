@@ -11,7 +11,6 @@ import org.berrycrush.model.WebhookConfig
 import org.berrycrush.model.callDirective
 import org.berrycrush.model.directiveAssertions
 import org.berrycrush.model.directiveExtractions
-import org.berrycrush.model.includeDirective
 import org.berrycrush.model.webhookDirective
 import org.berrycrush.plugin.PluginRegistry
 import org.berrycrush.plugin.ScenarioContext
@@ -287,9 +286,9 @@ class StepExecutor(
 internal inline fun <T> ScenarioContext.withIncludeParameters(
     includeParameters: Map<String, Any?>,
     block: () -> T,
-): T {
+): T =
     if (includeParameters.isEmpty()) {
-        return block()
+        block()
     } else {
         val context = this.executionContext
         val saved =
@@ -298,15 +297,9 @@ internal inline fun <T> ScenarioContext.withIncludeParameters(
                 .associateWith { context[it] as Any? }
         try {
             context.resolveParams(includeParameters).forEachNonNull { key, value -> context[key] = value }
-            return block()
+            block()
         } finally {
             // Restore original values
             saved.forEachNonNull { key, value -> context[key] = value }
         }
     }
-}
-
-internal inline fun <T> ScenarioContext.withIncludeParameters(
-    step: Step,
-    block: () -> T,
-): T = withIncludeParameters(step.includeDirective?.parameters ?: emptyMap(), block)

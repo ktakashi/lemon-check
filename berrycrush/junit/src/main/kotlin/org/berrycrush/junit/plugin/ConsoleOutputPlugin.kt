@@ -103,23 +103,25 @@ class ConsoleOutputPlugin(
 
         // Print step results
         val steps = scenarioSteps[context.scenarioName] ?: emptyList()
-        for (stepInfo in steps) {
-            val statusIcon = getStatusIcon(stepInfo.status)
-            output.println("  $statusIcon ${stepInfo.description}: ${stepInfo.status}")
+        for (step in steps) {
+            with(step) {
+                val statusIcon = getStatusIcon(status)
+                output.println("  $statusIcon $description: $status")
 
-            // Show HTTP status if available
-            stepInfo.statusCode?.let { status ->
-                output.println("    HTTP Status: $status")
-            }
+                // Show HTTP status if available
+                statusCode?.let { status ->
+                    output.println("    HTTP Status: $status")
+                }
 
-            // Show failure details if present
-            stepInfo.failureMessage?.let { message ->
-                output.println("    \u2717 $message")
-            }
+                // Show failure details if present
+                failureMessage?.let { message ->
+                    output.println("    \u2717 $message")
+                }
 
-            // Show error if present
-            stepInfo.errorMessage?.let { error ->
-                output.println("    Error: $error")
+                // Show error if present
+                errorMessage?.let { error ->
+                    output.println("    Error: $error")
+                }
             }
         }
 

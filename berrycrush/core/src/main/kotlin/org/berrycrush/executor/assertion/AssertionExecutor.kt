@@ -86,9 +86,9 @@ class AssertionExecutor(
     ): AssertionResults {
         val assertionContext = buildAssertionContext(response, context)
         // Try branches first
-        for (branch in conditional.branches) {
-            if (assertionEngine.evaluate(branch.condition, assertionContext).passed) {
-                return runConditionalActions(response, branch.actions, context)
+        for ((condition, actions) in conditional.branches) {
+            if (assertionEngine.evaluate(condition, assertionContext).passed) {
+                return runConditionalActions(response, actions, context)
             }
         }
 

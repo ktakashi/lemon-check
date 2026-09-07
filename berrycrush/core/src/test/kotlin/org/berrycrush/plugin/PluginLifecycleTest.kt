@@ -55,7 +55,7 @@ class PluginLifecycleTest {
 
         // Verify scenario context was passed correctly
         assertEquals("My Test Scenario", testPlugin.lastScenarioName)
-        assertEquals(testPlugin.lastScenarioTags?.containsAll(setOf("api", "integration")), true)
+        assertEquals(true, testPlugin.lastScenarioTags?.containsAll(setOf("api", "integration")))
     }
 
     /**

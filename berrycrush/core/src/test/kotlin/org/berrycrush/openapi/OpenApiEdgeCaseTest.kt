@@ -57,7 +57,7 @@ class OpenApiEdgeCaseTest {
                 loader.loadFromString("not valid openapi")
             }
 
-        assertEquals(error.message?.startsWith("Failed to parse OpenAPI spec"), true)
+        assertEquals(true, error.message?.startsWith("Failed to parse OpenAPI spec"))
     }
 
     @Test

@@ -9,7 +9,6 @@ import org.berrycrush.executor.assertion.AssertionExecutor
 import org.berrycrush.executor.assertion.DefaultAssertionEngine
 import org.berrycrush.executor.enricher.ErrorEnricher
 import org.berrycrush.executor.fragment.DefaultFragmentExecutor
-import org.berrycrush.executor.fragment.FragmentExecutor
 import org.berrycrush.executor.response.ResponseProcessor
 import org.berrycrush.executor.step.OperationStepExecutor
 import org.berrycrush.executor.step.StepExecutor

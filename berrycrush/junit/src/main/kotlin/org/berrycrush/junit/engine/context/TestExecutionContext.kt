@@ -313,7 +313,7 @@ private class ScenarioMethodLifecycleController(
         }
 
         if (topDown) {
-            Collections.reverse(classHierarchy)
+            classHierarchy.reverse()
         }
 
         return classHierarchy

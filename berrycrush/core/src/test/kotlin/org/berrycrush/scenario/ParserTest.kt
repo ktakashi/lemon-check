@@ -2691,7 +2691,7 @@ class ParserTest {
 
         assertTrue(result.isSuccess, "Parse should succeed: ${result.errors}")
         val scenario = result.ast!!.scenarios[0]
-        assertEquals(scenario.parameters, null, "Scenario should not have parameters")
+        assertEquals(null, scenario.parameters, "Scenario should not have parameters")
     }
 
     @Test

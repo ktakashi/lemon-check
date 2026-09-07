@@ -79,7 +79,7 @@ class BerryCrushScenarioExecutorBranchTest {
                 executor.execute(scenario)
             }
 
-        assertEquals(error.message?.contains("Fragment 'does-not-exist' not found"), true)
+        assertEquals(true, error.message?.contains("Fragment 'does-not-exist' not found"))
     }
 
     @Test
@@ -107,12 +107,12 @@ class BerryCrushScenarioExecutorBranchTest {
         assertEquals(ResultStatus.ERROR, result.status)
         assertEquals(ResultStatus.ERROR, result.stepResults.single().status)
         assertEquals(
+            true,
             result.stepResults
                 .single()
                 .error
                 ?.message
                 ?.contains("No previous response"),
-            true,
         )
     }
 

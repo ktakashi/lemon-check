@@ -2,16 +2,12 @@ package org.berrycrush.junit.engine
 
 import org.berrycrush.junit.ScenarioTest
 import org.berrycrush.model.Scenario
-import org.berrycrush.model.SourceLocation
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.platform.engine.TestDescriptor
 import org.junit.platform.engine.UniqueId
 import org.junit.platform.engine.support.descriptor.EngineDescriptor
-import java.io.File
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TestDescriptorsTest {

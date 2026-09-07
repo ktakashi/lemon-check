@@ -176,13 +176,8 @@ class MockWebhookServer(
     fun verify(operationId: String): Boolean {
         val expectation = expectations[operationId] ?: return false
         val calls = receivedCalls[operationId] ?: return false
-        return if (expectation.expectedCount >= 0 && calls.size != expectation.expectedCount) {
-            false
-        } else if (calls.isEmpty() && expectation.expectedCount != 0) {
-            false
-        } else {
-            true
-        }
+        return !(expectation.expectedCount >= 0 && calls.size != expectation.expectedCount) &&
+            !(calls.isEmpty() && expectation.expectedCount != 0)
     }
 
     /**

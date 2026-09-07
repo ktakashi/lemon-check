@@ -429,9 +429,9 @@ class ExecutionContext(
      */
     private fun buildJsonPath(segments: List<PathSegment>): String {
         val builder = StringBuilder("$")
-        for (segment in segments) {
-            builder.append(".${segment.name}")
-            segment.indices.forEach { idx -> builder.append("[$idx]") }
+        for ((name, indices) in segments) {
+            builder.append(".$name")
+            indices.forEach { idx -> builder.append("[$idx]") }
         }
         return builder.toString()
     }

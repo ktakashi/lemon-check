@@ -34,54 +34,55 @@ class XmlReportPlugin(
             // Scenarios
             appendLine("  <scenarios>")
             for (scenario in report.scenarios) {
-                appendLine(
-                    """    <scenario name="${escapeXml(
-                        scenario.name,
-                    )}" status="${scenario.status}" duration="${scenario.duration.toMillis()}">""",
-                )
-
-                // Tags
-                if (scenario.tags.isNotEmpty()) {
-                    appendLine("      <tags>")
-                    for (tag in scenario.tags) {
-                        appendLine("""        <tag>${escapeXml(tag)}</tag>""")
-                    }
-                    appendLine("      </tags>")
-                }
-
-                // Steps
-                appendLine("      <steps>")
-                for (step in scenario.steps) {
+                with(scenario) {
                     appendLine(
-                        """        <step description="${escapeXml(
-                            step.description,
-                        )}" status="${step.status}" duration="${step.duration.toMillis()}">""",
+                        """    <scenario name="${escapeXml(name)}" status="$status" duration="${duration.toMillis()}">""",
                     )
 
-                    step.failure?.let { failure ->
-                        appendLine("          <failure>")
-                        appendLine("""            <message>${escapeXml(failure.message)}</message>""")
-                        failure.expected?.let { appendLine("""            <expected>${escapeXml(it.toString())}</expected>""") }
-                        failure.actual?.let { appendLine("""            <actual>${escapeXml(it.toString())}</actual>""") }
-                        failure.diff?.let { appendLine("""            <diff>${escapeXml(it)}</diff>""") }
-                        appendLine("          </failure>")
+                    // Tags
+                    if (tags.isNotEmpty()) {
+                        appendLine("      <tags>")
+                        for (tag in tags) {
+                            appendLine("""        <tag>${escapeXml(tag)}</tag>""")
+                        }
+                        appendLine("      </tags>")
                     }
 
-                    appendLine("        </step>")
+                    // Steps
+                    appendLine("      <steps>")
+                    for (step in steps) {
+                        with(step) {
+                            append(
+                                """        <step description="${escapeXml(description)}"""",
+                            )
+                            appendLine(""" status="$status" duration="${duration.toMillis()}">""")
+
+                            failure?.let { failure ->
+                                appendLine("          <failure>")
+                                appendLine("""            <message>${escapeXml(failure.message)}</message>""")
+                                failure.expected?.let { appendLine("""            <expected>${escapeXml(it.toString())}</expected>""") }
+                                failure.actual?.let { appendLine("""            <actual>${escapeXml(it.toString())}</actual>""") }
+                                failure.diff?.let { appendLine("""            <diff>${escapeXml(it)}</diff>""") }
+                                appendLine("          </failure>")
+                            }
+
+                            appendLine("        </step>")
+                        }
+                    }
+                    appendLine("      </steps>")
+                    appendLine("    </scenario>")
                 }
-                appendLine("      </steps>")
-                appendLine("    </scenario>")
-            }
-            appendLine("  </scenarios>")
+                appendLine("  </scenarios>")
 
-            // Environment
-            appendLine("  <environment>")
-            for ((key, value) in report.environment) {
-                appendLine("""    <property name="${escapeXml(key)}">${escapeXml(value)}</property>""")
-            }
-            appendLine("  </environment>")
+                // Environment
+                appendLine("  <environment>")
+                for ((key, value) in report.environment) {
+                    appendLine("""    <property name="${escapeXml(key)}">${escapeXml(value)}</property>""")
+                }
+                appendLine("  </environment>")
 
-            appendLine("</testReport>")
+                appendLine("</testReport>")
+            }
         }
 
     private fun escapeXml(text: String): String =
