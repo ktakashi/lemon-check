@@ -5,6 +5,7 @@ import org.berrycrush.model.Fragment
 import org.berrycrush.model.FragmentRegistry
 import org.berrycrush.model.ParameterFragment
 import org.berrycrush.model.Step
+import org.berrycrush.model.includeDirective
 import org.berrycrush.plugin.ScenarioContext
 
 /**
@@ -40,13 +41,16 @@ class DefaultFragmentExecutor(
     override fun includeParameters(
         step: Step,
         context: ScenarioContext?,
-    ): Map<String, Any?> = fragmentRegistry?.resolveParameters(step.includeParameters) ?: step.includeParameters
+    ): Map<String, Any?> {
+        val includeParameters = step.includeDirective?.parameters ?: emptyMap()
+        return fragmentRegistry?.resolveParameters(includeParameters) ?: includeParameters
+    }
 
     private fun resolveFragment(
         step: Step,
         context: ScenarioContext?,
     ): Fragment? {
-        val fragmentName = step.fragmentName?.let { context.interpolate(it) } ?: return null
+        val fragmentName = step.includeDirective?.fragmentName?.let { context.interpolate(it) } ?: return null
         return fragmentRegistry?.get(fragmentName)
             ?: throw ConfigurationException(
                 "Fragment '$fragmentName' not found. " +

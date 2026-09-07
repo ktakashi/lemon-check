@@ -11,6 +11,7 @@ import org.berrycrush.executor.response.ResponseProcessor
 import org.berrycrush.model.ResultStatus
 import org.berrycrush.model.Step
 import org.berrycrush.model.StepResult
+import org.berrycrush.model.callDirective
 import org.berrycrush.openapi.SpecRegistry
 import org.berrycrush.plugin.StepContext
 import java.time.Duration
@@ -64,7 +65,7 @@ class OperationStepExecutor(
         Instant.now().let { stepStartTime ->
             runCatching {
                 // Check if this step has auto-test configuration
-                val autoTestConfig = step.autoTestConfig
+                val autoTestConfig = step.callDirective?.autoTestConfig
                 if (autoTestConfig != null) {
                     executeAutoTestStep(step, stepContext, stepStartTime, listener)
                 } else {
@@ -102,7 +103,7 @@ class OperationStepExecutor(
         listener: BerryCrushExecutionListener,
     ): StepResult {
         // Extract step-level multi-test parameters from pathParams
-        val stepMultiTestParams = step.pathParams.filterKeys { it.startsWith("multiTest") }
+        val stepMultiTestParams = (step.callDirective?.pathParams ?: emptyMap()).filterKeys { it.startsWith("multiTest") }
 
         // Merge configuration defaults -> context params -> step params (step wins)
         val parameters =

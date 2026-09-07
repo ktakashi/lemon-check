@@ -8,6 +8,11 @@ import org.berrycrush.model.Scenario
 import org.berrycrush.model.Step
 import org.berrycrush.model.StepResult
 import org.berrycrush.model.WebhookConfig
+import org.berrycrush.model.callDirective
+import org.berrycrush.model.directiveAssertions
+import org.berrycrush.model.directiveExtractions
+import org.berrycrush.model.includeDirective
+import org.berrycrush.model.webhookDirective
 import org.berrycrush.plugin.PluginRegistry
 import org.berrycrush.plugin.ScenarioContext
 import org.berrycrush.plugin.StepContext
@@ -102,7 +107,8 @@ class StepExecutor(
         pluginRegistry?.dispatchStepStart(stepContext)
 
         // Execute the actual step with scenario context for error enrichment
-        val hasCallTarget = step.operationId != null || step.rawRequest != null
+        val call = step.callDirective
+        val hasCallTarget = call?.operationId != null || call?.rawRequest != null
         val result =
             if (hasCallTarget) {
                 operationStepExecutor.execute(step, stepContext, stepIndex, listener)
@@ -125,7 +131,7 @@ class StepExecutor(
     ): StepResult {
         val stepStartTime = Instant.now()
         // First, check if this is a webhook step
-        step.webhookConfig?.let { config ->
+        step.webhookDirective?.config?.let { config ->
             return executeWebhookStep(step, config, stepContext, stepStartTime)
         }
 
@@ -139,7 +145,7 @@ class StepExecutor(
         }
 
         // Not a custom step - check for assertions/extractions
-        return if (step.assertions.isEmpty() && step.extractions.isEmpty()) {
+        return if (step.directiveAssertions.isEmpty() && step.directiveExtractions.isEmpty()) {
             // No operation and no assertions - just pass
             StepResult(
                 step = step,
@@ -278,12 +284,12 @@ class StepExecutor(
         }
 }
 
-internal inline fun ScenarioContext.withIncludeParameters(
+internal inline fun <T> ScenarioContext.withIncludeParameters(
     includeParameters: Map<String, Any?>,
-    block: () -> Unit,
-) {
+    block: () -> T,
+): T {
     if (includeParameters.isEmpty()) {
-        block()
+        return block()
     } else {
         val context = this.executionContext
         val saved =
@@ -292,7 +298,7 @@ internal inline fun ScenarioContext.withIncludeParameters(
                 .associateWith { context[it] as Any? }
         try {
             context.resolveParams(includeParameters).forEachNonNull { key, value -> context[key] = value }
-            block()
+            return block()
         } finally {
             // Restore original values
             saved.forEachNonNull { key, value -> context[key] = value }
@@ -300,7 +306,7 @@ internal inline fun ScenarioContext.withIncludeParameters(
     }
 }
 
-internal inline fun ScenarioContext.withIncludeParameters(
+internal inline fun <T> ScenarioContext.withIncludeParameters(
     step: Step,
-    block: () -> Unit,
-) = withIncludeParameters(step.includeParameters, block)
+    block: () -> T,
+): T = withIncludeParameters(step.includeDirective?.parameters ?: emptyMap(), block)

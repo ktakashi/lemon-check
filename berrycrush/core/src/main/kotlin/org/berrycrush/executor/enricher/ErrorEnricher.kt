@@ -5,6 +5,7 @@ import org.berrycrush.exception.ScenarioErrorContext
 import org.berrycrush.executor.BerryCrushConfigurationProvider
 import org.berrycrush.model.HttpMethod
 import org.berrycrush.model.Step
+import org.berrycrush.model.callDirective
 import org.berrycrush.plugin.StepContext
 
 class ErrorEnricher(
@@ -24,7 +25,7 @@ class ErrorEnricher(
             stepDescription = step.description,
             stepIndex = stepIndex,
             stepLine = step.sourceLocation?.line,
-            operationId = step.operationId,
+            operationId = step.callDirective?.operationId,
         )
 
     /**

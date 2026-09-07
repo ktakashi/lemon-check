@@ -10,6 +10,14 @@ This document provides a comprehensive view of the key classes and interfaces in
 org.berrycrush.model
 ├── Scenario                    # Test scenario with steps
 ├── Step                        # Single step in a scenario
+├── Directive (sealed)          # Canonical step directive model
+│   ├── CallDirective           # Operation/raw call + request settings
+│   ├── AssertionDirective      # Single assertion
+│   ├── ConditionalDirective    # Conditional assertion tree
+│   ├── ExtractionDirective     # Response extraction
+│   ├── IncludeDirective        # Fragment include + parameters
+│   ├── FailDirective           # Unconditional fail action
+│   └── WebhookDirective        # Webhook server setup
 ├── StepType                    # Enum: GIVEN, WHEN, THEN, AND, BUT
 ├── Fragment                    # Reusable step collection
 ├── ExampleRow                  # Parameter row for scenario outline
@@ -26,6 +34,18 @@ org.berrycrush.model
 ├── ValidationError             # Schema validation error
 └── FragmentRegistry            # Registry for fragments by name
 ```
+
+### Step Compatibility Notes
+
+- `Step` is now canonically represented by `directives: List<Directive>`.
+- Legacy constructor parameters and getter properties on `Step` are preserved as `@Deprecated` compatibility members.
+- Legacy-to-directive mapping examples:
+    - `step.operationId` -> `step.callDirective?.operationId`
+    - `step.assertions` -> `step.directiveAssertions`
+    - `step.extractions` -> `step.directiveExtractions`
+    - `step.fragmentName` -> `step.includeDirective?.fragmentName`
+    - `step.webhookConfig` -> `step.webhookDirective?.config`
+- `Step.copy(...)` now follows the canonical data-class signature (`type`, `description`, `directives`, `sourceLocation`).
 
 ### DSL Classes
 

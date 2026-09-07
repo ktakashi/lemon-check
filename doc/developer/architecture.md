@@ -181,6 +181,11 @@ For detailed documentation, see [OpenAPI Version Support](openapi-versioning.md)
 - `ResponseProcessor` - Processes responses, applies assertion results, extracts values
 - `StepRegistry` - Manages custom step definitions
 
+**Directive-Based Step Model:**
+- `Step` now stores behavior as an ordered `directives: List<Directive>`.
+- Core execution reads directives directly (`callDirective`, `directiveAssertions`, `directiveExtractions`, `includeDirective`, `webhookDirective`).
+- Legacy `Step` getters/constructor remain available as deprecated compatibility shims for external consumers.
+
 ### 5. Plugin System
 
 ```text

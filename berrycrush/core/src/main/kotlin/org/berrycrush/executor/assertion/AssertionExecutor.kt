@@ -9,6 +9,7 @@ import org.berrycrush.model.Condition
 import org.berrycrush.model.ConditionalActions
 import org.berrycrush.model.HttpResponse
 import org.berrycrush.model.Step
+import org.berrycrush.model.directiveAssertions
 import org.berrycrush.plugin.StepContext
 import org.berrycrush.plugin.adapter.StepOperationAdapter
 
@@ -180,7 +181,7 @@ class AssertionExecutor(
     /**
      * Check if a step contains any custom assertions.
      */
-    fun hasCustomAssertion(step: Step): Boolean = step.assertions.any { hasCustomAssertionInTree(it) }
+    fun hasCustomAssertion(step: Step): Boolean = step.directiveAssertions.any { hasCustomAssertionInTree(it) }
 
     private fun hasCustomAssertionInTree(assertion: Assertion): Boolean =
         when (assertion) {
